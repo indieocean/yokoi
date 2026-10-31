@@ -1,0 +1,125 @@
+import Foundation
+
+/// Formats byte counts the way the mockups do: decimal units, about three significant digits.
+/// Examples: `846 MB`, `1.42 GB`, `18.4 GB`, `153.3 GB`, `1.42 TB`.
+enum ByteFormat {
+    private static let units = ["B", "KB", "MB", "GB", "TB", "PB"]
+
+    static func string(_ bytes: Int64) -> String {
+        let (value, unit) = scaled(bytes)
+        return "\(number(value, unit: unit)) \(units[unit])"
+    }
+
+    /// Compact form for sidebar counters: `18.4G`, `846M`.
+    static func compact(_ bytes: Int64) -> String {
+        let (value, unit) = scaled(bytes)
+        let suffix = String(units[unit].prefix(1))
+        if unit == 0 { return "\(bytes)B" }
+        if value < 10 { return String(format: "%.1f%@", value, suffix) }
+        if value < 100 { return String(format: "%.1f%@", value, suffix) }
+        return String(format: "%.0f%@", value, suffix)
+    }
+
+    /// Splits a formatted value into number and unit (for KPI tiles that style them separately).
+    static func parts(_ bytes: Int64) -> (number: String, unit: String) {
+        let (value, unit) = scaled(bytes)
+        return (number(value, unit: unit), units[unit])
+    }
+
+    private static func scaled(_ bytes: Int64) -> (Double, Int) {
+        var value = Double(max(bytes, 0))
+        var unit = 0
+        while value >= 1000, unit < units.count - 1 {
+            value /= 1000
+            unit += 1
+        }
+        return (value, unit)
+    }
+
+    private static func number(_ value: Double, unit: Int) -> String {
+        if unit == 0 { return String(format: "%.0f", value) }
+        if value < 10 { return String(format: "%.2f", value) }
+        if value < 100 { return String(format: "%.1f", value) }
+        // Hundreds of GB/TB keep one decimal (153.3 GB); MB and KB don't (846 MB).
+        return unit >= 3 ? String(format: "%.1f", value) : String(format: "%.0f", value)
+    }
+}
+
+enum CountFormat {
+    /// `1 folder`, `3 folders`
+    static func plural(_ n: Int, _ singular: String, _ plural: String? = nil) -> String {
+        "\(n) \(n == 1 ? singular : (plural ?? singular + "s"))"
+    }
+
+    /// `412k`, `3.1M`, `1,284`
+    static func compact(_ n: Int) -> String {
+        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
+        if n >= 10_000 { return "\(n / 1000)k" }
+        return n.formatted(.number)
+    }
+}
+
+enum PathFormat {
+    /// Replaces the home directory prefix with `~`.
+    static func abbreviate(_ url: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> String {
+        abbreviate(url.path, home: home.path)
+    }
+
+    static func abbreviate(_ path: String, home: String = FileManager.default.homeDirectoryForCurrentUser.path) -> String {
+        let home = home.hasSuffix("/") ? String(home.dropLast()) : home
+        if path == home { return "~" }
+        if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
+        return path
+    }
+
+    /// One spelling per location: `standardizedFileURL` and `resolvingSymlinksInPath` drop the
+    /// `/private` prefix of `/var`, `/tmp` and `/etc`, `realpath` adds it. Always compare canonical paths.
+    static func canonical(_ path: String) -> String {
+        var p = (path as NSString).standardizingPath
+        for prefix in ["/private/var", "/private/tmp", "/private/etc"] where p == prefix || p.hasPrefix(prefix + "/") {
+            p.removeFirst("/private".count)
+        }
+        return p
+    }
+
+    /// Expands a leading `~` to the home directory.
+    static func expand(_ path: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+        if path == "~" { return home }
+        if path.hasPrefix("~/") { return home.appendingPathComponent(String(path.dropFirst(2))) }
+        return URL(fileURLWithPath: path)
+    }
+}
+
+enum RelativeDate {
+    /// "Today", "Yesterday", "3 weeks ago", "4 months ago", "2 years ago".
+    static func string(_ date: Date?, now: Date = Date()) -> String {
+        guard let date else { return "Unknown" }
+        let cal = Calendar.current
+        if cal.isDate(date, inSameDayAs: now) { return "Today" }
+        if let y = cal.date(byAdding: .day, value: -1, to: now), cal.isDate(date, inSameDayAs: y) { return "Yesterday" }
+        let days = max(1, Int(now.timeIntervalSince(date) / 86_400))
+        if days < 14 { return "\(days) days ago" }
+        if days < 60 { return "\(days / 7) weeks ago" }
+        if days < 365 { return "\(days / 30) months ago" }
+        let years = days / 365
+        return years == 1 ? "1 year ago" : "\(years) years ago"
+    }
+
+    static func ago(_ date: Date?, now: Date = Date()) -> String {
+        guard let date else { return "never" }
+        let s = Int(now.timeIntervalSince(date))
+        if s < 60 { return "just now" }
+        if s < 3600 { return "\(s / 60) min ago" }
+        if s < 86_400 { return "\(s / 3600) h ago" }
+        return "\(s / 86_400) d ago"
+    }
+
+    /// "Mar 3", or "Nov 2025" when not in the current year.
+    static func short(_ date: Date?, now: Date = Date()) -> String {
+        guard let date else { return "—" }
+        let cal = Calendar.current
+        let f = DateFormatter()
+        f.dateFormat = cal.component(.year, from: date) == cal.component(.year, from: now) ? "MMM d" : "MMM yyyy"
+        return f.string(from: date)
+    }
+}

@@ -1,0 +1,164 @@
+import Foundation
+
+/// Runs command-line tools (PRD §10 "ProcessRunner").
+///
+/// - Executables are launched directly via `/usr/bin/env`, never through a shell, and every argument is
+///   passed separately, so package names can't inject commands.
+/// - `PATH` comes from the user's login shell (Homebrew, nvm, asdf shims), resolved once.
+/// - Privilege escalation is refused outright: Disk Keeper never runs `sudo`, `su`, `doas` or `osascript`.
+/// - Every run has a timeout and keeps its output so the UI can show it.
+actor ProcessRunner {
+    struct Result: Sendable, Equatable {
+        let command: [String]
+        let exitCode: Int32
+        let stdout: String
+        let stderr: String
+        let duration: TimeInterval
+        let timedOut: Bool
+
+        var succeeded: Bool { exitCode == 0 && !timedOut }
+        var commandLine: String { command.map(ProcessRunner.quote).joined(separator: " ") }
+    }
+
+    enum RunnerError: Error, LocalizedError, Equatable {
+        case refused(String)
+        case launchFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .refused(let why): "Refused: \(why)"
+            case .launchFailed(let why): "Couldn't start: \(why)"
+            }
+        }
+    }
+
+    static let shared = ProcessRunner()
+    static let forbidden: Set<String> = ["sudo", "su", "doas", "osascript", "launchctl", "rm", "sh", "bash", "zsh"]
+
+    private var resolvedPath: String?
+    private let pathOverride: String?
+
+    init(path: String? = nil) {
+        self.pathOverride = path
+    }
+
+    /// Login-shell PATH plus common tool locations, so GUI launches find `brew`, `npm`, `cargo`…
+    func searchPath() async -> String {
+        if let pathOverride { return pathOverride }
+        if let resolvedPath { return resolvedPath }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let fallback = ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "\(home)/.cargo/bin", "\(home)/.bun/bin",
+                        "\(home)/Library/pnpm", "\(home)/.local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        var path = fallback.joined(separator: ":")
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        if let out = try? await Self.launch(executable: shell, arguments: ["-l", "-c", "printf %s \"$PATH\""],
+                                            environment: ["HOME": home, "PATH": path], timeout: 5),
+           out.succeeded, !out.stdout.isEmpty {
+            // Login-shell entries first, then anything from the fallback list it didn't include.
+            var parts = out.stdout.split(separator: ":").map(String.init)
+            for p in fallback where !parts.contains(p) { parts.append(p) }
+            path = parts.joined(separator: ":")
+        }
+        resolvedPath = path
+        return path
+    }
+
+    /// Finds an executable on the search path, or nil when the tool isn't installed.
+    func which(_ tool: String) async -> String? {
+        let path = await searchPath()
+        for dir in path.split(separator: ":") {
+            let candidate = "\(dir)/\(tool)"
+            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        return nil
+    }
+
+    func run(_ command: [String], timeout: TimeInterval = 120, environment extra: [String: String] = [:]) async throws -> Result {
+        guard let tool = command.first, !tool.isEmpty else { throw RunnerError.refused("empty command") }
+        let name = (tool as NSString).lastPathComponent
+        guard !Self.forbidden.contains(name) else { throw RunnerError.refused("\(name) is never run by Disk Keeper") }
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = await searchPath()
+        env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+        env["HOMEBREW_NO_ENV_HINTS"] = "1"
+        env["NO_COLOR"] = "1"
+        env["NPM_CONFIG_UPDATE_NOTIFIER"] = "false"
+        for (k, v) in extra { env[k] = v }
+        return try await Self.launch(executable: "/usr/bin/env", arguments: command, environment: env, timeout: timeout, display: command)
+    }
+
+    private static func launch(executable: String, arguments: [String], environment: [String: String],
+                               timeout: TimeInterval, display: [String]? = nil) async throws -> Result {
+        let start = Date()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.environment = environment
+        process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        let out = Pipe(), err = Pipe()
+        process.standardOutput = out
+        process.standardError = err
+        process.standardInput = FileHandle.nullDevice
+
+        let outData = DataBox(), errData = DataBox()
+        out.fileHandleForReading.readabilityHandler = { h in outData.append(h.availableData) }
+        err.fileHandleForReading.readabilityHandler = { h in errData.append(h.availableData) }
+
+        let timedOut = DataBox()
+        do {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                process.terminationHandler = { _ in cont.resume() }
+                do {
+                    try process.run()
+                } catch {
+                    process.terminationHandler = nil
+                    cont.resume(throwing: RunnerError.launchFailed(error.localizedDescription))
+                    return
+                }
+                DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                    if process.isRunning {
+                        timedOut.append(Data([1]))
+                        process.terminate()
+                    }
+                }
+            }
+        } catch {
+            out.fileHandleForReading.readabilityHandler = nil
+            err.fileHandleForReading.readabilityHandler = nil
+            throw error
+        }
+        out.fileHandleForReading.readabilityHandler = nil
+        err.fileHandleForReading.readabilityHandler = nil
+        outData.append(out.fileHandleForReading.readDataToEndOfFile())
+        errData.append(err.fileHandleForReading.readDataToEndOfFile())
+
+        return Result(command: display ?? [executable] + arguments,
+                      exitCode: process.terminationStatus,
+                      stdout: String(decoding: outData.data, as: UTF8.self),
+                      stderr: String(decoding: errData.data, as: UTF8.self),
+                      duration: Date().timeIntervalSince(start),
+                      timedOut: !timedOut.data.isEmpty)
+    }
+
+    nonisolated static func quote(_ arg: String) -> String {
+        let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./=:@,+%^"))
+        if !arg.isEmpty, arg.unicodeScalars.allSatisfy({ safe.contains($0) }) { return arg }
+        return "'" + arg.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+}
+
+/// Thread-safe byte buffer for pipe handlers.
+final class DataBox: @unchecked Sendable {
+    private var storage = Data()
+    private let lock = NSLock()
+
+    func append(_ d: Data) {
+        guard !d.isEmpty else { return }
+        lock.lock(); storage.append(d); lock.unlock()
+    }
+
+    var data: Data {
+        lock.lock(); defer { lock.unlock() }
+        return storage
+    }
+}
