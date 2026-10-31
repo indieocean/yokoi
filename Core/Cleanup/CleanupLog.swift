@@ -1,6 +1,6 @@
 import Foundation
 
-/// One line in `~/Library/Application Support/DiskKeeper/cleanup.log` (JSON Lines).
+/// One line in `~/Library/Application Support/Yokoi/cleanup.log` (JSON Lines).
 struct CleanupRecord: Codable, Sendable, Identifiable, Hashable {
     struct Moved: Codable, Sendable, Hashable {
         /// Where the item was.
@@ -31,7 +31,7 @@ actor CleanupLog {
 
     static var defaultURL: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return support.appendingPathComponent("DiskKeeper/cleanup.log")
+        return support.appendingPathComponent("Yokoi/cleanup.log")
     }
 
     init(url: URL = CleanupLog.defaultURL) {

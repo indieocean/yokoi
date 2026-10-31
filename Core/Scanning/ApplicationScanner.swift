@@ -19,7 +19,7 @@ struct AppItem: Reclaimable, Codable, Hashable {
     let leftovers: [AppLeftover]
     let lastUsed: Date?
     let isAppStore: Bool
-    /// Apple apps and Disk Keeper itself can't be uninstalled here.
+    /// Apple apps and Yokoi itself can't be uninstalled here.
     let protectedReason: String?
     let fileCount: Int
 
@@ -66,14 +66,14 @@ struct ApplicationScanner: CategoryScanner {
         makeStream { yield in
             let apps = Self.findApps(in: context.applicationFolders, context: context)
             let names = Dictionary(grouping: apps, by: { $0.name.lowercased() })
-            let ownID = Bundle.main.bundleIdentifier ?? "com.diskkeeper.DiskKeeper"
+            let ownID = Bundle.main.bundleIdentifier ?? "com.yokoi.Yokoi"
             for await item in FileWalker.concurrentMap(apps, limit: context.concurrency, { (info: Info) -> AppItem? in
                 guard !Task.isCancelled else { return nil }
                 let m = FileWalker.measure(info.url, progress: progress)
                 let uniqueName = (names[info.name.lowercased()]?.count ?? 0) == 1
                 let leftovers = Self.leftovers(for: info, home: context.home, matchName: uniqueName, context: context)
                 let reason: String? = info.bundleID.hasPrefix("com.apple.") ? "Apple app"
-                    : (info.bundleID == ownID ? "Disk Keeper itself" : nil)
+                    : (info.bundleID == ownID ? "Yokoi itself" : nil)
                 return AppItem(url: info.url, name: info.name, bundleID: info.bundleID, version: info.version,
                                appSize: m.size, leftovers: leftovers, lastUsed: Self.lastUsed(info.url),
                                isAppStore: info.isAppStore, protectedReason: reason,

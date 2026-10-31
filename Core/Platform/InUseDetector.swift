@@ -66,13 +66,19 @@ struct InUseSnapshot: Sendable {
     static func processName(_ pid: pid_t) -> String {
         var buf = [CChar](repeating: 0, count: 256)
         proc_name(pid, &buf, UInt32(buf.count))
-        return String(cString: buf)
+        return Self.string(buf)
     }
 
     static func executablePath(_ pid: pid_t) -> String? {
         var buf = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
         let n = proc_pidpath(pid, &buf, UInt32(buf.count))
-        return n > 0 ? String(cString: buf) : nil
+        return n > 0 ? Self.string(buf) : nil
+    }
+
+    /// C string in a fixed buffer → String (up to the first NUL).
+    static func string(_ buf: [CChar]) -> String {
+        let bytes = buf.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     static func workingDirectory(_ pid: pid_t) -> String? {

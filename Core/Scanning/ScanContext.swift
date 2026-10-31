@@ -1,7 +1,7 @@
 import Foundation
 import os
 
-/// A folder Disk Keeper scans for projects, with an optional depth limit.
+/// A folder Yokoi scans for projects, with an optional depth limit.
 struct ScanRoot: Codable, Sendable, Hashable, Identifiable {
     var id: String { path }
     /// Stored with `~` so it reads naturally in Settings.

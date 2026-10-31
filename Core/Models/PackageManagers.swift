@@ -146,7 +146,7 @@ enum PackageManagerKind: String, Codable, Sendable, CaseIterable, Identifiable {
     /// Why the whole manager is list-only, if it is.
     var readOnlyReason: String? {
         switch self {
-        case .macports: "MacPorts needs sudo to change ports. Disk Keeper never uses sudo; run `sudo port …` yourself."
+        case .macports: "MacPorts needs sudo to change ports. Yokoi never uses sudo; run `sudo port …` yourself."
         case .mas: "mas needs root to update or remove App Store apps. Use the App Store, or the Applications screen to uninstall."
         default: nil
         }
@@ -479,10 +479,10 @@ struct PackageManagerService: Sendable {
         if let reason = kind.readOnlyReason { return reason }
         switch kind {
         case .pip:
-            return await runner.which("python3") == "/usr/bin/python3" ? "This is Apple's system Python. Disk Keeper won't change it." : nil
+            return await runner.which("python3") == "/usr/bin/python3" ? "This is Apple's system Python. Yokoi won't change it." : nil
         case .gem:
             return await runner.which("gem") == "/usr/bin/gem"
-                ? "This is macOS's system Ruby; changing its gems needs sudo, which Disk Keeper never uses." : nil
+                ? "This is macOS's system Ruby; changing its gems needs sudo, which Yokoi never uses." : nil
         default:
             return nil
         }

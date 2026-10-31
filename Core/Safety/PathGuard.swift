@@ -1,6 +1,6 @@
 import Foundation
 
-/// The single place that decides whether Disk Keeper may touch a path (PRD §6).
+/// The single place that decides whether Yokoi may touch a path (PRD §6).
 ///
 /// A path is allowed only when it is strictly inside an allowed root (scan roots plus known global
 /// locations), is not excluded, isn't part of a `.git` folder, and isn't under a protected system folder.

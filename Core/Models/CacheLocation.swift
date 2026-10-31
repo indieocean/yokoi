@@ -39,7 +39,7 @@ extension CacheLocation {
         // System & User
         CacheLocation(id: "user-caches", name: "User caches", section: .systemUser, relativePath: "Library/Caches",
                       safety: .safe, badge: "◎", colorHex: 0x7D8597, restoreHint: "apps rebuild their caches automatically",
-                      keepChildren: ["com.apple.*", "com.diskkeeper.*", "CloudKit", "FamilyCircle"], excludesNestedLocations: true),
+                      keepChildren: ["com.apple.*", "com.yokoi.*", "com.diskkeeper.*", "CloudKit", "FamilyCircle"], excludesNestedLocations: true),
         CacheLocation(id: "trash", name: "Trash", section: .systemUser, relativePath: ".Trash",
                       safety: .review, badge: "🗑", colorHex: 0xF0565E, restoreHint: "emptying the Trash can't be undone",
                       permanentOnly: true),

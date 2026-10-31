@@ -5,7 +5,7 @@ import Foundation
 /// - Executables are launched directly via `/usr/bin/env`, never through a shell, and every argument is
 ///   passed separately, so package names can't inject commands.
 /// - `PATH` comes from the user's login shell (Homebrew, nvm, asdf shims), resolved once.
-/// - Privilege escalation is refused outright: Disk Keeper never runs `sudo`, `su`, `doas` or `osascript`.
+/// - Privilege escalation is refused outright: Yokoi never runs `sudo`, `su`, `doas` or `osascript`.
 /// - Every run has a timeout and keeps its output so the UI can show it.
 actor ProcessRunner {
     struct Result: Sendable, Equatable {
@@ -95,7 +95,7 @@ actor ProcessRunner {
     func run(_ command: [String], timeout: TimeInterval = 120, environment extra: [String: String] = [:]) async throws -> Result {
         guard let tool = command.first, !tool.isEmpty else { throw RunnerError.refused("empty command") }
         let name = (tool as NSString).lastPathComponent
-        guard !Self.forbidden.contains(name) else { throw RunnerError.refused("\(name) is never run by Disk Keeper") }
+        guard !Self.forbidden.contains(name) else { throw RunnerError.refused("\(name) is never run by Yokoi") }
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = await searchPath()
         env["HOMEBREW_NO_AUTO_UPDATE"] = "1"

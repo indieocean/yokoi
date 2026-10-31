@@ -63,7 +63,7 @@ struct ToolActionService: Sendable {
             let dates = Self.parseSnapshotDates(r.stdout)
             return ToolActionStatus(action: action, count: dates.count, size: nil, items: dates,
                                     commands: dates.map { ["tmutil", "deletelocalsnapshots", $0] },
-                                    note: "macOS may require administrator rights for this. Disk Keeper never uses sudo; if it fails, run `sudo tmutil deletelocalsnapshots /` yourself.")
+                                    note: "macOS may require administrator rights for this. Yokoi never uses sudo; if it fails, run `sudo tmutil deletelocalsnapshots /` yourself.")
         }
     }
 

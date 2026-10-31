@@ -15,7 +15,7 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .screenshots: "Screenshots"
         case .applications: "Applications"
         case .externalDrives: "External drives"
-        case .packages: "Old packages"
+        case .packages: "Package managers"
         }
     }
 
