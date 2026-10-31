@@ -38,9 +38,10 @@ could continue. Answer or override any of them and I'll adjust.
 
 ## Product questions
 
-10. **Bundle identifier / signing.** Using `com.diskkeeper.DiskKeeper`, ad-hoc signed ("Sign to Run
-    Locally"). Note: with ad-hoc signing, macOS forgets the Full Disk Access grant after each rebuild.
-    What bundle id and Developer ID team should we use?
+10. **Bundle identifier / signing.** Using `com.diskkeeper.DiskKeeper`. The app target is now signed with the
+    "Apple Development" certificate on this Mac (team `3P2Q7V729Y`), so privacy permissions and Full Disk Access
+    survive rebuilds (ad-hoc signing made macOS re-ask on every build). Shipping outside the Mac App Store
+    still needs a **Developer ID Application** certificate plus notarization. Which team should own releases?
 11. **JetBrains Mono** isn't installed on this Mac and I didn't download it. The app uses it when
     installed and falls back to SF Mono. Bundle the font (OFL licensed) in the app?
 12. **Default scan roots.** PRD says `~/dev`, `~/work`, `~/games`, `~/Library/Developer` "plus folders

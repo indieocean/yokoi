@@ -30,7 +30,7 @@ final class CleanupActivity: Identifiable {
     }
 }
 
-/// Full-window progress for a cleanup: an animated drive whose sectors clear as files go, a live
+/// Full-window progress for a cleanup: an animated SSD whose flash cells erase as files go, a live
 /// bytes counter and a feed of the paths being removed, so it never looks frozen.
 struct CleanupOverlay: View {
     @Environment(AppModel.self) private var app
@@ -52,16 +52,16 @@ struct CleanupOverlay: View {
                 ZStack {
                     Circle()
                         .fill(RadialGradient(colors: [Theme.accent.opacity(finished ? 0.15 : 0.35), .clear], center: .center, startRadius: 10, endRadius: 160))
-                        .frame(width: 320, height: 320)
+                        .frame(width: 440, height: 260)
                         .blur(radius: 10)
-                    DriveAnimation(fraction: fraction, finished: finished, reduceMotion: reduceMotion)
-                        .frame(width: 230, height: 230)
+                    SSDAnimation(fraction: fraction, finished: finished, reduceMotion: reduceMotion)
+                        .frame(width: 440, height: 200)
                     if finished {
                         FinishBadge(success: (outcome?.failures.isEmpty ?? true) && activity.lateBlocked.isEmpty)
                             .transition(.scale(scale: 0.3).combined(with: .opacity))
                     }
                 }
-                .frame(height: 250)
+                .frame(height: 230)
                 .animation(.spring(response: 0.45, dampingFraction: 0.6), value: finished)
 
                 VStack(spacing: 6) {
@@ -135,15 +135,15 @@ struct CleanupOverlay: View {
     }
 }
 
-// MARK: - Drive animation
+// MARK: - SSD animation
 
-/// A stylized hard-drive platter: sectors of data (violet→cyan) clear as the cleanup progresses,
-/// flashing and throwing off particles, while the platter spins and the head sweeps the tracks.
-private struct DriveAnimation: View {
+/// A stylized M.2 NVMe SSD: memory cells in four NAND flash chips erase as the cleanup progresses
+/// (flash, go dark, release particles), while data pulses run from the controller along the traces.
+private struct SSDAnimation: View {
     let fraction: Double
     let finished: Bool
     let reduceMotion: Bool
-    @State private var model = DriveModel()
+    @State private var model = SSDModel()
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / 60, paused: reduceMotion && finished)) { context in
@@ -157,131 +157,209 @@ private struct DriveAnimation: View {
 }
 
 /// Animation state lives in a reference type so the Canvas can advance it each frame.
-private final class DriveModel {
-    static let tracks = 4
-    static let perTrack = 36
-    static let count = tracks * perTrack
+private final class SSDModel {
+    static let chips = 4
+    static let cols = 4
+    static let rows = 8
+    static let perChip = cols * rows
+    static let count = chips * perChip
 
     private var displayed = 0.0
-    private var angle = 0.0
-    private var spin = 1.0
+    private var activity = 1.0
     private var lastTime: Double?
     private var clearedAt: [Int: Double] = [:]
-    /// Sectors clear in a scattered but stable order, like files spread over a disk.
+    /// Cells erase in a scattered but stable order, like blocks spread across the flash.
     private let order: [Int] = {
-        var rng = SplitMix(seed: 0xD15C)
-        return (0..<DriveModel.count).shuffled(using: &rng)
+        var rng = SplitMix(seed: 0x55D)
+        return (0..<SSDModel.count).shuffled(using: &rng)
     }()
 
     private let violet = (r: 0.545, g: 0.424, b: 1.0)
     private let cyan = (r: 0.133, g: 0.827, b: 0.933)
 
+    private func cellColor(_ mix: Double) -> Color {
+        Color(.sRGB, red: violet.r + (cyan.r - violet.r) * mix,
+              green: violet.g + (cyan.g - violet.g) * mix,
+              blue: violet.b + (cyan.b - violet.b) * mix)
+    }
+
     func draw(in gc: inout GraphicsContext, size: CGSize, time t: Double, target: Double, finished: Bool, reduceMotion: Bool) {
         let dt = min(max(t - (lastTime ?? t), 0), 0.1)
         lastTime = t
-        // Ease toward the real progress so big single steps still play out sector by sector.
+        // Ease toward the real progress so big single steps still play out cell by cell.
         let goal = finished ? 1.0 : target
         displayed += (goal - displayed) * min(1, dt * (finished ? 4 : 2.2))
         if reduceMotion || (finished && displayed > 0.985) { displayed = goal }
-        spin += ((finished ? 0 : 1) - spin) * min(1, dt * 1.2)
-        if !reduceMotion { angle += spin * dt * .pi * 1.6 }
+        activity += ((finished ? 0 : 1) - activity) * min(1, dt * 1.5)
 
-        let c = CGPoint(x: size.width / 2, y: size.height / 2)
-        let R = min(size.width, size.height) / 2 - 6
+        // M.2 2280-style board, centered.
+        let W = min(size.width, size.height * 2.3) - 8
+        let H = W / 2.3
+        let board = CGRect(x: (size.width - W) / 2, y: (size.height - H) / 2, width: W, height: H)
+        let boardPath = Path(roundedRect: board, cornerRadius: H * 0.06)
+        gc.fill(boardPath, with: .linearGradient(Gradient(colors: [Color(hex: 0x1C2130), Color(hex: 0x10131B)]),
+                                                 startPoint: CGPoint(x: board.minX, y: board.minY), endPoint: CGPoint(x: board.maxX, y: board.maxY)))
+        gc.stroke(boardPath, with: .color(.white.opacity(0.10)), lineWidth: 1.2)
 
-        // Platter
-        let platter = Path(ellipseIn: CGRect(x: c.x - R, y: c.y - R, width: 2 * R, height: 2 * R))
-        gc.fill(platter, with: .radialGradient(Gradient(colors: [Color(hex: 0x2A2E3D), Color(hex: 0x11131A)]),
-                                               center: c, startRadius: 0, endRadius: R))
-        gc.stroke(platter, with: .color(.white.opacity(0.10)), lineWidth: 1.5)
-        for k in stride(from: 0.30, through: 0.97, by: 0.045) {
-            let r = R * k
-            gc.stroke(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)),
-                      with: .color(.white.opacity(0.025)), lineWidth: 0.6)
+        // Faint PCB grid
+        var grid = Path()
+        stride(from: board.minX + 10, to: board.maxX, by: 14).forEach { x in
+            grid.move(to: CGPoint(x: x, y: board.minY + 4)); grid.addLine(to: CGPoint(x: x, y: board.maxY - 4))
+        }
+        gc.stroke(grid, with: .color(.white.opacity(0.018)), lineWidth: 0.6)
+
+        // Gold connector fingers on the left edge, with the M-key notch.
+        let fingerW = W * 0.045
+        let fingers = 18
+        let pitch = (H * 0.86) / Double(fingers)
+        for i in 0..<fingers where i != 5 {
+            let y = board.minY + H * 0.07 + Double(i) * pitch
+            let r = CGRect(x: board.minX - fingerW * 0.35, y: y + pitch * 0.18, width: fingerW, height: pitch * 0.64)
+            gc.fill(Path(roundedRect: r, cornerRadius: 1.5),
+                    with: .linearGradient(Gradient(colors: [Color(hex: 0xF5D27A), Color(hex: 0xB8892E)]),
+                                          startPoint: CGPoint(x: r.minX, y: r.minY), endPoint: CGPoint(x: r.maxX, y: r.maxY)))
+        }
+        // Mounting half-hole on the right edge.
+        let hole = H * 0.13
+        gc.fill(Path(ellipseIn: CGRect(x: board.maxX - hole, y: board.midY - hole / 2, width: hole, height: hole)),
+                with: .color(Color(hex: 0x0B0D13)))
+
+        // Controller
+        let ctrl = CGRect(x: board.minX + W * 0.09, y: board.midY - H * 0.22, width: H * 0.44, height: H * 0.44)
+        let ctrlPath = Path(roundedRect: ctrl, cornerRadius: 4)
+        gc.fill(ctrlPath, with: .linearGradient(Gradient(colors: [Color(hex: 0x3A3F52), Color(hex: 0x1F2330)]),
+                                                startPoint: CGPoint(x: ctrl.minX, y: ctrl.minY), endPoint: CGPoint(x: ctrl.maxX, y: ctrl.maxY)))
+        gc.stroke(ctrlPath, with: .color(.white.opacity(0.14)), lineWidth: 1)
+        gc.draw(Text("DK").font(.system(size: ctrl.height * 0.32, weight: .heavy)).foregroundColor(.white.opacity(0.85)),
+                at: CGPoint(x: ctrl.midX, y: ctrl.midY))
+
+        // NAND chips
+        let chipsLeft = ctrl.maxX + W * 0.07
+        let chipsRight = board.maxX - hole - W * 0.03
+        let gap = W * 0.025
+        let chipW = (chipsRight - chipsLeft - gap * Double(Self.chips - 1)) / Double(Self.chips)
+        let chipH = H * 0.72
+        var chipRects: [CGRect] = []
+        for k in 0..<Self.chips {
+            chipRects.append(CGRect(x: chipsLeft + Double(k) * (chipW + gap), y: board.midY - chipH / 2, width: chipW, height: chipH))
         }
 
-        // Sectors
-        let clearedCount = Int((displayed * Double(Self.count)).rounded(.down))
-        for i in order.prefix(clearedCount) where clearedAt[i] == nil { clearedAt[i] = t }
-        let cleared = Set(order.prefix(clearedCount))
-        let slot = 2 * Double.pi / Double(Self.perTrack)
-        var particles: [(CGPoint, Double, Color)] = []
-
-        for i in 0..<Self.count {
-            let track = i / Self.perTrack
-            let s = i % Self.perTrack
-            let r0 = R * (0.40 + 0.14 * Double(track))
-            let r1 = r0 + R * 0.105
-            let a0 = angle + Double(s) * slot + 0.035
-            let a1 = a0 + slot - 0.07
-            var sector = Path()
-            sector.addArc(center: c, radius: r1, startAngle: .radians(a0), endAngle: .radians(a1), clockwise: false)
-            sector.addArc(center: c, radius: r0, startAngle: .radians(a1), endAngle: .radians(a0), clockwise: true)
-            sector.closeSubpath()
-
-            let mix = (Double(s) / Double(Self.perTrack) + Double(track) * 0.12).truncatingRemainder(dividingBy: 1)
-            let color = Color(.sRGB, red: violet.r + (cyan.r - violet.r) * mix,
-                              green: violet.g + (cyan.g - violet.g) * mix,
-                              blue: violet.b + (cyan.b - violet.b) * mix)
-
-            if cleared.contains(i), let when = clearedAt[i] {
-                let age = t - when
-                if !reduceMotion && age < 0.35 {
-                    gc.fill(sector, with: .color(.white.opacity(0.9 * (1 - age / 0.35))))
-                } else {
-                    gc.stroke(sector, with: .color(.white.opacity(0.06)), lineWidth: 0.7)
-                }
-                if !reduceMotion && age < 0.9 {
-                    let mid = (a0 + a1) / 2
-                    let rm = (r0 + r1) / 2 + age * R * 0.75
-                    for k in 0..<3 {
-                        let jitter = Double(k - 1) * 0.06 + sin(Double(i) * 12.9898 + Double(k)) * 0.04
-                        let p = CGPoint(x: c.x + cos(mid + jitter) * (rm + Double(k) * 6), y: c.y + sin(mid + jitter) * (rm + Double(k) * 6))
-                        particles.append((p, 1 - age / 0.9, color))
+        // Traces from the controller to each chip, with data pulses while working.
+        let start = CGPoint(x: ctrl.maxX, y: ctrl.midY)
+        for (k, chip) in chipRects.enumerated() {
+            let lane = board.minY + H * (0.08 + 0.025 * Double(k))
+            let laneB = board.maxY - H * (0.08 + 0.025 * Double(k))
+            for (y, endY) in [(lane, chip.minY), (laneB, chip.maxY)] {
+                var trace = Path()
+                trace.move(to: start)
+                trace.addLine(to: CGPoint(x: start.x + 8 + Double(k) * 3, y: start.y))
+                trace.addLine(to: CGPoint(x: start.x + 8 + Double(k) * 3, y: y))
+                trace.addLine(to: CGPoint(x: chip.midX, y: y))
+                trace.addLine(to: CGPoint(x: chip.midX, y: endY))
+                gc.stroke(trace, with: .color(Color(hex: 0x8B6CFF).opacity(0.18)), lineWidth: 1)
+                if !reduceMotion && activity > 0.05 {
+                    // A pulse travelling along this trace.
+                    let length = (8 + Double(k) * 3) + abs(y - start.y) + abs(chip.midX - (start.x + 8 + Double(k) * 3)) + abs(endY - y)
+                    let phase = (t * 0.9 + Double(k) * 0.23 + (y < board.midY ? 0 : 0.5)).truncatingRemainder(dividingBy: 1)
+                    if let p = Self.point(on: trace, at: phase * length) {
+                        var glow = gc
+                        glow.blendMode = .plusLighter
+                        glow.addFilter(.blur(radius: 3))
+                        glow.fill(Path(ellipseIn: CGRect(x: p.x - 3.5, y: p.y - 3.5, width: 7, height: 7)),
+                                  with: .color(Color(hex: 0x22D3EE).opacity(0.9 * activity)))
+                        gc.fill(Path(ellipseIn: CGRect(x: p.x - 1.5, y: p.y - 1.5, width: 3, height: 3)),
+                                with: .color(.white.opacity(0.9 * activity)))
                     }
                 }
-            } else {
-                gc.fill(sector, with: .color(color.opacity(0.85)))
             }
         }
 
-        // Particles (additive glow)
+        // Cells
+        let clearedCount = Int((displayed * Double(Self.count)).rounded(.down))
+        for i in order.prefix(clearedCount) where clearedAt[i] == nil { clearedAt[i] = t }
+        let cleared = Set(order.prefix(clearedCount))
+        var particles: [(CGPoint, Double, Color)] = []
+
+        for (k, chip) in chipRects.enumerated() {
+            let chipPath = Path(roundedRect: chip, cornerRadius: 3)
+            gc.fill(chipPath, with: .color(Color(hex: 0x0D1017)))
+            gc.stroke(chipPath, with: .color(.white.opacity(0.12)), lineWidth: 1)
+            let pad = chipW * 0.1
+            let cellW = (chip.width - 2 * pad) / Double(Self.cols)
+            let cellH = (chip.height - 2 * pad) / Double(Self.rows)
+            for r in 0..<Self.rows {
+                for col in 0..<Self.cols {
+                    let i = k * Self.perChip + r * Self.cols + col
+                    let rect = CGRect(x: chip.minX + pad + Double(col) * cellW + 1, y: chip.minY + pad + Double(r) * cellH + 1,
+                                      width: cellW - 2, height: cellH - 2)
+                    let cell = Path(roundedRect: rect, cornerRadius: 1.2)
+                    let mix = (Double(k) / Double(Self.chips) + Double(col) / Double(Self.cols * Self.chips)).truncatingRemainder(dividingBy: 1)
+                    let color = cellColor(mix)
+                    if cleared.contains(i), let when = clearedAt[i] {
+                        let age = t - when
+                        if !reduceMotion && age < 0.3 {
+                            gc.fill(cell, with: .color(.white.opacity(0.95 * (1 - age / 0.3))))
+                        } else {
+                            gc.stroke(cell, with: .color(.white.opacity(0.07)), lineWidth: 0.6)
+                        }
+                        if !reduceMotion && age < 1.0 {
+                            // Erased bits drift up off the chip.
+                            for n in 0..<2 {
+                                let drift = sin(Double(i) * 7.31 + Double(n) * 2.1) * 8
+                                let p = CGPoint(x: rect.midX + drift * age, y: rect.midY - age * H * 0.55 - Double(n) * 5)
+                                particles.append((p, 1 - age, color))
+                            }
+                        }
+                    } else {
+                        gc.fill(cell, with: .color(color.opacity(0.85)))
+                    }
+                }
+            }
+        }
+
         if !particles.isEmpty {
             var glow = gc
             glow.blendMode = .plusLighter
             for (p, alpha, color) in particles {
-                let d = 2.2 + 2.0 * alpha
-                glow.fill(Path(ellipseIn: CGRect(x: p.x - d / 2, y: p.y - d / 2, width: d, height: d)), with: .color(color.opacity(alpha)))
+                let d = 1.8 + 2.2 * alpha
+                glow.fill(Path(roundedRect: CGRect(x: p.x - d / 2, y: p.y - d / 2, width: d, height: d), cornerRadius: 0.6),
+                          with: .color(color.opacity(alpha)))
             }
         }
 
-        // Spindle
-        let hub = R * 0.22
-        let hubPath = Path(ellipseIn: CGRect(x: c.x - hub, y: c.y - hub, width: 2 * hub, height: 2 * hub))
-        gc.fill(hubPath, with: .linearGradient(Gradient(colors: [Color(hex: 0x3A3F52), Color(hex: 0x1A1D27)]),
-                                               startPoint: CGPoint(x: c.x, y: c.y - hub), endPoint: CGPoint(x: c.x, y: c.y + hub)))
-        gc.stroke(hubPath, with: .color(.white.opacity(0.15)), lineWidth: 1)
-        gc.draw(Text("DK").font(.system(size: hub * 0.62, weight: .heavy)).foregroundColor(.white.opacity(0.85)), at: c)
+        // Status LED on the controller: pulsing violet while working, green when done.
+        let led = CGRect(x: ctrl.maxX - 9, y: ctrl.minY + 4, width: 5, height: 5)
+        let ledColor = finished ? Color(hex: 0x34D399) : Color(hex: 0x8B6CFF)
+        let ledAlpha = finished ? 1 : (reduceMotion ? 0.9 : 0.5 + 0.5 * abs(sin(t * 6)))
+        var ledGlow = gc
+        ledGlow.addFilter(.blur(radius: 3))
+        ledGlow.fill(Path(ellipseIn: led.insetBy(dx: -2, dy: -2)), with: .color(ledColor.opacity(ledAlpha)))
+        gc.fill(Path(ellipseIn: led), with: .color(ledColor.opacity(ledAlpha)))
 
-        // Read/write arm sweeping across the tracks
-        let pivot = CGPoint(x: c.x + R * 0.98, y: c.y - R * 0.98)
-        let sweep = reduceMotion ? 0 : sin(t * 3.1) * spin
-        let headR = R * (0.66 + 0.24 * sweep)
-        let headAngle = -Double.pi / 4 + 0.35
-        let head = CGPoint(x: c.x + cos(headAngle) * headR, y: c.y + sin(headAngle) * headR)
-        var arm = Path()
-        arm.move(to: pivot)
-        arm.addLine(to: head)
-        gc.stroke(arm, with: .linearGradient(Gradient(colors: [Color(hex: 0x9AA3B8), Color(hex: 0x5E6578)]), startPoint: pivot, endPoint: head),
-                  style: StrokeStyle(lineWidth: 5, lineCap: .round))
-        let pivotDot = Path(ellipseIn: CGRect(x: pivot.x - 9, y: pivot.y - 9, width: 18, height: 18))
-        gc.fill(pivotDot, with: .color(Color(hex: 0x3A3F52)))
-        gc.stroke(pivotDot, with: .color(.white.opacity(0.2)), lineWidth: 1)
-        let headDot = Path(ellipseIn: CGRect(x: head.x - 4.5, y: head.y - 4.5, width: 9, height: 9))
-        var headGlow = gc
-        headGlow.addFilter(.blur(radius: 4))
-        headGlow.fill(headDot, with: .color(Color(hex: 0x22D3EE).opacity(0.9 * spin)))
-        gc.fill(headDot, with: .color(.white.opacity(0.9)))
+        // Label
+        gc.draw(Text("NVMe").font(.system(size: H * 0.075, weight: .semibold, design: .monospaced)).foregroundColor(.white.opacity(0.25)),
+                at: CGPoint(x: ctrl.midX, y: ctrl.maxY + H * 0.1))
+    }
+
+    /// The point at `distance` along a polyline path.
+    static func point(on path: Path, at distance: Double) -> CGPoint? {
+        var points: [CGPoint] = []
+        path.forEach { el in
+            switch el {
+            case .move(let p), .line(let p): points.append(p)
+            default: break
+            }
+        }
+        var remaining = distance
+        for (a, b) in zip(points, points.dropFirst()) {
+            let seg = hypot(b.x - a.x, b.y - a.y)
+            if remaining <= seg, seg > 0 {
+                let f = remaining / seg
+                return CGPoint(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f)
+            }
+            remaining -= seg
+        }
+        return points.last
     }
 }
 
