@@ -38,6 +38,22 @@ enum SnapshotDriver {
             capture(dir.appendingPathComponent("10-confirm.png"), sheet: true)
             app.pendingCleanup = nil
         }
+        // The cleanup overlay, driven by a *dry run* so nothing on disk changes.
+        let wasDryRun = app.settings.data.dryRun
+        app.settings.data.dryRun = true
+        app.screen = .dashboard
+        let entries = Array(app.store.smartSelection().prefix(12))
+        if !entries.isEmpty {
+            let run = Task { await app.run(entries, action: .delete) }
+            try? await Task.sleep(for: .milliseconds(650))
+            capture(dir.appendingPathComponent("11-cleaning.png"))
+            await run.value
+            try? await Task.sleep(for: .milliseconds(1200))
+            capture(dir.appendingPathComponent("12-cleaned.png"))
+            app.dismissActivity()
+        }
+        app.settings.data.dryRun = wasDryRun
+
         try? await Task.sleep(for: .milliseconds(300))
         NSApp.terminate(nil)
     }

@@ -35,8 +35,9 @@ struct NodeModulesItem: Reclaimable, Codable, Hashable {
     var projectLastTouched: Date? { lastTouched }
     var restoreHint: String { (packageManager ?? .npm).installCommand }
 
+    /// Unknown age is *not* stale: when in doubt, don't preselect it for deletion.
     func isStale(days: Int, now: Date = Date()) -> Bool {
-        guard let lastTouched else { return true }
+        guard let lastTouched else { return false }
         return now.timeIntervalSince(lastTouched) > Double(days) * 86_400
     }
 }

@@ -13,6 +13,11 @@ struct RootView: View {
                 Theme.bgWindow.ignoresSafeArea()
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if let activity = app.activity {
+                    CleanupOverlay(activity: activity)
+                        .transition(.opacity)
+                        .zIndex(10)
+                }
                 if let toast = app.toast {
                     ToastView(toast: toast) { app.toast = nil }
                         .padding(.bottom, 84)
@@ -21,6 +26,7 @@ struct RootView: View {
                 }
             }
             .animation(.snappy, value: app.toast)
+            .animation(.easeInOut(duration: 0.25), value: app.activity?.id)
             .ignoresSafeArea(.container, edges: .top)
         }
         .toolbar(removing: .sidebarToggle)

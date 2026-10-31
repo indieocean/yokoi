@@ -11,7 +11,6 @@ struct SidebarView: View {
             } header: { SectionLabel(text: "Overview") }
 
             Section {
-                row(.nodeModules)
                 row(.buildArtifacts)
                 row(.caches)
                 row(.bigFiles)
@@ -55,7 +54,7 @@ struct SidebarView: View {
         .padding(.bottom, 10)
     }
 
-    private func row(_ screen: Screen) -> some View {
+    private func row(_ screen: Screen, indent: Bool = false) -> some View {
         HStack(spacing: 10) {
             Image(systemName: screen.symbol)
                 .font(.system(size: 12.5))
@@ -74,6 +73,7 @@ struct SidebarView: View {
             }
         }
         .padding(.vertical, 3)
+        .padding(.leading, indent ? 16 : 0)
         .tag(screen)
         .accessibilityElement(children: .combine)
     }

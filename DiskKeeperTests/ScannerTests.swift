@@ -172,3 +172,23 @@ struct ScannerTests {
         _ = await task.value // must return rather than hang
     }
 }
+
+@Suite("Staleness")
+struct StalenessTests {
+    @Test func projectWithOnlyNodeModulesUsesTheFolderDate() async throws {
+        let f = try Fixture()
+        try f.file("dev/leftover/node_modules/x/index.js", modified: Fixture.longAgo)
+        try f.setModified("dev/leftover/node_modules/x", Fixture.longAgo)
+        try f.setModified("dev/leftover/node_modules", Fixture.longAgo)
+        try f.setModified("dev/leftover", Fixture.longAgo)
+        let item = try #require(await NodeModulesScanner().collect(f.context(roots: ["~/dev"])).first)
+        #expect(item.lastTouched != nil)
+        #expect(item.isStale(days: 90))
+    }
+
+    @Test func unknownAgeIsNeverStale() {
+        let item = NodeModulesItem(url: URL(fileURLWithPath: "/x/node_modules"), projectURL: URL(fileURLWithPath: "/x"),
+                                   projectName: "x", frameworkHint: "node", packageManager: nil, size: 1, fileCount: 1, lastTouched: nil)
+        #expect(!item.isStale(days: 90))
+    }
+}

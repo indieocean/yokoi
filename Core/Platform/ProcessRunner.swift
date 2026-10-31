@@ -48,19 +48,38 @@ actor ProcessRunner {
         if let resolvedPath { return resolvedPath }
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let fallback = ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "\(home)/.cargo/bin", "\(home)/.bun/bin",
-                        "\(home)/Library/pnpm", "\(home)/.local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+                        "\(home)/Library/pnpm", "\(home)/Library/pnpm/bin", "\(home)/.local/bin", "\(home)/go/bin", "/usr/local/go/bin", "/opt/local/bin",
+                        "\(home)/.dotnet/tools", "/usr/local/share/dotnet", "\(home)/miniconda3/bin", "\(home)/miniforge3/bin",
+                        "\(home)/anaconda3/bin", "/opt/homebrew/anaconda3/bin", "\(home)/.composer/vendor/bin",
+                        "\(home)/.volta/bin", "\(home)/.local/share/fnm/aliases/default/bin"]
+            + Self.nvmNodeBins(home: home)
+            + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
         var path = fallback.joined(separator: ":")
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        if let out = try? await Self.launch(executable: shell, arguments: ["-l", "-c", "printf %s \"$PATH\""],
-                                            environment: ["HOME": home, "PATH": path], timeout: 5),
-           out.succeeded, !out.stdout.isEmpty {
-            // Login-shell entries first, then anything from the fallback list it didn't include.
-            var parts = out.stdout.split(separator: ":").map(String.init)
+        // Interactive *and* login, so tools set up in ~/.zshrc (nvm, pyenv, conda init) are found too.
+        // stdin is closed and there's a timeout, and markers cut out any greeting the rc files print.
+        let script = "printf '__DKPATH__%s__DKEND__' \"$PATH\""
+        if let out = try? await Self.launch(executable: shell, arguments: ["-i", "-l", "-c", script],
+                                            environment: ["HOME": home, "PATH": path, "TERM": "dumb"], timeout: 5),
+           let start = out.stdout.range(of: "__DKPATH__"),
+           let end = out.stdout.range(of: "__DKEND__", range: start.upperBound..<out.stdout.endIndex) {
+            // Shell entries first, then anything from the fallback list it didn't include.
+            var parts = out.stdout[start.upperBound..<end.lowerBound].split(separator: ":").map(String.init)
             for p in fallback where !parts.contains(p) { parts.append(p) }
             path = parts.joined(separator: ":")
         }
         resolvedPath = path
         return path
+    }
+
+    /// `~/.nvm/versions/node/<newest>/bin`, so global npm packages are found even if nvm isn't loaded.
+    static func nvmNodeBins(home: String) -> [String] {
+        let root = "\(home)/.nvm/versions/node"
+        let versions = (try? FileManager.default.contentsOfDirectory(atPath: root)) ?? []
+        let newest = versions.filter { $0.hasPrefix("v") }.max { a, b in
+            a.dropFirst().split(separator: ".").compactMap { Int($0) }.lexicographicallyPrecedes(b.dropFirst().split(separator: ".").compactMap { Int($0) })
+        }
+        return newest.map { ["\(root)/\($0)/bin"] } ?? []
     }
 
     /// Finds an executable on the search path, or nil when the tool isn't installed.

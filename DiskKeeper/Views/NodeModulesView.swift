@@ -2,6 +2,8 @@ import SwiftUI
 
 struct NodeModulesView: View {
     @Environment(AppModel.self) private var app
+    /// Shown inside the Package Managers npm tab, which provides the header.
+    var embedded = false
 
     var body: some View {
         @Bindable var vm = app.nodeModulesVM
@@ -11,9 +13,11 @@ struct NodeModulesView: View {
         let maxSize = Double(max(vm.maxSize, 1))
 
         VStack(spacing: 0) {
-            HeaderBar(title: "node_modules",
-                      subtitle: "\(CountFormat.plural(store.nodeModules.count, "folder")) · \(ByteFormat.string(store.total(.nodeModules)))") {
-                RescanButton(category: .nodeModules)
+            if !embedded {
+                HeaderBar(title: "node_modules",
+                          subtitle: "\(CountFormat.plural(store.nodeModules.count, "folder")) · \(ByteFormat.string(store.total(.nodeModules)))") {
+                    RescanButton(category: .nodeModules)
+                }
             }
 
             VStack(spacing: 14) {
@@ -83,7 +87,9 @@ struct NodeModulesView: View {
                     .card(padding: 4)
                 }
             }
-            .padding(Theme.Metrics.contentPadding)
+            .padding(.horizontal, Theme.Metrics.contentPadding)
+            .padding(.top, embedded ? 14 : Theme.Metrics.contentPadding)
+            .padding(.bottom, Theme.Metrics.contentPadding)
 
             SelectionBar(state: vm.checkState(for: rows), toggleAll: { vm.toggleAll(rows) },
                          count: vm.checked.count, noun: vm.checked.count == 1 ? "folder" : "folders", size: vm.selectedSize) {

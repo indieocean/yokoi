@@ -89,7 +89,9 @@ enum FileWalker {
                 if let d = v.contentModificationDate, d > (newest ?? .distantPast) { newest = d }
             }
         }
+        // Fallbacks: last git commit, then the project folder's own date (e.g. only node_modules is left).
         return newest ?? gitLastCommitDate(project)
+            ?? (try? project.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
     }
 
     /// Reads the timestamp of the last entry in `.git/logs/HEAD` without running git.

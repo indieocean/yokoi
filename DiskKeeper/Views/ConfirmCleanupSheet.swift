@@ -224,11 +224,9 @@ struct ConfirmCleanupSheet: View {
         }
         let chosen = entries
         let action: CleanupAction = mode == .trash ? .trash : .delete
-        Task {
-            await app.run(chosen, action: action)
-            running = false
-            dismiss()
-        }
+        // Close the sheet right away; the progress overlay takes over.
+        dismiss()
+        Task { await app.run(chosen, action: action) }
     }
 }
 

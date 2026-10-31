@@ -98,7 +98,8 @@ struct CleanupOutcome: Sendable {
 /// The file operations behind a cleanup. Abstracted so tests can observe or fake them.
 protocol FileOperations: Sendable {
     func trash(_ url: URL) throws -> URL?
-    func remove(_ url: URL) throws
+    /// Permanently removes `url` (recursively), calling `onFile` for each path as it goes.
+    func remove(_ url: URL, onFile: ((String) -> Void)?) throws
     func move(_ url: URL, to destination: URL) throws
     func createDirectory(_ url: URL) throws
     func exists(_ url: URL) -> Bool
@@ -111,7 +112,29 @@ struct SystemFileOperations: FileOperations {
         return result as URL?
     }
 
-    func remove(_ url: URL) throws { try FileManager.default.removeItem(at: url) }
+    /// Uses `removefile(3)`: recursive, never follows symlinks, and reports every path it removes.
+    func remove(_ url: URL, onFile: ((String) -> Void)?) throws {
+        guard let onFile else { return try FileManager.default.removeItem(at: url) }
+        guard let state = removefile_state_alloc() else { return try FileManager.default.removeItem(at: url) }
+        defer { removefile_state_free(state) }
+        let box = Unmanaged.passRetained(RemoveCallbackBox(onFile))
+        defer { box.release() }
+        let callback: @convention(c) (removefile_state_t?, UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Int32 = { _, path, ctx in
+            if let path, let ctx {
+                Unmanaged<RemoveCallbackBox>.fromOpaque(ctx).takeUnretainedValue().onFile(String(cString: path))
+            }
+            return Int32(REMOVEFILE_PROCEED)
+        }
+        removefile_state_set(state, UInt32(REMOVEFILE_STATE_CONFIRM_CALLBACK), unsafeBitCast(callback, to: UnsafeRawPointer.self))
+        removefile_state_set(state, UInt32(REMOVEFILE_STATE_CONFIRM_CONTEXT), box.toOpaque())
+        if removefile(url.path, state, removefile_flags_t(REMOVEFILE_RECURSIVE)) != 0 {
+            let code = errno
+            // removefile reports ENOENT if something vanished mid-way; only fail if the item is still there.
+            if (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: url.path])
+            }
+        }
+    }
 
     func move(_ url: URL, to destination: URL) throws { try FileManager.default.moveItem(at: url, to: destination) }
 
@@ -123,6 +146,12 @@ struct SystemFileOperations: FileOperations {
         // lstat semantics: a dangling symlink still "exists".
         (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil
     }
+}
+
+/// Holds the per-file callback for `removefile`'s C callback.
+final class RemoveCallbackBox {
+    let onFile: (String) -> Void
+    init(_ onFile: @escaping (String) -> Void) { self.onFile = onFile }
 }
 
 /// Trashes, deletes and moves files, enforcing the `PathGuard` on every single path and logging
@@ -143,17 +172,26 @@ actor CleanupService {
         self.init(guards: context.pathGuards(), log: log, fileOperations: fileOperations)
     }
 
-    func perform(_ entries: [CleanupEntry], action: CleanupAction, dryRun: Bool, now: Date = Date()) async -> CleanupOutcome {
+    func perform(_ entries: [CleanupEntry], action: CleanupAction, dryRun: Bool, now: Date = Date(),
+                 progress: CleanupProgress? = nil) async -> CleanupOutcome {
         let batchID = UUID().uuidString
         var records: [CleanupRecord] = []
         var failures: [CleanupOutcome.Failure] = []
         var completed = Set<String>()
         var bytes: Int64 = 0
+        progress?.begin(entries: entries.count, files: entries.reduce(0) { $0 + max($1.fileCount, $1.urls.count) },
+                        bytes: entries.reduce(0) { $0 + $1.size })
 
         for entry in entries {
             if Task.isCancelled { break }
             var moved: [CleanupRecord.Moved] = []
             var failedHere = 0
+            var filesCounted = 0
+            progress?.startEntry(label: entry.label)
+            defer {
+                progress?.finishEntry(bytes: failedHere == 0 ? entry.size : 0, files: max(entry.fileCount, entry.urls.count),
+                                      filesAlreadyCounted: filesCounted, failed: failedHere > 0)
+            }
             let pathGuard = guards[entry.category] ?? PathGuard(allowedRoots: [], exclusions: GlobMatcher(patterns: []))
             if entry.permanentOnly, case .trash = action {
                 failures.append(.init(path: entry.displayPath, reason: "Refused: items already in the Trash can only be deleted permanently"))
@@ -177,21 +215,32 @@ actor CleanupService {
                     continue
                 }
                 if dryRun {
+                    progress?.touched(url.path)
                     moved.append(.init(original: url.path, destination: nil))
                     continue
                 }
                 do {
                     switch action {
                     case .trash:
+                        progress?.touched(url.path)
                         let result = try ops.trash(url)
                         moved.append(.init(original: url.path, destination: result?.path))
                     case .delete:
-                        try ops.remove(url)
+                        progress?.touched(url.path)
+                        var n = 0
+                        try ops.remove(url, onFile: progress.map { p in
+                            { path in
+                                n += 1
+                                p.touched(path, countsAsFile: true)
+                            }
+                        })
+                        filesCounted += n
                         moved.append(.init(original: url.path, destination: nil))
                     case .move(let destination, let organize):
                         let folder = Self.destinationFolder(base: destination, date: entry.date ?? now, organizeByDate: organize)
                         try ops.createDirectory(folder)
                         let target = Self.uniqueDestination(for: url.lastPathComponent, in: folder, exists: ops.exists)
+                        progress?.touched(url.path)
                         try ops.move(url, to: target)
                         moved.append(.init(original: url.path, destination: target.path))
                     }

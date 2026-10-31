@@ -165,9 +165,9 @@ final class ScanStore {
 
     // MARK: Cleanup
 
-    func perform(_ entries: [CleanupEntry], action: CleanupAction) async -> CleanupOutcome {
+    func perform(_ entries: [CleanupEntry], action: CleanupAction, progress: CleanupProgress? = nil) async -> CleanupOutcome {
         let service = CleanupService(context: settings.context(), log: log)
-        let outcome = await service.perform(entries, action: action, dryRun: settings.data.dryRun)
+        let outcome = await service.perform(entries, action: action, dryRun: settings.data.dryRun, progress: progress)
         if !outcome.dryRun { remove(ids: outcome.completedIDs) }
         await reloadLog()
         disk = DiskInfo.current()

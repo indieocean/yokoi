@@ -91,7 +91,16 @@ final class AppModel {
     let store: ScanStore
 
     var screen: Screen = .dashboard {
-        didSet { if screen != oldValue { search = "" } }
+        didSet {
+            // node_modules lives in Package Managers → npm (the old screen id still works for deep links).
+            if screen == .nodeModules {
+                packages.selected = .npm
+                packages.npmMode = .projects
+                screen = .packageManagers
+                return
+            }
+            if screen != oldValue { search = "" }
+        }
     }
     var search = ""
     /// Bumped by ⌘K; the search field focuses itself when it changes.
@@ -100,6 +109,8 @@ final class AppModel {
     var lastOutcome: CleanupOutcome?
     var showOutcomeDetails = false
     var toast: Toast?
+    /// The cleanup currently shown in the progress overlay.
+    var activity: CleanupActivity?
     var showOnboarding = false
     var fullDiskAccess = FullDiskAccess.isGranted
 
@@ -151,6 +162,10 @@ final class AppModel {
 
     func rescan() {
         if screen == .externalDrives { settings.refreshDrives(); return }
+        if screen == .packageManagers {
+            if packages.showingProjects { store.scan([.nodeModules]) } else { Task { await packages.refresh(packages.selected) } }
+            return
+        }
         if let category = screen.category { store.scan([category]) } else { store.scan() }
     }
 
@@ -190,31 +205,41 @@ final class AppModel {
         return (allowed, blocked)
     }
 
+    /// Runs a confirmed cleanup with the animated progress overlay.
     func run(_ entries: [CleanupEntry], action: CleanupAction) async {
+        guard activity == nil || activity?.isFinished == true else { return }
+        let activity = CleanupActivity(action: action, dryRun: settings.data.dryRun)
+        self.activity = activity
+
         // Check again right before acting: something may have opened since the sheet appeared.
         let (entries, lateBlocked) = await Self.splitInUse(entries)
-        let outcome = await store.perform(entries, action: action)
+        activity.lateBlocked = lateBlocked
+
+        let progress = CleanupProgress()
+        let poll = Task { @MainActor in
+            while !Task.isCancelled {
+                activity.snapshot = progress.snapshot
+                try? await Task.sleep(for: .milliseconds(70))
+            }
+        }
+        let outcome = await store.perform(entries, action: action, progress: progress)
+
+        // Keep the animation on screen long enough to read, even for instant cleanups.
+        let minimum: TimeInterval = 1.8
+        let elapsed = Date().timeIntervalSince(activity.started)
+        if elapsed < minimum { try? await Task.sleep(for: .seconds(minimum - elapsed)) }
+        poll.cancel()
+        activity.snapshot = progress.snapshot
+        activity.outcome = outcome
         lastOutcome = outcome
+
         for vm in [nodeModulesVM as any SelectionPruning, artifactsVM, cachesVM, bigFilesVM, screenshotsVM, applicationsVM] {
             vm.prune(outcome.completedIDs)
         }
-        let verb: String
-        switch action {
-        case .trash: verb = outcome.dryRun ? "Would move to Trash" : "Moved to Trash"
-        case .delete: verb = outcome.dryRun ? "Would delete" : "Deleted"
-        case .move: verb = outcome.dryRun ? "Would move" : "Moved"
-        }
-        let size = ByteFormat.string(outcome.bytes)
-        let message = "\(verb) \(outcome.itemCount) item\(outcome.itemCount == 1 ? "" : "s") · \(size)"
-        if outcome.dryRun {
-            showOutcomeDetails = true
-        } else if !lateBlocked.isEmpty {
-            toast = Toast(kind: .warning, message: message, detail: "\(lateBlocked.count) skipped: now open in \(lateBlocked[0].process)")
-        } else if !outcome.failures.isEmpty {
-            toast = Toast(kind: .warning, message: message, detail: "\(outcome.failures.count) path\(outcome.failures.count == 1 ? "" : "s") skipped")
-        } else {
-            toast = Toast(kind: .success, message: message)
-        }
+    }
+
+    func dismissActivity() {
+        activity = nil
     }
 }
 

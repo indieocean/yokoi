@@ -174,11 +174,71 @@ struct ParserTests {
     }
 
     @Test func commandsNeverUseAShell() {
+        let evil = "evil; rm -rf ~"
         for kind in PackageManagerKind.allCases {
-            let cmd = kind.uninstallCommand("evil; rm -rf ~")
-            #expect(cmd.last == "evil; rm -rf ~", "the package name stays one literal argument")
-            #expect(!ProcessRunner.forbidden.contains(cmd[0]))
+            for cmd in [kind.uninstallCommand(evil), kind.updateCommand(evil), kind.outdatedCommand, Optional(kind.listCommand)].compactMap({ $0 }) {
+                #expect(!ProcessRunner.forbidden.contains(cmd[0]), "\(kind) uses \(cmd[0])")
+                #expect(!cmd.contains("sudo"))
+                #expect(!cmd.contains { $0 != evil && $0 != "\(evil)@latest" && $0.contains(";") })
+            }
+            if let cmd = kind.uninstallCommand(evil) { #expect(cmd.contains(evil), "the package name stays one literal argument") }
         }
+        #expect(PackageManagerKind.macports.updateCommand("x") == nil, "MacPorts needs sudo, so no commands")
+        #expect(PackageManagerKind.go.uninstallCommand("x") == nil)
+    }
+
+    @Test func yarnAndBun() {
+        let yarn = "yarn global v1.22.22\ninfo \"typescript@5.4.5\" has binaries:\n   - tsc\ninfo \"@angular/cli@18.2.11\" has binaries:\n   - ng\n"
+        let y = PackageParsers.installed(.yarn, yarn)
+        #expect(y.map(\.name) == ["typescript", "@angular/cli"])
+        #expect(y.last?.installedVersion == "18.2.11")
+        let bun = "/Users/x/.bun/install/global node_modules (2)\n├── typescript@5.4.5\n└── @biomejs/biome@1.9.0\n"
+        #expect(PackageParsers.installed(.bun, bun).map(\.name) == ["typescript", "@biomejs/biome"])
+    }
+
+    @Test func macportsAndMas() {
+        let ports = "The following ports are currently installed:\n  wget @1.21.4_0 (active)\n  wget @1.21.3_0\n  git @2.46.0_0+diff_highlight (active)\n"
+        #expect(PackageParsers.installed(.macports, ports).map(\.name) == ["wget", "git"])
+        #expect(PackageParsers.outdated(.macports, "The following installed ports are outdated:\nwget    1.21.3_0 < 1.21.4_0\n") == ["wget": "1.21.4_0"])
+        let mas = "497799835  Xcode            (16.1)\n1451685025 WireGuard        (1.0.16)\n"
+        let m = PackageParsers.installed(.mas, mas)
+        #expect(m.map(\.name) == ["Xcode", "WireGuard"])
+        #expect(m.first?.commandTarget == "497799835")
+        #expect(PackageParsers.outdated(.mas, "497799835 Xcode (16.0 -> 16.1)\n") == ["Xcode": "16.1"])
+    }
+
+    @Test func goAndDotnet() {
+        let go = "/Users/x/go/bin/gopls: go1.23.1\n\tpath\tgolang.org/x/tools/gopls\n\tmod\tgolang.org/x/tools/gopls\tv0.16.2\th1:abc\n\tdep\tgithub.com/x\tv1.0.0\n/Users/x/go/bin/air: go1.22\n\tpath\tgithub.com/air-verse/air\n\tmod\tgithub.com/air-verse/air\tv1.52.3\th1:x\n"
+        let g = PackageParsers.installed(.go, go)
+        #expect(g.map(\.name) == ["gopls", "air"])
+        #expect(g.first?.installedVersion == "0.16.2")
+        #expect(g.first.map { PackageManagerKind.go.updateCommand($0.commandTarget) } == ["go", "install", "golang.org/x/tools/gopls@latest"])
+        let dn = "Package Id      Version      Commands\n-------------------------------------\ndotnet-ef       8.0.0        dotnet-ef\n"
+        #expect(PackageParsers.installed(.dotnet, dn).map(\.name) == ["dotnet-ef"])
+    }
+
+    @Test func pythonManagers() {
+        let pipx = #"{"venvs":{"black":{"metadata":{"main_package":{"package_version":"24.8.0","apps":["black","blackd"]}}}}}"#
+        let p = PackageParsers.installed(.pipx, pipx)
+        #expect(p.first?.installedVersion == "24.8.0")
+        #expect(p.first?.binaries == ["black", "blackd"])
+        let uv = "ruff v0.6.9\n- ruff\nhttpie v3.2.4\n- http\n- https\n"
+        let u = PackageParsers.installed(.uv, uv)
+        #expect(u.map(\.name) == ["ruff", "httpie"])
+        #expect(u.last?.binaries == ["http", "https"])
+        #expect(PackageParsers.outdated(.uv, "ruff v0.6.9 [latest: 0.7.0]\n- ruff\n") == ["ruff": "0.7.0"])
+        let conda = #"{"envs":["/Users/x/miniconda3","/Users/x/miniconda3/envs/ml"]}"#
+        let c = PackageParsers.installed(.conda, conda)
+        #expect(c.map(\.name) == ["base", "ml"])
+        #expect(c.first?.locked != nil, "base can't be removed")
+        #expect(c.last.map { PackageManagerKind.conda.uninstallCommand($0.commandTarget) } == ["conda", "env", "remove", "-p", "/Users/x/miniconda3/envs/ml", "-y"])
+    }
+
+    @Test func composer() {
+        let show = #"{"installed":[{"name":"laravel/installer","version":"v5.8.3"}]}"#
+        #expect(PackageParsers.installed(.composer, show).first?.installedVersion == "5.8.3")
+        let out = #"{"installed":[{"name":"laravel/installer","version":"v5.8.3","latest":"v5.9.0"}]}"#
+        #expect(PackageParsers.outdated(.composer, out) == ["laravel/installer": "5.9.0"])
     }
 
     @Test func simulatorsAndSnapshots() {

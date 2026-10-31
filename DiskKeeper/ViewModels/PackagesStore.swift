@@ -8,6 +8,8 @@ import Observation
 @Observable
 final class PackagesStore {
     enum Filter: Hashable { case all, outdated, unused }
+    /// The npm tab shows project node_modules folders or global `npm -g` packages.
+    enum NpmMode: Hashable { case projects, global }
     enum Action: String { case update = "Update", uninstall = "Uninstall" }
 
     struct PendingAction: Identifiable {
@@ -16,7 +18,7 @@ final class PackagesStore {
         let action: Action
         let packages: [InstalledPackage]
         var commands: [[String]] {
-            packages.map { action == .update ? kind.updateCommand($0.name) : kind.uninstallCommand($0.name) }
+            packages.compactMap { action == .update ? kind.updateCommand($0.commandTarget) : kind.uninstallCommand($0.commandTarget) }
         }
     }
 
@@ -28,7 +30,10 @@ final class PackagesStore {
         var succeeded: Bool { result?.succeeded ?? false }
     }
 
-    var installed: [PackageManagerKind] = []
+    var installed: [PackageManagerKind] = [.npm]
+    var npmMode: NpmMode = .projects
+    /// Whether the `npm` executable was found (the npm tab exists either way, for node_modules).
+    var npmToolFound = false
     var detected = false
     var selected: PackageManagerKind = .npm
     var packages: [PackageManagerKind: [InstalledPackage]] = [:]
@@ -54,20 +59,29 @@ final class PackagesStore {
     func loadIfNeeded() async {
         guard !detected else { return }
         detected = true
-        var found: [PackageManagerKind] = []
+        var found: [PackageManagerKind] = [.npm]
         for kind in PackageManagerKind.allCases where await service(kind).isInstalled() {
-            found.append(kind)
+            if kind == .npm { npmToolFound = true } else { found.append(kind) }
             readOnly[kind] = await service(kind).readOnlyReason()
         }
         installed = found
-        if !found.contains(selected), let first = found.first { selected = first }
-        if !found.isEmpty { await refresh(selected) }
+        if !found.contains(selected) { selected = .npm }
+        if !showingProjects { await refresh(selected) }
     }
+
+    /// The npm tab in node_modules mode shows project folders instead of the package table.
+    var showingProjects: Bool { selected == .npm && npmMode == .projects }
 
     func select(_ kind: PackageManagerKind) async {
         selected = kind
         checked = []
-        if packages[kind] == nil { await refresh(kind) }
+        if !showingProjects, packages[kind] == nil { await refresh(kind) }
+    }
+
+    func setNpmMode(_ mode: NpmMode) async {
+        npmMode = mode
+        checked = []
+        if mode == .global, npmToolFound, packages[.npm] == nil { await refresh(.npm) }
     }
 
     func refresh(_ kind: PackageManagerKind) async {
@@ -139,7 +153,9 @@ final class PackagesStore {
             .filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }
     }
 
-    func count(_ kind: PackageManagerKind) -> Int? { packages[kind]?.count }
+    func count(_ kind: PackageManagerKind) -> Int? {
+        kind == .npm ? store.nodeModules.count : packages[kind]?.count
+    }
 
     var outdatedCount: Int { (packages[selected] ?? []).filter(\.isOutdated).count }
     var unusedCount: Int { (packages[selected] ?? []).filter(\.isUnused).count }
@@ -151,9 +167,16 @@ final class PackagesStore {
 
     var selectedPackages: [InstalledPackage] { (packages[selected] ?? []).filter { checked.contains($0.id) } }
 
+    /// Whether `action` is possible for this package (manager supports it, package isn't locked).
+    func can(_ action: Action, _ p: InstalledPackage) -> Bool {
+        guard readOnly[p.manager] == nil, p.locked == nil else { return false }
+        return action == .update ? p.manager.updateCommand(p.commandTarget) != nil : p.manager.uninstallCommand(p.commandTarget) != nil
+    }
+
     func request(_ action: Action, _ pkgs: [InstalledPackage]) {
-        guard !pkgs.isEmpty, readOnly[selected] == nil else { return }
-        pending = PendingAction(kind: selected, action: action, packages: pkgs)
+        let allowed = pkgs.filter { can(action, $0) }
+        guard !allowed.isEmpty else { return }
+        pending = PendingAction(kind: selected, action: action, packages: allowed)
     }
 
     /// Runs the confirmed commands one at a time, keeping each one's output.

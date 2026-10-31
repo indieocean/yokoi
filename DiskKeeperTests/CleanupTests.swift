@@ -131,3 +131,40 @@ struct CleanupTests {
         #expect(records.batches.map(\.title) == ["s", "Cleared 2 node_modules"])
     }
 }
+
+@Suite("Cleanup progress")
+struct CleanupProgressTests {
+    @Test func permanentDeleteReportsEveryFile() async throws {
+        let f = try Fixture()
+        for i in 0..<25 { try f.file("dev/p/node_modules/pkg\(i)/index.js") }
+        try FileManager.default.createSymbolicLink(at: f.url("dev/p/node_modules/link"), withDestinationURL: f.url("dev/keep"))
+        try f.file("dev/keep/precious.txt")
+        let svc = CleanupService(context: f.context(roots: ["~/dev"]), log: CleanupLog(url: f.url("log")))
+        let progress = CleanupProgress()
+        let entry = CleanupEntry(id: "nm", category: .nodeModules, label: "p", displayPath: "~/dev/p/node_modules",
+                                 urls: [f.url("dev/p/node_modules")], size: 1000, fileCount: 25)
+        let out = await svc.perform([entry], action: .delete, dryRun: false, progress: progress)
+
+        #expect(out.failures.isEmpty)
+        #expect(!f.exists("dev/p/node_modules"))
+        #expect(f.exists("dev/keep/precious.txt"), "symlinks are removed, never followed")
+        let s = progress.snapshot
+        #expect(s.filesDone >= 25)
+        #expect(s.fraction == 1)
+        #expect(s.bytesDone == 1000)
+        #expect(s.recent.contains { $0.hasSuffix("index.js") }, "individual file paths are streamed")
+        #expect(s.recent.count <= CleanupProgress.recentLimit)
+    }
+
+    @Test func trashCountsWholeEntries() async throws {
+        let f = try Fixture.standard()
+        let svc = CleanupService(context: f.context(), log: CleanupLog(url: f.url("log")))
+        let progress = CleanupProgress()
+        let entry = CleanupEntry(id: "x", category: .buildArtifacts, label: "rusty", displayPath: "~/dev/rusty/target",
+                                 urls: [f.url("dev/rusty/target")], size: 50, fileCount: 3)
+        let out = await svc.perform([entry], action: .trash, dryRun: false, progress: progress)
+        #expect(progress.snapshot.fraction == 1)
+        #expect(progress.snapshot.currentPath.hasSuffix("dev/rusty/target"))
+        if let trashed = out.records.first?.items.first?.destination { try? FileManager.default.removeItem(atPath: trashed) }
+    }
+}
