@@ -127,7 +127,9 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 
 ### Download
 
-Signed, notarized builds will be published on the [Releases](https://github.com/indieocean/yokoi/releases) page.
+**[Download Yokoi 1.0](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
+
+Every release is on the [Releases](https://github.com/indieocean/yokoi/releases) page, with a SHA-256 checksum.
 
 ### Build from source
 
@@ -222,7 +224,7 @@ It's the same idea as in a runtime: find what's no longer reachable from your ac
 
 ## Roadmap
 
-- [ ] Signed and notarized releases (pipeline ready in `scripts/release.sh`; first release pending)
+- [x] Signed and notarized releases
 - [x] Docker images, build cache and volumes
 - [x] Android SDK and emulators
 - [ ] Incremental rescans (FSEvents)
