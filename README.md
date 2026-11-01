@@ -128,9 +128,11 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 
 ### Download
 
-**[Download Yokoi 1.1.3](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
+**[Download Yokoi 1.2.0](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
 
 Every release is on the [Releases](https://github.com/indieocean/yokoi/releases) page, with a SHA-256 checksum.
+
+Yokoi updates itself with [Sparkle](https://sparkle-project.org). On the second launch it asks whether to check automatically; you can change that in **Settings › Updates** or check any time from **Yokoi › Check for Updates…**. Every update is signed, and Sparkle refuses one whose signature doesn't match.
 
 ### Build from source
 
@@ -185,7 +187,10 @@ It uses the roots, exclusions and thresholds from Settings, and never deletes an
 
 Yokoi is 100% local. It has no account, no analytics and no telemetry.
 
-The only network traffic is package managers checking registries for newer versions, and only when you click **Check for Updates**.
+Yokoi only uses the network in two cases:
+
+- **Package managers** check their registries for newer versions, only when you click **Check for Updates** on the Packages screen.
+- **App updates**: Yokoi fetches a small feed from GitHub, once a day if you allowed automatic checks, or when you choose **Check for Updates…**. The request carries Yokoi's version and nothing else (system profiling is off).
 
 <br>
 

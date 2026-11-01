@@ -175,7 +175,7 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 | UI | 60 fps scrolling with 10k-row tables. Launch to usable in < 1 s. |
 | Correctness | Size = allocated size (`totalFileAllocatedSize`). Hard links counted once. |
 | Permissions | Full Disk Access is requested with an onboarding explainer. The app degrades gracefully without it (shows unscanned locations). |
-| Privacy | 100% local. No network calls except package registry lookups the user starts. No telemetry by default. Opt-in anonymous crash reports only. |
+| Privacy | 100% local. No network calls except package registry lookups the user starts and Sparkle update checks the user allows. No telemetry by default. Opt-in anonymous crash reports only. |
 | Accessibility | Full VoiceOver labels, keyboard navigation (⌘K, ⌘⌫, space to Quick Look), Dynamic Type where possible, respects Reduce Motion/Transparency, color never the only signal (pills carry text). |
 | Appearance | Dark first. Light mode supported in v1.1. |
 | Min OS | macOS 14 Sonoma (Observation, latest SwiftUI Table/Inspector, SMAppService). |

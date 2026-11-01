@@ -124,6 +124,7 @@ final class AppModel {
     let tools: ToolActionsModel
     let scheduler: BackgroundScheduler
     let drivesVM: ExternalDrivesViewModel
+    let updater: Updater
 
     init() {
         let demo = DemoData.isEnabled
@@ -143,6 +144,7 @@ final class AppModel {
         tools = ToolActionsModel(store: store)
         scheduler = BackgroundScheduler(settings: settings, store: store)
         drivesVM = ExternalDrivesViewModel(settings: settings)
+        updater = Updater(enabled: !demo)
         settings.refreshDrives()
         if demo { fullDiskAccess = true }
         showOnboarding = !fullDiskAccess && !settings.data.hasCompletedOnboarding

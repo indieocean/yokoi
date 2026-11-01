@@ -8,6 +8,9 @@
 #
 #   Or, instead of step 2 (used by GitHub Actions), an App Store Connect API key:
 #        NOTARY_KEY_PATH=AuthKey.p8 NOTARY_KEY_ID=ABC123 NOTARY_ISSUER_ID=uuid scripts/release.sh
+#   3. The Sparkle update-signing key, in the login keychain under the account "yokoi" (made once with
+#      build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account yokoi). Its public half is
+#      SUPublicEDKey in Config/Yokoi-Info.plist. GitHub Actions passes the exported key in SPARKLE_KEY_PATH instead.
 #
 # Usage:
 #   scripts/release.sh                 # uses MARKETING_VERSION from the project
@@ -21,6 +24,9 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-yokoi-notary}"
 OUT="build/release"
 ARCHIVE="$OUT/Yokoi.xcarchive"
 EXPORT="$OUT/export"
+# Packages are checked out here (outside $OUT, so they survive) to find Sparkle's sign_update afterwards.
+PACKAGES="build/SourcePackages"
+REPO_URL="https://github.com/indieocean/yokoi"
 
 if ! security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
   echo "error: no 'Developer ID Application' certificate found in the keychain." >&2
@@ -33,7 +39,7 @@ mkdir -p "$OUT"
 
 echo "› Archiving"
 xcodebuild -project Yokoi.xcodeproj -scheme Yokoi -configuration Release \
-  -archivePath "$ARCHIVE" -destination "generic/platform=macOS" \
+  -archivePath "$ARCHIVE" -destination "generic/platform=macOS" -clonedSourcePackagesDirPath "$PACKAGES" \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Developer ID Application" DEVELOPMENT_TEAM="$TEAM_ID" \
   OTHER_CODE_SIGN_FLAGS="--timestamp" \
   -quiet archive
@@ -53,6 +59,8 @@ xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" -exportO
 
 APP="$EXPORT/Yokoi.app"
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist")
+BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$APP/Contents/Info.plist")
+MIN_OS=$(/usr/libexec/PlistBuddy -c "Print LSMinimumSystemVersion" "$APP/Contents/Info.plist")
 DMG="$OUT/Yokoi-$VERSION.dmg"
 
 echo "› Verifying signature"
@@ -92,5 +100,36 @@ spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 
 # Name only, so `shasum -c` works next to the downloaded DMG.
 (cd "$OUT" && shasum -a 256 "$(basename "$DMG")") | tee "$DMG.sha256"
+
+# Sparkle: sign the final (stapled) DMG and write the one-item appcast that is attached to the release.
+# Installed copies read it from releases/latest/download/appcast.xml and compare sparkle:version with
+# their CFBundleVersion, so CURRENT_PROJECT_VERSION must go up with every release.
+echo "› Signing the update for Sparkle"
+SIGN_UPDATE="$PACKAGES/artifacts/sparkle/Sparkle/bin/sign_update"
+if [[ -n "${SPARKLE_KEY_PATH:-}" ]]; then
+  SPARKLE_SIG=$("$SIGN_UPDATE" --ed-key-file "$SPARKLE_KEY_PATH" "$DMG")
+else
+  SPARKLE_SIG=$("$SIGN_UPDATE" --account yokoi "$DMG")
+fi
+cat > "$OUT/appcast.xml" <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Yokoi</title>
+    <link>$REPO_URL</link>
+    <item>
+      <title>Yokoi $VERSION</title>
+      <pubDate>$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")</pubDate>
+      <sparkle:version>$BUILD</sparkle:version>
+      <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>$MIN_OS</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>$REPO_URL/releases/tag/v$VERSION</sparkle:fullReleaseNotesLink>
+      <enclosure url="$REPO_URL/releases/download/v$VERSION/$(basename "$DMG")" type="application/octet-stream" $SPARKLE_SIG />
+    </item>
+  </channel>
+</rss>
+XML
+xmllint --noout "$OUT/appcast.xml"
+
 echo "✓ Ready to upload: $DMG"
-echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' --title 'Yokoi $VERSION' --generate-notes"
+echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' '$OUT/appcast.xml' --title 'Yokoi $VERSION' --generate-notes"

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keys Xcode can't generate from INFOPLIST_KEY_ build settings. Merged into the generated Info.plist. -->
+<plist version="1.0">
+<dict>
+	<!-- Sparkle: the appcast is attached to every GitHub release; "latest" always points at the newest. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/indieocean/yokoi/releases/latest/download/appcast.xml</string>
+	<!-- Public half of the EdDSA key that signs each DMG (private half: login keychain, account "yokoi"). -->
+	<key>SUPublicEDKey</key>
+	<string>H6prUy3WGLtDdDYfpgLraRpzC5fPvwhaawNaoEKM+zk=</string>
+	<!-- Never send a system profile with update checks. -->
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+</dict>
+</plist>

@@ -18,6 +18,7 @@ struct SettingsView: View {
                         ScreenshotSettingsCard()
                         ScheduleCard()
                         AutomationCard()
+                        if app.updater.isAvailable { UpdatesCard() }
                         AboutCard()
                     }
                     .frame(maxWidth: .infinity)
@@ -409,12 +410,42 @@ private struct AutomationCard: View {
     }
 }
 
+/// Sparkle updates. Hidden in debug builds and demo mode.
+private struct UpdatesCard: View {
+    @Environment(AppModel.self) private var app
+
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(short) (\(build))"
+    }
+
+    var body: some View {
+        @Bindable var updater = app.updater
+        VStack(alignment: .leading, spacing: 4) {
+            CardTitle(title: "Updates", subtitle: "Yokoi \(version). Updates are signed and notarized.")
+            SettingRow(title: "Check automatically", subtitle: "Once a day, from GitHub. Nothing about you is sent") {
+                Toggle("", isOn: $updater.automaticallyChecks).toggleStyle(.dk).fixedSize()
+            }
+            SettingRow(title: "Last checked",
+                       subtitle: updater.lastCheck.map { $0.formatted(.relative(presentation: .named)) } ?? "Never",
+                       divider: false) {
+                Button("Check Now") { updater.checkForUpdates() }
+                    .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
+                    .disabled(!updater.canCheckForUpdates)
+            }
+        }
+        .card(padding: 22)
+    }
+}
+
 private struct AboutCard: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            CardTitle(title: "Privacy & logs", subtitle: "100% local. No network calls, no telemetry.")
+            CardTitle(title: "Privacy & logs", subtitle: "100% local. No telemetry. The network is only used for checks you ask for.")
             HStack(spacing: 8) {
                 Button("Reveal Cleanup Log") { Finder.reveal([app.store.logURL]) }.buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
                 Button(app.fullDiskAccess ? "Full Disk Access: On" : "Grant Full Disk Access…") { FullDiskAccess.openSystemSettings() }

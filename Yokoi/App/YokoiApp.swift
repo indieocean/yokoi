@@ -59,6 +59,12 @@ struct YokoiApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 820)
         .commands {
+            CommandGroup(after: .appInfo) {
+                if app.updater.isAvailable {
+                    Button("Check for Updates…") { app.updater.checkForUpdates() }
+                        .disabled(!app.updater.canCheckForUpdates)
+                }
+            }
             CommandGroup(replacing: .newItem) {}
             CommandMenu("Scan") {
                 Button(app.store.isScanning ? "Stop Scan" : "Scan Everything") {

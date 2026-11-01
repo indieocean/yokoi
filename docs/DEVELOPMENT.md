@@ -55,7 +55,9 @@ opt-in flags and a restore hint. Badge color and name go in `Ecosystem` (`Core/M
 - Every cleanup is appended to `~/Library/Application Support/Yokoi/cleanup.log` (JSON Lines:
   batch, timestamp, action, path, size, Trash location of each item).
 - Cache cleanup removes a cache folder's *contents*, never the folder. No telemetry. The only network
-  traffic is package managers checking for updates, and only when you click "Check for Updates".
+  traffic is package managers checking for updates when you click "Check for Updates", and Sparkle's app update
+  check (`Yokoi/App/Updater.swift`), which runs only if the user allowed it or chose "Check for Updates…".
+  Debug builds and demo mode never start Sparkle.
 
 ## Status
 
@@ -111,6 +113,14 @@ takes a full scan from about 14 s to about 3 s.
 notarizes it with `notarytool` and staples it. One-time setup is at the top of the script.
 `SKIP_NOTARIZE=1` stops after signing.
 
+After notarizing it signs the DMG with the Sparkle key and writes `build/release/appcast.xml`, which is attached to
+the release. Installed copies read `releases/latest/download/appcast.xml` (`SUFeedURL` in `Config/Yokoi-Info.plist`)
+and only offer an update whose **build number** is higher than theirs, so bump `CURRENT_PROJECT_VERSION` every
+release (the workflow refuses a tag that doesn't). The Sparkle key is in the login keychain under the account
+`yokoi`; its public half is `SUPublicEDKey`. Losing the private key means installed copies can't be updated
+automatically any more, so keep a backup:
+`build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account yokoi -x sparkle-private.key`.
+
 The DMG window (background, icon positions, volume icon) is laid out by `dmgbuild` from `scripts/dmg-settings.py`,
 installed into `build/dmgbuild-venv` on first use. The background is `assets/dmg/background.tiff` (1x + 2x), drawn by
 `scripts/make-dmg-background.py`. To change it, edit that script (it needs Pillow), then:
@@ -122,7 +132,7 @@ Icon positions are set in both scripts and must match.
 `.github/workflows/release.yml` runs the same script when a version tag is pushed, then publishes the release:
 
 ```sh
-# bump MARKETING_VERSION (and CURRENT_PROJECT_VERSION) first; the tag must match
+# bump MARKETING_VERSION and CURRENT_PROJECT_VERSION first; the tag must match
 git tag v1.2 && git push origin v1.2
 ```
 
@@ -135,8 +145,9 @@ It needs these repository secrets (Settings › Secrets and variables › Action
 | `NOTARY_API_KEY` | The full text of the App Store Connect API key (`AuthKey_XXXX.p8`) |
 | `NOTARY_KEY_ID` | That key's ID |
 | `NOTARY_ISSUER_ID` | The issuer ID shown above the keys list in App Store Connect |
+| `SPARKLE_PRIVATE_KEY` | The Sparkle update-signing key: `generate_keys --account yokoi -x key.txt`, then paste the file's contents |
 
-The certificate goes into a temporary keychain that is deleted at the end of the run.
+The certificate goes into a temporary keychain and the keys into temporary files, all deleted at the end of the run.
 `.github/workflows/test.yml` runs the tests (unsigned) on pushes to `main` and on pull requests.
 
 ## README screenshots
