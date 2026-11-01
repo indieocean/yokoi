@@ -8,7 +8,29 @@ enum Entry {
         if CommandLineTool.isRequested(args) {
             exit(CommandLineTool.run(args, settings: SettingsStore.loadStandard))
         }
+        if SingleInstance.handOffToRunningCopy() { exit(0) }
         YokoiApp.main()
+    }
+}
+
+/// Only one Yokoi runs at a time, even with several copies on disk (Applications, the mounted DMG,
+/// a build folder). A second launch brings the running one forward and quits.
+enum SingleInstance {
+    static func handOffToRunningCopy() -> Bool {
+        #if DEBUG
+        return false  // let a debug build run next to the installed app
+        #else
+        guard let id = Bundle.main.bundleIdentifier else { return false }
+        let me = ProcessInfo.processInfo.processIdentifier
+        guard let other = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+            .first(where: { $0.processIdentifier != me && !$0.isTerminated }),
+            let url = other.bundleURL else { return false }
+        // Opening the running copy's bundle reactivates it and reopens its window if it was closed.
+        let done = DispatchSemaphore(value: 0)
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in done.signal() }
+        _ = done.wait(timeout: .now() + 5)
+        return true
+        #endif
     }
 }
 
@@ -16,7 +38,8 @@ struct YokoiApp: App {
     @State private var app = AppModel()
 
     var body: some Scene {
-        WindowGroup("Yokoi", id: "main") {
+        // A single window: opening it again (menu bar, Dock) brings it forward instead of adding another.
+        Window("Yokoi", id: "main") {
             RootView()
                 .environment(app)
                 .preferredColorScheme(.dark)
