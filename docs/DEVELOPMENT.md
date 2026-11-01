@@ -64,7 +64,8 @@ simulators, local Time Machine snapshots), Big Files, Screenshots (+ daily auto 
 (uninstall + `~/Library` leftovers), **External Drives** (drive Trash, `.DS_Store`, `._` files, include a
 drive in scans), **Package Managers** (npm/pnpm/brew/casks/cargo/pip/gem with confirmed update/uninstall),
 confirmation sheet, Put Back (undo from the log), open-project blocking, menu bar helper, scheduled scans,
-launch at login, notifications, Settings.
+launch at login, notifications, Settings, **Docker** (unused images, build cache, dangling volumes via `docker`),
+**Android** (AVDs, system images, SDK and build caches, Gradle wrapper dists), the **`yokoi` CLI** and **App Intents**.
 
 Extra safety added with these:
 - Personal data is hard-blocked regardless of roots: Keychains, Mail, Messages, iCloud Drive
@@ -73,6 +74,24 @@ Extra safety added with these:
   running app). Checked when the sheet opens and again right before acting.
 - Command-line tools run without a shell, arguments passed literally; `sudo`, `su`, `osascript` and shells
   are refused outright.
+
+## Command line and Shortcuts
+
+- `Core/CLI/CommandLineTool.swift`: the `yokoi` command. `Yokoi/App/YokoiApp.swift` has a custom `@main` (`Entry`)
+  that runs it instead of the app when the binary is invoked as `yokoi` (a lowercase symlink) or with a known
+  subcommand (`Yokoi scan --json`). Other arguments, such as Xcode's `-NSDocumentRevisionsDebugMode`, start the app.
+- `Core/Scanning/ScanReport.swift`: the headless, read-only scan both the CLI and Shortcuts use. Its totals follow
+  `ScanStore.total` so the numbers match the dashboard.
+- `Yokoi/App/Intents.swift`: App Intents (scan, free space, open a screen) and the `AppShortcutsProvider`.
+  Navigation from an intent goes through `IntentRouter`, which waits for `AppModel` if the window isn't up yet.
+
+None of these can delete. Cleaning always goes through the confirmation sheet.
+
+## Releasing
+
+`scripts/release.sh` archives with the Developer ID certificate, exports, verifies the hardened runtime, builds a DMG,
+notarizes it with `notarytool` and staples it. One-time setup is at the top of the script.
+`SKIP_NOTARIZE=1` stops after signing.
 
 ## README screenshots
 

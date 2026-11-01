@@ -51,7 +51,8 @@ actor ProcessRunner {
                         "\(home)/Library/pnpm", "\(home)/Library/pnpm/bin", "\(home)/.local/bin", "\(home)/go/bin", "/usr/local/go/bin", "/opt/local/bin",
                         "\(home)/.dotnet/tools", "/usr/local/share/dotnet", "\(home)/miniconda3/bin", "\(home)/miniforge3/bin",
                         "\(home)/anaconda3/bin", "/opt/homebrew/anaconda3/bin", "\(home)/.composer/vendor/bin",
-                        "\(home)/.volta/bin", "\(home)/.local/share/fnm/aliases/default/bin"]
+                        "\(home)/.volta/bin", "\(home)/.docker/bin", "\(home)/.orbstack/bin", "/Applications/Docker.app/Contents/Resources/bin",
+                        "\(home)/Library/Android/sdk/platform-tools", "\(home)/Library/Android/sdk/emulator", "\(home)/.local/share/fnm/aliases/default/bin"]
             + Self.nvmNodeBins(home: home)
             + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
         var path = fallback.joined(separator: ":")

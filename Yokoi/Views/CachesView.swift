@@ -19,7 +19,7 @@ struct CachesView: View {
                 ScanProgressStrip(category: .caches)
                 if store.caches.isEmpty && !store.scanningCategories.contains(.caches) {
                     EmptyStateView(symbol: "archivebox", title: "No caches measured yet",
-                                   message: "Run a scan to measure npm, Yarn, pnpm, Homebrew, CocoaPods, pip, Cargo, Xcode and browser caches.",
+                                   message: "Run a scan to measure npm, Yarn, pnpm, Homebrew, CocoaPods, pip, Cargo, Xcode, Android and browser caches.",
                                    actionTitle: "Scan caches") { store.scan([.caches]) }
                         .card()
                 } else {
@@ -138,7 +138,7 @@ extension CacheRow where Accessory == EmptyView {
     }
 }
 
-/// Cleanups that go through the owning tool (simctl, tmutil). Each shows its exact command first.
+/// Cleanups that go through the owning tool (simctl, tmutil, docker). Each shows its exact command first.
 private struct ToolActionsSection: View {
     @Environment(AppModel.self) private var app
 
@@ -163,12 +163,13 @@ private struct ToolActionsSection: View {
                     Badge(text: action.badge, color: Theme.info, size: 28, fontSize: 10.5)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(action.title).font(.system(size: 13.5)).foregroundStyle(Theme.textPrimary)
-                        Text(action.explanation).font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary).lineLimit(1)
+                        Text(LocalizedStringKey(action.explanation)).font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary).lineLimit(1)
+                            .help(status == nil && action.isDocker && tools.loaded ? "Docker isn't installed or its engine isn't running." : "")
                     }
                     Spacer(minLength: 12)
                     Group {
                         if let status {
-                            Text(status.count == 0 ? "none" : CountFormat.plural(status.count, action == .localSnapshots ? "snapshot" : "device"))
+                            Text(status.count == 0 ? "none" : CountFormat.plural(status.count, action.noun))
                                 .font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
                         } else {
                             Text(tools.loaded ? "unavailable" : "not checked").font(Theme.mono(11.5)).foregroundStyle(Theme.textTertiary)
@@ -201,7 +202,7 @@ struct ToolActionSheet: View {
         let tools = app.tools
         VStack(alignment: .leading, spacing: 14) {
             Text("Delete \(status.action.title.lowercased())?").font(.system(size: 17, weight: .semibold))
-            Text(status.action.explanation).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+            Text(LocalizedStringKey(status.action.explanation)).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(status.items, id: \.self) { Text($0).font(Theme.mono(11.5)) }

@@ -7,6 +7,7 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
         case javascript = "JavaScript"
         case nativeToolchains = "Native toolchains"
         case xcode = "Xcode"
+        case android = "Android"
         case aiModels = "AI models"
         case downloads = "Downloads"
         case browsers = "Browsers"
@@ -32,6 +33,10 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
     var permanentOnly: Bool = false
 
     func url(home: URL) -> URL { home.appendingPathComponent(relativePath) }
+
+    /// Locations a running process may be using (emulators keep their AVD open). Cleanup is refused while
+    /// a process holds a file inside them, like an open project.
+    static let inUseGuarded: Set<String> = ["android-avd", "android-system-images"]
 }
 
 extension CacheLocation {
@@ -61,6 +66,8 @@ extension CacheLocation {
                       safety: .redownload, badge: "cg", colorHex: 0xF97316, restoreHint: "cargo re-downloads crates on the next build"),
         CacheLocation(id: "gradle-caches", name: "Gradle caches", section: .nativeToolchains, relativePath: ".gradle/caches",
                       safety: .redownload, badge: "gr", colorHex: 0x34D399, restoreHint: "Gradle re-downloads dependencies on the next build"),
+        CacheLocation(id: "gradle-wrapper", name: "Gradle wrapper distributions", section: .nativeToolchains, relativePath: ".gradle/wrapper/dists",
+                      safety: .redownload, badge: "gr", colorHex: 0x34D399, restoreHint: "./gradlew downloads its distribution again on the next build"),
         CacheLocation(id: "cocoapods", name: "CocoaPods", section: .nativeToolchains, relativePath: "Library/Caches/CocoaPods",
                       safety: .safe, badge: "pod", colorHex: 0xF87171, restoreHint: "pod install refills it"),
         CacheLocation(id: "pip", name: "pip", section: .nativeToolchains, relativePath: "Library/Caches/pip",
@@ -77,6 +84,15 @@ extension CacheLocation {
                       safety: .review, badge: "arc", colorHex: 0x60A5FA, restoreHint: "archives contain dSYMs and can't be recreated"),
         CacheLocation(id: "device-support", name: "Device support", section: .xcode, relativePath: "Library/Developer/Xcode/iOS DeviceSupport",
                       safety: .review, badge: "dev", colorHex: 0x60A5FA, restoreHint: "Xcode re-copies symbols when a device connects"),
+        // Android
+        CacheLocation(id: "android-avd", name: "Android emulators (AVDs)", section: .android, relativePath: ".android/avd",
+                      safety: .review, badge: "avd", colorHex: 0x3DDC84, restoreHint: "recreate emulators in Android Studio › Device Manager (their app data is lost)"),
+        CacheLocation(id: "android-system-images", name: "Android system images", section: .android, relativePath: "Library/Android/sdk/system-images",
+                      safety: .review, badge: "img", colorHex: 0x3DDC84, restoreHint: "reinstall them in Android Studio › SDK Manager; emulators that use them won't boot until then"),
+        CacheLocation(id: "android-cache", name: "Android SDK cache", section: .android, relativePath: ".android/cache",
+                      safety: .safe, badge: "and", colorHex: 0x3DDC84, restoreHint: "the SDK tools rebuild it"),
+        CacheLocation(id: "android-build-cache", name: "Android build cache", section: .android, relativePath: ".android/build-cache",
+                      safety: .safe, badge: "and", colorHex: 0x3DDC84, restoreHint: "the Android Gradle plugin rebuilds it on the next build"),
         // AI models (opt-in: unchecked by default)
         CacheLocation(id: "ollama", name: "Ollama models", section: .aiModels, relativePath: ".ollama/models",
                       safety: .review, badge: "ol", colorHex: 0xE6E8EE, restoreHint: "`ollama pull` downloads models again"),

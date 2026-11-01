@@ -20,6 +20,7 @@ struct InUseSnapshot: Sendable {
     static let devTools: Set<String> = [
         "Xcode", "Unity", "UnrealEditor", "UE4Editor", "node", "bun", "deno", "java", "cargo", "rustc",
         "rust-analyzer", "sourcekit-lsp", "swift-build", "gradle", "dotnet", "Rider", "Code Helper",
+        "emulator", "qemu-system-aarch64", "qemu-system-x86_64", "qemu-system-armel",
     ]
 
     /// The name of a process using `root` or anything inside it, or nil when nothing is.

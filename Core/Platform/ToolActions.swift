@@ -4,6 +4,9 @@ import Foundation
 enum ToolAction: String, CaseIterable, Sendable, Identifiable {
     case unavailableSimulators
     case localSnapshots
+    case dockerImages
+    case dockerBuildCache
+    case dockerVolumes
 
     var id: String { rawValue }
 
@@ -11,6 +14,9 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .unavailableSimulators: "Unavailable simulators"
         case .localSnapshots: "Local Time Machine snapshots"
+        case .dockerImages: "Unused Docker images"
+        case .dockerBuildCache: "Docker build cache"
+        case .dockerVolumes: "Unused Docker volumes"
         }
     }
 
@@ -18,13 +24,32 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .unavailableSimulators: "sim"
         case .localSnapshots: "tm"
+        case .dockerImages: "img"
+        case .dockerBuildCache: "bk"
+        case .dockerVolumes: "vol"
         }
     }
+
+    /// Singular noun for the count column ("3 images").
+    var noun: String {
+        switch self {
+        case .unavailableSimulators: "device"
+        case .localSnapshots: "snapshot"
+        case .dockerImages: "image"
+        case .dockerBuildCache: "record"
+        case .dockerVolumes: "volume"
+        }
+    }
+
+    var isDocker: Bool { [.dockerImages, .dockerBuildCache, .dockerVolumes].contains(self) }
 
     var explanation: String {
         switch self {
         case .unavailableSimulators: "Simulators whose iOS runtime is no longer installed. Xcode can't boot them."
         case .localSnapshots: "APFS snapshots macOS keeps between Time Machine backups. macOS frees them on its own when space runs low."
+        case .dockerImages: "Images no container uses, including dangling layers. `docker pull` or a rebuild brings them back."
+        case .dockerBuildCache: "BuildKit layer cache. The next `docker build` is slower while it refills."
+        case .dockerVolumes: "Volumes no container is attached to. They can hold database data, which is lost for good."
         }
     }
 }
@@ -64,6 +89,38 @@ struct ToolActionService: Sendable {
             return ToolActionStatus(action: action, count: dates.count, size: nil, items: dates,
                                     commands: dates.map { ["tmutil", "deletelocalsnapshots", $0] },
                                     note: "macOS may require administrator rights for this. Yokoi never uses sudo; if it fails, run `sudo tmutil deletelocalsnapshots /` yourself.")
+        case .dockerImages, .dockerBuildCache, .dockerVolumes:
+            return await dockerStatus(action)
+        }
+    }
+
+    /// Docker is asked through its own CLI. Nil when Docker isn't installed or its engine isn't running.
+    private func dockerStatus(_ action: ToolAction) async -> ToolActionStatus? {
+        guard await runner.which("docker") != nil,
+              let r = try? await runner.run(["docker", "system", "df", "--format", "{{json .}}"], timeout: 30),
+              r.succeeded else { return nil }
+        let usage = Self.parseDockerDF(r.stdout)
+        switch action {
+        case .dockerImages:
+            guard let u = usage["Images"] else { return nil }
+            let count = max(0, u.total - u.active)
+            return ToolActionStatus(action: action, count: count, size: u.reclaimable, items: [],
+                                    commands: count > 0 ? [["docker", "image", "prune", "--all", "--force"]] : [], note: nil)
+        case .dockerBuildCache:
+            guard let u = usage["Build Cache"] else { return nil }
+            let count = u.reclaimable > 0 ? max(u.total - u.active, 1) : 0
+            return ToolActionStatus(action: action, count: count, size: u.reclaimable, items: [],
+                                    commands: count > 0 ? [["docker", "builder", "prune", "--all", "--force"]] : [], note: nil)
+        case .dockerVolumes:
+            guard let ls = try? await runner.run(["docker", "volume", "ls", "--quiet", "--filter", "dangling=true"], timeout: 30),
+                  ls.succeeded else { return nil }
+            let names = ls.stdout.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            // Named volumes are listed one by one, so exactly these and nothing created since are removed.
+            return ToolActionStatus(action: action, count: names.count, size: names.isEmpty ? 0 : usage["Local Volumes"]?.reclaimable,
+                                    items: names, commands: names.isEmpty ? [] : [["docker", "volume", "rm"] + names],
+                                    note: "Volume data can't be put back. Check the list for databases you still need.")
+        default:
+            return nil
         }
     }
 
@@ -95,6 +152,36 @@ struct ToolActionService: Sendable {
             }
         }
         .sorted { $0.name < $1.name }
+    }
+
+    struct DockerUsage: Sendable, Equatable {
+        let total: Int
+        let active: Int
+        let size: Int64
+        let reclaimable: Int64
+    }
+
+    /// Parses `docker system df --format '{{json .}}'` (one JSON object per line), keyed by Type.
+    static func parseDockerDF(_ output: String) -> [String: DockerUsage] {
+        var out: [String: DockerUsage] = [:]
+        for line in output.split(whereSeparator: \.isNewline) {
+            guard let data = line.data(using: .utf8),
+                  let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let type = obj["Type"] as? String else { continue }
+            func int(_ k: String) -> Int { (obj[k] as? Int) ?? Int((obj[k] as? String) ?? "") ?? 0 }
+            func bytes(_ k: String) -> Int64 { parseDockerSize((obj[k] as? String) ?? "") ?? 0 }
+            out[type] = DockerUsage(total: int("TotalCount"), active: int("Active"), size: bytes("Size"), reclaimable: bytes("Reclaimable"))
+        }
+        return out
+    }
+
+    /// Docker's human sizes (`1.21GB (54%)`, `512.3MB`, `0B`, `12kB`) are decimal (1000-based).
+    static func parseDockerSize(_ text: String) -> Int64? {
+        let s = text.split(separator: " ").first.map(String.init) ?? ""
+        guard let split = s.firstIndex(where: { $0.isLetter }), let value = Double(s[..<split]) else { return nil }
+        let units: [String: Double] = ["B": 1, "KB": 1e3, "MB": 1e6, "GB": 1e9, "TB": 1e12, "PB": 1e15]
+        guard let mult = units[s[split...].uppercased()] else { return nil }
+        return Int64((value * mult).rounded())
     }
 
     /// Parses `tmutil listlocalsnapshots /` → snapshot dates like `2026-10-30-101010`.

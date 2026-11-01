@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var app
@@ -16,6 +17,7 @@ struct SettingsView: View {
                     VStack(spacing: Theme.Metrics.cardGap) {
                         ScreenshotSettingsCard()
                         ScheduleCard()
+                        AutomationCard()
                         AboutCard()
                     }
                     .frame(maxWidth: .infinity)
@@ -361,6 +363,49 @@ private struct ScheduleCard: View {
         .onChange(of: settings.data.autoScan) { _, on in
             if on { Task { await app.scheduler.requestNotificationPermission() } }
         }
+    }
+}
+
+/// The `yokoi` command-line companion and Shortcuts actions.
+private struct AutomationCard: View {
+    @State private var copied = false
+
+    private var installCommand: String {
+        let binary = Bundle.main.executableURL?.path ?? "/Applications/Yokoi.app/Contents/MacOS/Yokoi"
+        return "sudo ln -sf \(ProcessRunner.quote(binary)) /usr/local/bin/yokoi"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CardTitle(title: "Command line & Shortcuts",
+                      subtitle: "yokoi scan --json reports what a scan finds. It never deletes anything.")
+            Text(installCommand)
+                .font(Theme.mono(11))
+                .foregroundStyle(Theme.textSecondary)
+                .textSelection(.enabled)
+                .lineLimit(2)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 8).fill(.black.opacity(0.25)))
+            HStack(spacing: 8) {
+                Button(copied ? "Copied" : "Copy Install Command") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(installCommand, forType: .string)
+                    copied = true
+                }
+                .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
+                Button("Open Shortcuts") {
+                    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts") {
+                        NSWorkspace.shared.openApplication(at: url, configuration: .init())
+                    }
+                }
+                .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
+            }
+            Text("Run it in Terminal yourself: Yokoi never uses sudo. Shortcuts gets “Scan for Reclaimable Space”, “Get Free Disk Space” and “Open Yokoi”.")
+                .font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .card(padding: 22)
     }
 }
 

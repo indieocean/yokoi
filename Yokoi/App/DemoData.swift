@@ -261,7 +261,13 @@ enum DemoData {
     static var toolStatuses: [ToolAction: ToolActionStatus] {
         [.unavailableSimulators: ToolActionStatus(action: .unavailableSimulators, count: 6, size: 3_270 * MB,
                                                   items: ["iPhone 14 (iOS-16-4)"], commands: [["xcrun", "simctl", "delete", "unavailable"]], note: nil),
-         .localSnapshots: ToolActionStatus(action: .localSnapshots, count: 3, size: nil, items: [], commands: [], note: nil)]
+         .localSnapshots: ToolActionStatus(action: .localSnapshots, count: 3, size: nil, items: [], commands: [], note: nil),
+         .dockerImages: ToolActionStatus(action: .dockerImages, count: 11, size: 7_840 * MB, items: [],
+                                         commands: [["docker", "image", "prune", "--all", "--force"]], note: nil),
+         .dockerBuildCache: ToolActionStatus(action: .dockerBuildCache, count: 214, size: 4_120 * MB, items: [],
+                                             commands: [["docker", "builder", "prune", "--all", "--force"]], note: nil),
+         .dockerVolumes: ToolActionStatus(action: .dockerVolumes, count: 2, size: 1_310 * MB, items: ["orbital_pgdata", "3f9c1e7a2b"],
+                                          commands: [["docker", "volume", "rm", "orbital_pgdata", "3f9c1e7a2b"]], note: nil)]
     }
 
     /// Plausible file paths inside an entry, streamed by the demo cleanup.

@@ -18,7 +18,7 @@ final class SettingsStore {
     }
 
     /// Saved values laid over the defaults, so settings added in a newer version never reset old ones.
-    static func load(_ raw: Data?) -> SettingsData {
+    nonisolated static func load(_ raw: Data?) -> SettingsData {
         let base = SettingsData.defaults()
         guard let raw,
               let stored = (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any],
@@ -83,5 +83,13 @@ final class SettingsStore {
 
     func removeExclusion(_ pattern: String) {
         data.exclusions.removeAll { $0 == pattern }
+    }
+}
+
+extension SettingsStore {
+    /// The saved settings, readable outside the main actor (CLI, Shortcuts).
+    nonisolated static func loadStandard() -> SettingsData {
+        let raw = UserDefaults.standard.data(forKey: "settings.v1")
+        return load(raw)
     }
 }

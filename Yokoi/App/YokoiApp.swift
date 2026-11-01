@@ -1,6 +1,17 @@
 import SwiftUI
 
+/// Starts the `yokoi` command-line companion when asked for, otherwise the app.
 @main
+enum Entry {
+    static func main() {
+        let args = CommandLine.arguments
+        if CommandLineTool.isRequested(args) {
+            exit(CommandLineTool.run(args, settings: SettingsStore.loadStandard))
+        }
+        YokoiApp.main()
+    }
+}
+
 struct YokoiApp: App {
     @State private var app = AppModel()
 

@@ -50,7 +50,10 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
         case let i as NodeModulesItem: projectRoot = i.projectURL
         case let i as ArtifactItem: projectRoot = i.isGlobal ? nil : i.projectURL
         case let i as AppItem: projectRoot = i.url
-        case let i as CacheItem: permanentOnly = i.permanentOnly
+        case let i as CacheItem:
+            permanentOnly = i.permanentOnly
+            // A running emulator keeps its AVD's files open: block like an open project.
+            if CacheLocation.inUseGuarded.contains(i.locationID) { projectRoot = i.url }
         default: break
         }
     }

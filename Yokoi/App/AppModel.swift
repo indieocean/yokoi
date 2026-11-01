@@ -147,6 +147,7 @@ final class AppModel {
         if demo { fullDiskAccess = true }
         showOnboarding = !fullDiskAccess && !settings.data.hasCompletedOnboarding
         scheduler.configure()
+        IntentRouter.attach(self)
     }
 
     func onLaunch() {

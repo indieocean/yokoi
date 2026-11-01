@@ -48,8 +48,8 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 |---|---|---|
 | **📦 Package managers** | **Project `node_modules`** for npm · pnpm · yarn · bun, with framework, lockfile and last-touched date. **Global packages and environments** for 17 managers (Homebrew, Cargo, pip, conda…), with outdated and unused flags | node_modules is marked **stale** after 90 days untouched (configurable), and active projects start unchecked. Every update or uninstall shows the exact command and asks first |
 | **🔨 Build artifacts** | `target/`, `.build/`, DerivedData, `build/`, `.gradle/`, `.venv`, `__pycache__`, `bin/obj`, `.next`, Unity `Library/`, Unreal `Intermediate/` + `DerivedDataCache/`… | Only matched **next to the project's marker file**, so a random `target/` folder is never touched |
-| **🗄️ Caches** | npm, Yarn, pnpm, Bun, Homebrew, Cargo, Gradle, CocoaPods, pip, Xcode, simulators, browsers, Ollama / Hugging Face / LM Studio models, installers in Downloads, Trash | Every location is tagged **Safe**, **Re-download** or **Review** |
-| **🧰 Tool cleanups** | Unavailable iOS simulators, local Time Machine snapshots | Done through the tool itself (`xcrun simctl`, `tmutil`), with the exact command shown first |
+| **🗄️ Caches** | npm, Yarn, pnpm, Bun, Homebrew, Cargo, Gradle (+ wrapper distributions), CocoaPods, pip, Xcode, simulators, **Android emulators, system images and build cache**, browsers, Ollama / Hugging Face / LM Studio models, installers in Downloads, Trash | Every location is tagged **Safe**, **Re-download** or **Review**. Emulators that are running are refused |
+| **🧰 Tool cleanups** | Unavailable iOS simulators, local Time Machine snapshots, **unused Docker images, Docker build cache and dangling volumes** | Done through the tool itself (`xcrun simctl`, `tmutil`, `docker`), with the exact command shown first. Volumes are listed by name, so nothing created later is swept up |
 | **🐘 Big files** | Videos, archives, disk images, VMs (`.utm`, `.vmdk`…), 3D and art files | Log-scale size slider from 100 MB to 10 GB+, with filters by type |
 | **📸 Screenshots** | Screenshots and screen recordings in your screenshot folder | File them into `YYYY/MM` folders or trash them, by hand or with a daily rule |
 | **🧩 Applications** | Installed apps with size, last opened, and their leftovers in `~/Library` | Uninstalls the app *and* its support files. Apple apps and running apps are locked |
@@ -61,6 +61,10 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 <br>
 
 **Build artifacts:** Rust · Xcode · Swift PM · Gradle / Android · Python · .NET · Unity · Unreal Engine · Go · Next.js / Nuxt / SvelteKit / Turbo / Parcel · CMake
+
+**Android:** emulators (AVDs) · SDK system images · SDK cache · Android Gradle build cache · Gradle wrapper distributions
+
+**Docker** (through the `docker` CLI, Docker Desktop, OrbStack or Colima): unused images · BuildKit build cache · dangling volumes
 
 **Package managers** (project `node_modules` for npm · pnpm · Yarn · Bun, plus global packages): npm · pnpm · Yarn · Bun · Homebrew · Homebrew Casks · MacPorts · Mac App Store (`mas`) · Cargo · Go · .NET tools · pip · pipx · uv · conda · RubyGems · Composer
 
@@ -101,10 +105,11 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 - **Dry run.** Preview exactly what would happen, with sizes, without touching a byte.
 - **Scoped access.** Each category can only touch its own folders. node_modules cleanup can't reach your Downloads, and caches cleanup can't reach your projects.
 - **Hands off your life.** Keychains, Mail, Messages, iCloud Drive, cloud storage, Photos libraries, `/System` and `.git` are blocked unconditionally, even if you add them by accident.
-- **Busy means no.** Projects open in Xcode, Unity, Unreal or a running `node` process, and running apps, are refused. Yokoi checks twice: when you confirm and again right before acting.
+- **Busy means no.** Projects open in Xcode, Unity, Unreal or a running `node` process, running apps, and Android emulators that are booted are refused. Yokoi checks twice: when you confirm and again right before acting.
 - **Recent means careful.** Projects you touched in the last 14 days start unchecked and need an extra confirmation.
 - **No escalation.** Yokoi never runs `sudo`. Command-line tools are run without a shell, and arguments are passed literally, so package names can't inject commands.
 - **Symlink-proof.** Symlinks are removed, never followed. Paths are checked both as written and with symlinks resolved.
+- **Look, don't touch.** The `yokoi` command and the Shortcuts actions only scan and report. Cleaning always goes through the app's confirmation sheet.
 - **Everything is logged.** Every cleanup is written to `~/Library/Application Support/Yokoi/cleanup.log` with path, size, action and where it went.
 
 <p align="center">
@@ -122,13 +127,13 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 
 ### Download
 
-Signed, notarized builds will be published on the [Releases](../../releases) page.
+Signed, notarized builds will be published on the [Releases](https://github.com/indieocean/yokoi/releases) page.
 
 ### Build from source
 
 ```sh
-git clone <this-repo>
-cd <repo>
+git clone https://github.com/indieocean/yokoi.git
+cd yokoi
 open Yokoi.xcodeproj   # then press ⌘R
 ```
 
@@ -153,6 +158,23 @@ Yokoi works without it too. It just skips what it can't read.
 - Search any list with `⌘K`, rescan the current screen with `⌘R`, and clean the selection with `⌘⌫`.
 - Optional **menu bar helper** shows free and reclaimable space, with one-click access.
 - Optional **scheduled scans** (daily, weekly or monthly) run at low priority, with a notification when reclaimable space passes a threshold.
+- **Shortcuts and Siri:** *Scan for Reclaimable Space* (returns bytes), *Get Free Disk Space* and *Open Yokoi* on any screen. None of them deletes anything.
+
+### Command line
+
+The app binary doubles as a read-only `yokoi` command. Link it once (Settings → Command line & Shortcuts has a copy button):
+
+```sh
+sudo ln -sf /Applications/Yokoi.app/Contents/MacOS/Yokoi /usr/local/bin/yokoi
+```
+
+```sh
+yokoi scan                                  # summary + 5 largest items per category
+yokoi scan --json | jq .reclaimableBytes    # full report for scripts and CI
+yokoi scan --category caches,build-artifacts --top 10
+```
+
+It uses the roots, exclusions and thresholds from Settings, and never deletes anything: cleaning stays in the app.
 
 <br>
 
@@ -200,12 +222,12 @@ It's the same idea as in a runtime: find what's no longer reachable from your ac
 
 ## Roadmap
 
-- [ ] Signed and notarized releases
-- [ ] Docker images and volumes
-- [ ] Android SDK and emulators
+- [ ] Signed and notarized releases (pipeline ready in `scripts/release.sh`; first release pending)
+- [x] Docker images, build cache and volumes
+- [x] Android SDK and emulators
 - [ ] Incremental rescans (FSEvents)
-- [ ] `yokoi` command-line companion (`yokoi scan --json`)
-- [ ] Shortcuts and App Intents
+- [x] `yokoi` command-line companion (`yokoi scan --json`)
+- [x] Shortcuts and App Intents
 
 <br>
 
