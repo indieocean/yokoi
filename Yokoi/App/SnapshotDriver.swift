@@ -14,7 +14,11 @@ enum SnapshotDriver {
         guard let dir = outputDirectory else { return }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         if app.store.isDemo {
-            await runReadmeCapture(app, dir: dir)
+            if UserDefaults.standard.bool(forKey: "DKCaptureCleanupAnimation") {
+                await runAnimationCapture(app, dir: dir)
+            } else {
+                await runReadmeCapture(app, dir: dir)
+            }
             return
         }
         app.showOnboarding = false
@@ -118,6 +122,64 @@ enum SnapshotDriver {
 
         try? await Task.sleep(for: .milliseconds(300))
         NSApp.terminate(nil)
+    }
+
+    /// Demo mode: records the cleanup overlay as numbered PNG frames plus an ffmpeg concat list
+    /// (`frames.txt`) with each frame's real duration. `scripts/make-cleanup-gif.sh` turns it into a GIF.
+    static func runAnimationCapture(_ app: AppModel, dir: URL) async {
+        if let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil }) {
+            window.setContentSize(NSSize(width: 1280, height: 820))
+            window.center()
+        }
+        app.screen = .dashboard
+        try? await Task.sleep(for: .seconds(1.5))
+
+        let queue = DispatchQueue(label: "frames", qos: .userInitiated)
+        var stamps: [(String, Date)] = []
+        var index = 0
+        func frame() {
+            guard let image = windowImage(nominal: true) else { return }
+            let name = String(format: "frame-%04d.png", index)
+            index += 1
+            stamps.append((name, Date()))
+            let url = dir.appendingPathComponent(name)
+            queue.async {
+                if let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) {
+                    try? data.write(to: url)
+                }
+            }
+        }
+
+        // A short beat of the dashboard, then the cleanup, then hold on the result.
+        let start = Date()
+        while Date().timeIntervalSince(start) < 0.5 { frame(); try? await Task.sleep(for: .milliseconds(66)) }
+        let run = Task { await app.run(app.store.smartSelection(), action: .trash) }
+        while !(app.activity?.isFinished ?? false) { frame(); try? await Task.sleep(for: .milliseconds(66)) }
+        let end = Date()
+        while Date().timeIntervalSince(end) < 2.2 { frame(); try? await Task.sleep(for: .milliseconds(66)) }
+        await run.value
+
+        var list = "ffconcat version 1.0\n"
+        for (i, (name, date)) in stamps.enumerated() {
+            let next = i + 1 < stamps.count ? stamps[i + 1].1 : date.addingTimeInterval(1.5)
+            list += "file '\(name)'\nduration \(String(format: "%.3f", next.timeIntervalSince(date)))\n"
+        }
+        // The concat demuxer ignores the last duration unless the file is repeated.
+        if let last = stamps.last { list += "file '\(last.0)'\n" }
+        queue.sync {}
+        try? list.write(to: dir.appendingPathComponent("frames.txt"), atomically: true, encoding: .utf8)
+        app.dismissActivity()
+        try? await Task.sleep(for: .milliseconds(300))
+        NSApp.terminate(nil)
+    }
+
+    /// `nominal` captures at 1× (kCGWindowImageNominalResolution), which is much cheaper per frame.
+    private static func windowImage(nominal: Bool = false) -> CGImage? {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.sheetParent == nil && $0.contentView != nil }) else { return nil }
+        typealias CreateImage = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+        guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return nil }
+        let create = unsafeBitCast(sym, to: CreateImage.self)
+        return create(.null, 1 << 3, UInt32(window.windowNumber), nominal ? (1 << 0 | 1 << 4) : 1 << 0)?.takeRetainedValue()
     }
 
     private static func capture(_ url: URL, sheet: Bool = false) {

@@ -113,7 +113,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 - **Everything is logged.** Every cleanup is written to `~/Library/Application Support/Yokoi/cleanup.log` with path, size, action and where it went.
 
 <p align="center">
-  <img src="assets/readme/screenshots/cleaning.png" alt="Cleanup in progress: an SSD whose flash cells erase as files are removed" width="80%">
+  <img src="assets/readme/cleaning.gif" alt="Cleanup in progress: an SSD whose flash cells erase as files are removed, a live counter of space freed, then Moved to Trash" width="60%">
 </p>
 
 > [!TIP]

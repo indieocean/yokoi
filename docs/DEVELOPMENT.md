@@ -103,6 +103,12 @@ Yokoi.app/Contents/MacOS/Yokoi -YokoiDemo YES -ApplePersistenceIgnoreState YES -
 # then copy /tmp/shots/*.png into assets/readme/screenshots/ (resize to 1600 px wide: sips -Z 1600 *.png)
 ```
 
+The cleanup animation GIF (`assets/readme/cleaning.gif`) is recorded the same way, from a Debug build:
+
+```sh
+scripts/make-cleanup-gif.sh path/to/Debug/Yokoi.app   # needs ffmpeg; WIDTH= and SPEED= to tweak
+```
+
 ## App icon
 
 The icon comes from `assets/ui/yokoi-logo.jpg`. After changing the logo, regenerate every size with:
