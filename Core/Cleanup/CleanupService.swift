@@ -108,6 +108,36 @@ protocol FileOperations: Sendable {
     func exists(_ url: URL) -> Bool
 }
 
+/// `removefile(3)` from libSystem, looked up at runtime. The function ships with every macOS, but
+/// some SDKs (Xcode 26) have no header for it. Signatures and constants match `<removefile.h>`.
+private struct RemoveFile: Sendable {
+    typealias State = OpaquePointer
+    typealias Callback = @convention(c) (State?, UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Int32
+
+    let alloc: @convention(c) () -> State?
+    let free: @convention(c) (State?) -> Int32
+    let set: @convention(c) (State?, UInt32, UnsafeRawPointer?) -> Int32
+    let remove: @convention(c) (UnsafePointer<CChar>?, State?, UInt32) -> Int32
+
+    static let recursive: UInt32 = 1        // REMOVEFILE_RECURSIVE
+    static let confirmCallback: UInt32 = 1  // REMOVEFILE_STATE_CONFIRM_CALLBACK
+    static let confirmContext: UInt32 = 2   // REMOVEFILE_STATE_CONFIRM_CONTEXT
+    static let proceed: Int32 = 0           // REMOVEFILE_PROCEED
+
+    static let api: RemoveFile? = {
+        let defaultHandle = UnsafeMutableRawPointer(bitPattern: -2)  // RTLD_DEFAULT
+        func load<T>(_ name: String, as _: T.Type) -> T? {
+            dlsym(defaultHandle, name).map { unsafeBitCast($0, to: T.self) }
+        }
+        guard let alloc = load("removefile_state_alloc", as: (@convention(c) () -> State?).self),
+              let free = load("removefile_state_free", as: (@convention(c) (State?) -> Int32).self),
+              let set = load("removefile_state_set", as: (@convention(c) (State?, UInt32, UnsafeRawPointer?) -> Int32).self),
+              let remove = load("removefile", as: (@convention(c) (UnsafePointer<CChar>?, State?, UInt32) -> Int32).self)
+        else { return nil }
+        return RemoveFile(alloc: alloc, free: free, set: set, remove: remove)
+    }()
+}
+
 struct SystemFileOperations: FileOperations {
     func trash(_ url: URL) throws -> URL? {
         var result: NSURL?
@@ -118,19 +148,19 @@ struct SystemFileOperations: FileOperations {
     /// Uses `removefile(3)`: recursive, never follows symlinks, and reports every path it removes.
     func remove(_ url: URL, onFile: ((String) -> Void)?) throws {
         guard let onFile else { return try FileManager.default.removeItem(at: url) }
-        guard let state = removefile_state_alloc() else { return try FileManager.default.removeItem(at: url) }
-        defer { removefile_state_free(state) }
+        guard let api = RemoveFile.api, let state = api.alloc() else { return try FileManager.default.removeItem(at: url) }
+        defer { _ = api.free(state) }
         let box = Unmanaged.passRetained(RemoveCallbackBox(onFile))
         defer { box.release() }
-        let callback: @convention(c) (removefile_state_t?, UnsafePointer<CChar>?, UnsafeMutableRawPointer?) -> Int32 = { _, path, ctx in
+        let callback: RemoveFile.Callback = { _, path, ctx in
             if let path, let ctx {
                 Unmanaged<RemoveCallbackBox>.fromOpaque(ctx).takeUnretainedValue().onFile(String(cString: path))
             }
-            return Int32(REMOVEFILE_PROCEED)
+            return RemoveFile.proceed
         }
-        removefile_state_set(state, UInt32(REMOVEFILE_STATE_CONFIRM_CALLBACK), unsafeBitCast(callback, to: UnsafeRawPointer.self))
-        removefile_state_set(state, UInt32(REMOVEFILE_STATE_CONFIRM_CONTEXT), box.toOpaque())
-        if removefile(url.path, state, removefile_flags_t(REMOVEFILE_RECURSIVE)) != 0 {
+        _ = api.set(state, RemoveFile.confirmCallback, unsafeBitCast(callback, to: UnsafeRawPointer.self))
+        _ = api.set(state, RemoveFile.confirmContext, box.toOpaque())
+        if api.remove(url.path, state, RemoveFile.recursive) != 0 {
             let code = errno
             // removefile reports ENOENT if something vanished mid-way; only fail if the item is still there.
             if (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil {
