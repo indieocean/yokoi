@@ -94,6 +94,71 @@ struct CleanupTests {
         #expect(judged.first?.hasSuffix("/outside/node_modules") == true, "judged at the real location, not the literal path")
     }
 
+    @Test func trashRechecksTheParentsRealLocation() throws {
+        let f = try Fixture()
+        try f.file("outside/node_modules/precious.js")
+        try f.dir("dev")
+        try FileManager.default.createSymbolicLink(at: f.url("dev/p"), withDestinationURL: f.url("outside"))
+        let pathGuard = PathGuard(allowedRoots: [f.url("dev")], exclusions: GlobMatcher(patterns: []), home: f.home)
+        var judged: [String] = []
+        #expect(throws: (any Error).self) {
+            try SystemFileOperations().trash(f.url("dev/p/node_modules"), allowed: { url in
+                judged.append(url.path)
+                return pathGuard.check(url) == nil
+            })
+        }
+        #expect(f.exists("outside/node_modules/precious.js"))
+        #expect(judged.first?.hasSuffix("/outside/node_modules") == true, "judged at the real location, not the literal path")
+    }
+
+    @Test func moveRechecksTheParentsRealLocation() throws {
+        let f = try Fixture()
+        try f.file("outside/Screenshot 1.png")
+        try f.dir("Desktop")
+        try f.dir("Pictures")
+        try FileManager.default.createSymbolicLink(at: f.url("Desktop/shots"), withDestinationURL: f.url("outside"))
+        let pathGuard = PathGuard(allowedRoots: [f.url("Desktop")], exclusions: GlobMatcher(patterns: []), home: f.home)
+        #expect(throws: (any Error).self) {
+            try SystemFileOperations().move(f.url("Desktop/shots/Screenshot 1.png"), to: f.url("Pictures/Screenshot 1.png"),
+                                            allowed: { pathGuard.check($0) == nil })
+        }
+        #expect(f.exists("outside/Screenshot 1.png"))
+        #expect(!f.exists("Pictures/Screenshot 1.png"))
+    }
+
+    @Test func appleAppsAreRefusedByTheService() async throws {
+        let f = try Fixture()
+        try f.file("Applications/Safari.app/Contents/Info.plist", contents: "<plist/>")
+        try f.file("Library/Containers/com.vendor.app/Data/x")
+        var ctx = f.context()
+        ctx.applicationFolders = [f.url("Applications")]
+        let svc = CleanupService(context: ctx, log: CleanupLog(url: f.url("log")))
+        let apple = AppItem(url: f.url("Applications/Safari.app"), name: "Safari", bundleID: "com.apple.Safari", version: "1",
+                            appSize: 1, leftovers: [], lastUsed: nil, isAppStore: false, protectedReason: "Apple app", fileCount: 1)
+        let vendor = AppItem(url: f.url("Applications/Other.app"), name: "Other", bundleID: "com.vendor.app", version: "1",
+                             appSize: 1, leftovers: [.init(url: f.url("Library/Containers/com.vendor.app"), kind: "Containers", size: 1)],
+                             lastUsed: nil, isAppStore: false, protectedReason: nil, fileCount: 1)
+        try f.file("Applications/Other.app/Contents/Info.plist", contents: "<plist/>")
+        let out = await svc.perform([CleanupEntry(apple), CleanupEntry(vendor)], action: .delete, dryRun: false)
+        #expect(f.exists("Applications/Safari.app"), "refused whatever screen built the entry")
+        #expect(out.failures.map(\.reason) == ["Refused: Apple app"])
+        #expect(!f.exists("Applications/Other.app"))
+        #expect(!f.exists("Library/Containers/com.vendor.app"))
+    }
+
+    @Test func supportFilesAreOwnerOnly() async throws {
+        let f = try Fixture()
+        let log = CleanupLog(url: f.url("support/Yokoi/cleanup.log"))
+        let record = CleanupRecord(batchID: "b", timestamp: Date(), action: "trash", dryRun: false, category: .caches,
+                                   label: "x", path: "~/x", size: 1, items: [], failed: 0)
+        try await log.append([record])
+        try await log.append([record])
+        func mode(_ path: String) -> Int { (try? FileManager.default.attributesOfItem(atPath: f.url(path).path)[.posixPermissions] as? Int) ?? -1 }
+        #expect(mode("support/Yokoi") == 0o700)
+        #expect(mode("support/Yokoi/cleanup.log") == 0o600)
+        #expect(await log.readAll().count == 2, "appending keeps the earlier lines")
+    }
+
     @Test func permanentDeleteRemovesRelativeToTheCheckedFolder() throws {
         let f = try Fixture()
         for i in 0..<5 { try f.file("dev/p/node_modules/pkg\(i)/index.js") }

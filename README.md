@@ -111,7 +111,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 - **Busy means no.** Projects open in Xcode, Unity, Unreal or a running `node` process, running apps, and Android emulators that are booted are refused. Yokoi checks twice: when you confirm and again right before acting.
 - **Recent means careful.** Projects you touched in the last 14 days start unchecked and need an extra confirmation.
 - **No escalation.** Yokoi never runs `sudo`. Command-line tools are run without a shell, and arguments are passed literally, so package names can't inject commands.
-- **Symlink-proof.** Symlinks are removed, never followed. Paths are checked both as written and with symlinks resolved.
+- **Symlink-proof.** Symlinks are removed, never followed. Paths are checked both as written and with symlinks resolved, and checked again at their real location right before anything is trashed, deleted or moved.
 - **Look, don't touch.** The `yokoi` command and the Shortcuts actions only scan and report. Cleaning always goes through the app's confirmation sheet.
 - **Everything is logged.** Every cleanup is written to `~/Library/Application Support/Yokoi/cleanup.log` with path, size, action and where it went.
 

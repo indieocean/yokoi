@@ -25,6 +25,22 @@ struct CleanupRecord: Codable, Sendable, Identifiable, Hashable {
     var restoresBatchID: String? = nil
 }
 
+extension FileManager {
+    /// Creates Yokoi's support folder readable only by its owner (0700), tightening an existing one.
+    /// The scan cache and cleanup log list the user's files by name, so they don't rely on the
+    /// permissions of `~/Library` alone.
+    func createPrivateDirectory(at url: URL) throws {
+        try createDirectory(at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+    }
+
+    /// Atomic write (temporary file, then rename) followed by owner-only permissions on the result.
+    func writePrivately(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+        try setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+}
+
 /// Append-only cleanup log. Every cleanup (and dry run) is written here.
 actor CleanupLog {
     let url: URL
@@ -54,20 +70,21 @@ actor CleanupLog {
     func append(_ records: [CleanupRecord]) throws {
         guard !records.isEmpty else { return }
         let fm = FileManager.default
-        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fm.createPrivateDirectory(at: url.deletingLastPathComponent())
         var data = Data()
         for r in records {
             data.append(try Self.encoder.encode(r))
             data.append(0x0A)
         }
         if !fm.fileExists(atPath: url.path) {
-            try data.write(to: url, options: .atomic)
+            try fm.writePrivately(data, to: url)
             return
         }
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
         try handle.seekToEnd()
         try handle.write(contentsOf: data)
+        try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     func readAll() -> [CleanupRecord] {

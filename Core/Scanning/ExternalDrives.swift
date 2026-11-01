@@ -53,19 +53,21 @@ enum ExternalDrives {
     ]
 
     /// Local, non-boot volumes under `/Volumes` (network shares are skipped).
-    static func mounted() -> [ExternalDrive] {
+    /// - Parameter timeMachine: mount points `tmutil` lists as backup destinations (see
+    ///   `timeMachineMountPoints`); APFS backup disks carry no on-disk marker the folder scan can see.
+    static func mounted(timeMachine: Set<String> = []) -> [ExternalDrive] {
         let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
         return urls.compactMap { url in
             guard url.path.hasPrefix("/Volumes/"), let v = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
             guard v.volumeIsRootFileSystem != true, v.volumeIsLocal == true, v.volumeIsBrowsable != false else { return nil }
             // Internal non-ejectable volumes (other APFS volumes on the boot disk) aren't "external drives".
             if v.volumeIsInternal == true && v.volumeIsEjectable != true && v.volumeIsRemovable != true { return nil }
-            return drive(at: url, values: v)
+            return drive(at: url, values: v, timeMachine: timeMachine)
         }
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    static func drive(at url: URL, values v: URLResourceValues? = nil) -> ExternalDrive {
+    static func drive(at url: URL, values v: URLResourceValues? = nil, timeMachine: Set<String> = []) -> ExternalDrive {
         let v = v ?? (try? url.resourceValues(forKeys: Set(keys)))
         let format = v?.volumeLocalizedFormatDescription ?? "Unknown"
         let lower = format.lowercased()
@@ -76,19 +78,38 @@ enum ExternalDrives {
             total: Int64(v?.volumeTotalCapacity ?? 0),
             available: Int64(v?.volumeAvailableCapacity ?? 0),
             isReadOnly: v?.volumeIsReadOnly ?? false,
-            isTimeMachine: isTimeMachine(url),
+            isTimeMachine: timeMachine.contains(PathFormat.canonical(url.path)) || isTimeMachine(url),
             // Many USB SSDs report "not ejectable" but are external or removable; they can still be unmounted.
             isEjectable: (v?.volumeIsEjectable ?? false) || (v?.volumeIsRemovable ?? false) || v?.volumeIsInternal == false,
             isAppleFormat: lower.contains("apfs") || lower.contains("mac os") || lower.contains("hfs")
         )
     }
 
+    /// On-disk markers of an HFS+ backup disk or a network backup. APFS backup disks (macOS 11 and later)
+    /// have none at the mount root: `timeMachineMountPoints` covers those.
     static func isTimeMachine(_ volume: URL) -> Bool {
         let fm = FileManager.default
         if fm.fileExists(atPath: volume.appendingPathComponent("Backups.backupdb").path)
             || fm.fileExists(atPath: volume.appendingPathComponent(".com.apple.timemachine.donotpresent").path) { return true }
         let names = (try? fm.contentsOfDirectory(atPath: volume.path)) ?? []
-        return names.contains { $0.hasSuffix(".previous") || $0.hasSuffix(".backupbundle") || $0.hasSuffix(".sparsebundle") && $0.contains("Time Machine") }
+        return names.contains {
+            $0.hasSuffix(".previous") || $0.hasSuffix(".backupbundle") || $0.hasSuffix(".backup")
+                || ($0.hasSuffix(".sparsebundle") && $0.contains("Time Machine"))
+        }
+    }
+
+    /// Mount points of every configured backup destination, asked from `tmutil destinationinfo -X`.
+    /// Empty when `tmutil` can't answer (no destinations, or Time Machine disabled).
+    static func timeMachineMountPoints(runner: ProcessRunner = .shared) async -> Set<String> {
+        guard let r = try? await runner.run(["tmutil", "destinationinfo", "-X"], timeout: 10), r.succeeded else { return [] }
+        return parseDestinations(r.stdout)
+    }
+
+    /// Mount points from the plist `tmutil destinationinfo -X` prints. Unmounted destinations have none.
+    static func parseDestinations(_ plist: String) -> Set<String> {
+        guard let root = (try? PropertyListSerialization.propertyList(from: Data(plist.utf8), format: nil)) as? [String: Any],
+              let destinations = root["Destinations"] as? [[String: Any]] else { return [] }
+        return Set(destinations.compactMap { $0["MountPoint"] as? String }.map(PathFormat.canonical))
     }
 
     /// The current user's Trash on a volume: `/Volumes/X/.Trashes/<uid>`.

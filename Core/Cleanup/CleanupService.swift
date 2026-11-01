@@ -33,6 +33,9 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
     var projectRoot: URL? = nil
     /// Only permanent delete is allowed (the Trash itself).
     var permanentOnly = false
+    /// Why the item must never be cleaned (an Apple app, Yokoi itself). `CleanupService` refuses it,
+    /// whatever screen or automation built the entry.
+    var refusal: String? = nil
 
     init<R: Reclaimable>(_ item: R, displayPath: String? = nil, date: Date? = nil) {
         id = item.id
@@ -49,7 +52,9 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
         switch item {
         case let i as NodeModulesItem: projectRoot = i.projectURL
         case let i as ArtifactItem: projectRoot = i.isGlobal ? nil : i.projectURL
-        case let i as AppItem: projectRoot = i.url
+        case let i as AppItem:
+            projectRoot = i.url
+            refusal = i.protectedReason
         case let i as CacheItem:
             permanentOnly = i.permanentOnly
             // A running emulator keeps its AVD's files open: block like an open project.
@@ -99,13 +104,15 @@ struct CleanupOutcome: Sendable {
 }
 
 /// The file operations behind a cleanup. Abstracted so tests can observe or fake them.
+///
+/// Every operation that takes `allowed` asks it again about the item at its parent folder's real
+/// location (`F_GETPATH`) just before acting, and refuses if it says no. A parent swapped for a
+/// symlink after the `PathGuard` check therefore can't redirect a trash, delete or move elsewhere.
 protocol FileOperations: Sendable {
-    func trash(_ url: URL) throws -> URL?
-    /// Permanently removes `url` (recursively), calling `onFile` for each path as it goes. Just before
-    /// removing, `allowed` is asked again about the item at its parent folder's real location, and the
-    /// removal is refused if it says no.
+    func trash(_ url: URL, allowed: (URL) -> Bool) throws -> URL?
+    /// Permanently removes `url` (recursively), calling `onFile` for each path as it goes.
     func remove(_ url: URL, allowed: (URL) -> Bool, onFile: ((String) -> Void)?) throws
-    func move(_ url: URL, to destination: URL) throws
+    func move(_ url: URL, to destination: URL, allowed: (URL) -> Bool) throws
     func createDirectory(_ url: URL) throws
     func exists(_ url: URL) -> Bool
 }
@@ -144,9 +151,49 @@ private struct RemoveFile: Sendable {
 }
 
 struct SystemFileOperations: FileOperations {
-    func trash(_ url: URL) throws -> URL? {
+    /// Opens the item's parent folder and returns the descriptor plus the item's path with the parent
+    /// as the kernel sees it (`F_GETPATH`). The caller closes the descriptor.
+    private static func openParent(of url: URL) throws -> (dir: Int32, real: URL) {
+        let name = url.lastPathComponent
+        guard !name.isEmpty, name != ".", name != "..", name != "/" else { throw posixError(EINVAL, url.path) }
+        let dir = open(url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard dir >= 0 else { throw posixError(errno, url.path) }
+        var buf = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard fcntl(dir, F_GETPATH, &buf) != -1 else {
+            let code = errno
+            close(dir)
+            throw posixError(code, url.path)
+        }
+        return (dir, URL(fileURLWithPath: String(cString: buf)).appendingPathComponent(name))
+    }
+
+    /// The item's path with its parent folder's symlinks resolved (`realpath(3)`), checked again by
+    /// `allowed` just before a path-based operation. Refuses when the parent has been swapped for a
+    /// symlink since the `PathGuard` check. `realpath` needs only search permission on the parent, so
+    /// this also works on `~/.Trash` without Full Disk Access (put back); opening the folder would not.
+    static func verifiedLocation(of url: URL, allowed: (URL) -> Bool) throws -> URL {
+        let name = url.lastPathComponent
+        guard !name.isEmpty, name != ".", name != "..", name != "/" else { throw posixError(EINVAL, url.path) }
+        guard let resolved = realpath(url.deletingLastPathComponent().path, nil) else { throw posixError(errno, url.path) }
+        defer { free(resolved) }
+        let real = URL(fileURLWithPath: String(cString: resolved)).appendingPathComponent(name)
+        guard allowed(real) else { throw refused(real, checkedAs: url) }
+        return real
+    }
+
+    private static func refused(_ real: URL, checkedAs url: URL) -> NSError {
+        NSError(domain: "Yokoi.Cleanup", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "Refused: \(real.path) is not where the item was checked",
+            NSFilePathErrorKey: url.path,
+        ])
+    }
+
+    /// Moves the item to the Trash from its verified location. `trashItem` itself is path-based, so the
+    /// remaining window is the microseconds between that resolution and the move.
+    func trash(_ url: URL, allowed: (URL) -> Bool) throws -> URL? {
+        let real = try Self.verifiedLocation(of: url, allowed: allowed)
         var result: NSURL?
-        try FileManager.default.trashItem(at: url, resultingItemURL: &result)
+        try FileManager.default.trashItem(at: real, resultingItemURL: &result)
         return result as URL?
     }
 
@@ -157,20 +204,10 @@ struct SystemFileOperations: FileOperations {
     /// parent for a symlink after the PathGuard check can't redirect a permanent delete somewhere else.
     func remove(_ url: URL, allowed: (URL) -> Bool, onFile: ((String) -> Void)?) throws {
         let name = url.lastPathComponent
-        guard !name.isEmpty, name != ".", name != "..", name != "/" else { throw Self.posixError(EINVAL, url.path) }
-        let dir = open(url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-        guard dir >= 0 else { throw Self.posixError(errno, url.path) }
+        let (dir, real) = try Self.openParent(of: url)
         defer { close(dir) }
-        var buf = [CChar](repeating: 0, count: Int(MAXPATHLEN))
-        guard fcntl(dir, F_GETPATH, &buf) != -1 else { throw Self.posixError(errno, url.path) }
-        let parent = String(cString: buf)
-        let real = URL(fileURLWithPath: parent).appendingPathComponent(name)
-        guard allowed(real) else {
-            throw NSError(domain: "Yokoi.Cleanup", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Refused: \(real.path) is not where the item was checked",
-                NSFilePathErrorKey: url.path,
-            ])
-        }
+        let parent = real.deletingLastPathComponent().path
+        guard allowed(real) else { throw Self.refused(real, checkedAs: url) }
 
         guard let api = RemoveFile.api, let removeAt = api.removeAt, let state = api.alloc() else {
             // No removefileat: fall back to the path (re-checked just above).
@@ -204,7 +241,11 @@ struct SystemFileOperations: FileOperations {
         NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: path])
     }
 
-    func move(_ url: URL, to destination: URL) throws { try FileManager.default.moveItem(at: url, to: destination) }
+    /// Moves from the verified location. `moveItem` never overwrites an existing destination.
+    func move(_ url: URL, to destination: URL, allowed: (URL) -> Bool) throws {
+        let real = try Self.verifiedLocation(of: url, allowed: allowed)
+        try FileManager.default.moveItem(at: real, to: destination)
+    }
 
     func createDirectory(_ url: URL) throws {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -280,6 +321,11 @@ actor CleanupService {
                                       filesAlreadyCounted: filesCounted, failed: failedHere > 0)
             }
             let pathGuard = guards[entry.category] ?? PathGuard(allowedRoots: [], exclusions: GlobMatcher(patterns: []))
+            if let why = entry.refusal {
+                failures.append(.init(path: entry.displayPath, reason: "Refused: \(why)"))
+                failedHere = 1
+                continue
+            }
             if entry.permanentOnly, case .trash = action {
                 failures.append(.init(path: entry.displayPath, reason: "Refused: items already in the Trash can only be deleted permanently"))
                 continue
@@ -306,16 +352,18 @@ actor CleanupService {
                     moved.append(.init(original: url.path, destination: nil))
                     continue
                 }
+                // Asked again at the item's real location just before each operation.
+                let stillAllowed: (URL) -> Bool = { pathGuard.check($0) == nil }
                 do {
                     switch action {
                     case .trash:
                         progress?.touched(url.path)
-                        let result = try ops.trash(url)
+                        let result = try ops.trash(url, allowed: stillAllowed)
                         moved.append(.init(original: url.path, destination: result?.path))
                     case .delete:
                         progress?.touched(url.path)
                         var n = 0
-                        try ops.remove(url, allowed: { pathGuard.check($0) == nil }, onFile: progress.map { p in
+                        try ops.remove(url, allowed: stillAllowed, onFile: progress.map { p in
                             { path in
                                 n += 1
                                 p.touched(path, countsAsFile: true)
@@ -328,7 +376,7 @@ actor CleanupService {
                         try ops.createDirectory(folder)
                         let target = Self.uniqueDestination(for: url.lastPathComponent, in: folder, exists: ops.exists)
                         progress?.touched(url.path)
-                        try ops.move(url, to: target)
+                        try ops.move(url, to: target, allowed: stillAllowed)
                         moved.append(.init(original: url.path, destination: target.path))
                     }
                 } catch {
@@ -387,7 +435,7 @@ actor CleanupService {
                 } else {
                     do {
                         try ops.createDirectory(original.deletingLastPathComponent())
-                        try ops.move(trashed, to: original)
+                        try ops.move(trashed, to: original, allowed: { Self.isInTrash($0, home: home) })
                         moved.append(.init(original: trashed.path, destination: original.path))
                     } catch {
                         failures.append(.init(path: item.original, reason: error.localizedDescription))

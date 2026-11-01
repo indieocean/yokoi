@@ -278,8 +278,8 @@ final class ScanStore {
         let url = Self.cacheURL
         Task.detached(priority: .utility) {
             guard let data = try? JSONEncoder().encode(cache) else { return }
-            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? data.write(to: url, options: .atomic)
+            try? FileManager.default.createPrivateDirectory(at: url.deletingLastPathComponent())
+            try? FileManager.default.writePrivately(data, to: url)
         }
     }
 }

@@ -160,7 +160,10 @@ private struct ScanLocationsCard: View {
                 }
             }
             Button {
-                if let url = Finder.chooseFolder(title: "Add a scan location", prompt: "Add") { settings.addScanRoot(url) }
+                if let url = Finder.chooseFolder(title: "Add a scan location", prompt: "Add"),
+                   let why = settings.addScanRoot(url) {
+                    app.toast = Toast(kind: .warning, message: "Not added", detail: why)
+                }
             } label: {
                 Label("Add Folder…", systemImage: "plus")
             }
@@ -173,7 +176,10 @@ private struct ScanLocationsCard: View {
                     ChipView(text: path) { settings.data.bigFileRoots.removeAll { $0 == path } }
                 }
                 Button {
-                    if let url = Finder.chooseFolder(title: "Add a big-file location", prompt: "Add") { settings.addBigFileRoot(url) }
+                    if let url = Finder.chooseFolder(title: "Add a big-file location", prompt: "Add"),
+                       let why = settings.addBigFileRoot(url) {
+                        app.toast = Toast(kind: .warning, message: "Not added", detail: why)
+                    }
                 } label: {
                     Label("Add", systemImage: "plus").font(.system(size: 12))
                 }

@@ -50,16 +50,22 @@ final class SettingsStore {
         driveRefreshes += 1
         let generation = driveRefreshes
         Task {
-            let drives = await Task.detached(priority: .userInitiated) { ExternalDrives.mounted() }.value
+            let drives = await Task.detached(priority: .userInitiated) {
+                // Asked each time: a backup disk may have been added since the last refresh.
+                let timeMachine = await ExternalDrives.timeMachineMountPoints()
+                return ExternalDrives.mounted(timeMachine: timeMachine)
+            }.value
             // A newer refresh (another mount or unmount) has started; let that one win.
             guard generation == driveRefreshes, drives != externalDrives else { return }
             externalDrives = drives
         }
     }
 
-    /// Synchronous first read at launch, so the first scan already knows the external volumes.
+    /// Synchronous first read at launch, so the first scan already knows the external volumes. Only
+    /// the on-disk Time Machine markers are known at this point; the refresh that follows asks `tmutil`.
     func loadDrivesAtLaunch() {
         externalDrives = demoDrives ?? ExternalDrives.mounted()
+        refreshDrives()
     }
 
     func context() -> ScanContext {
@@ -70,10 +76,14 @@ final class SettingsStore {
 
     // MARK: Editing helpers
 
-    func addScanRoot(_ url: URL) {
+    /// Adds a scan location. Returns why it was refused (disk root, above home, system folder), or nil.
+    @discardableResult
+    func addScanRoot(_ url: URL) -> String? {
+        if let why = ScanRootPolicy.refusal(for: url) { return why }
         let path = PathFormat.abbreviate(url)
-        guard !data.scanRoots.contains(where: { $0.path == path }) else { return }
+        guard !data.scanRoots.contains(where: { $0.path == path }) else { return nil }
         data.scanRoots.append(ScanRoot(path: path))
+        return nil
     }
 
     func removeScanRoot(_ root: ScanRoot) {
@@ -85,10 +95,14 @@ final class SettingsStore {
         data.scanRoots[i].maxDepth = depth
     }
 
-    func addBigFileRoot(_ url: URL) {
+    /// Adds a big-file location. Returns why it was refused, or nil.
+    @discardableResult
+    func addBigFileRoot(_ url: URL) -> String? {
+        if let why = ScanRootPolicy.refusal(for: url) { return why }
         let path = PathFormat.abbreviate(url)
-        guard !data.bigFileRoots.contains(path) else { return }
+        guard !data.bigFileRoots.contains(path) else { return nil }
         data.bigFileRoots.append(path)
+        return nil
     }
 
     func addExclusion(_ pattern: String) {

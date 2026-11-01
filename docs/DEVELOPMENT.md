@@ -47,8 +47,20 @@ opt-in flags and a restore hint. Badge color and name go in `Ecosystem` (`Core/M
 - Move to Trash by default. Permanent delete only from the confirmation sheet, with an extra
   "I understand" tick every time.
 - Every path goes through `PathGuard`: it must be strictly inside that **category's** allowed roots,
-  not excluded, not inside `.git`, and not under `/System`, `/Library`, `/usr`… It checks both the literal path
-  and the path with parent symlinks resolved.
+  not excluded, not inside `.git`, and not under `/System`, `/Library`, `/usr`, `/var`, Homebrew's or
+  MacPorts' install trees… It checks both the literal path and the path with parent symlinks resolved.
+  Apple's own app data under `~/Library` (`Containers/com.apple.*`, `Preferences/com.apple.*`…) is
+  blocked too, and an `AppItem` marked as an Apple app or Yokoi itself is refused by `CleanupService`
+  regardless of which screen built the entry.
+- Scan and big-file locations can't be `/`, a folder above home, or a protected system folder
+  (`ScanRootPolicy`), since a location is also the boundary cleanup may reach.
+- Right before each operation the item is checked again at its parent's real location: permanent
+  delete opens the parent and removes relative to it (`removefileat`); trash, move and put back
+  re-resolve the parent with `realpath` first, so a parent swapped for a symlink after the check is noticed.
+- `~/Library/Application Support/Yokoi` is created `0700` and its files (`cleanup.log`, `last-scan.json`,
+  `scan-index.json`) `0600`: they list the user's files by name.
+- External drives that `tmutil destinationinfo` lists as backup destinations are locked, in addition to the
+  on-disk markers (APFS backup disks have none at the mount root).
 - Projects changed in the last 14 days (configurable) start unchecked. The sheet holds them back
   unless you tick "Include them anyway".
 - Dry run (Settings → Safety) logs and reports what would happen without touching anything.

@@ -122,4 +122,56 @@ struct ProtectedDataTests {
         #expect(guardEverything.check(URL(fileURLWithPath: "/Applications/Foo.app")) == nil)
         #expect(guardEverything.check(URL(fileURLWithPath: "/Applications")) == .protectedUserData)
     }
+
+    /// A guard whose roots cover the whole disk: only the protected lists stand between it and a path.
+    var guardWholeDisk: PathGuard {
+        PathGuard(allowedRoots: [URL(fileURLWithPath: "/")], exclusions: GlobMatcher(patterns: []), home: home)
+    }
+
+    @Test(arguments: [
+        "/var/db/dslocal/nodes/Default", "/private/var/log/system.log", "/var/root/x", "/opt/homebrew/lib/node_modules/npm",
+        "/opt/homebrew/bin/node", "/opt/homebrew/opt/openssl", "/opt/homebrew/Cellar/git/2.0", "/opt/local/bin/port", "/nix/store/x",
+    ])
+    func blocksWritableSystemLocations(_ path: String) {
+        #expect(guardWholeDisk.check(URL(fileURLWithPath: path)) == .protectedSystemPath)
+    }
+
+    @Test(arguments: ["/var/folders/zz/abc/T/scratch/node_modules", "/private/var/folders/zz/abc/T/x", "/var/tmp/build", "/opt/projects/x"])
+    func userTemporaryFoldersStayReachable(_ path: String) {
+        let violation = guardWholeDisk.check(URL(fileURLWithPath: path))
+        #expect(violation != .protectedSystemPath, "\(path): \(String(describing: violation))")
+    }
+
+    @Test(arguments: [
+        "Library/Containers/com.apple.Safari", "Library/Containers/com.apple.Safari/Data/Library/Cookies",
+        "Library/Group Containers/group.com.apple.notes/x", "Library/Group Containers/UBF8T346G9.com.apple.mail",
+        "Library/Preferences/com.apple.Safari.plist", "Library/Preferences/ByHost/com.apple.finder.ABC.plist",
+        "Library/HTTPStorages/com.apple.Safari", "Library/Application Support/com.apple.sharedfilelist",
+        "Library/Saved Application State/com.apple.mail.savedState", "Library/Cookies/com.apple.Safari.binarycookies",
+    ])
+    func blocksAppleAppData(_ rel: String) {
+        #expect(guardEverything.check(home.appendingPathComponent(rel)) == .protectedUserData)
+    }
+
+    @Test(arguments: [
+        "Library/Caches/com.apple.dt.Xcode/x", "Library/Containers/com.vendor.app", "Library/Preferences/com.vendor.app.plist",
+        "Library/Application Support/Code/Cache", "Library/Developer/Xcode/DerivedData/App-abc",
+    ])
+    func thirdPartyAndToolchainDataStaysCleanable(_ rel: String) {
+        #expect(guardEverything.check(home.appendingPathComponent(rel)) == nil)
+    }
+
+    @Test func scanLocationsCantBeTheDiskOrAboveHome() {
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/"), home: home) != nil)
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/Users"), home: home) != nil)
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/var/db"), home: home) != nil)
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/opt/homebrew/lib"), home: home) != nil)
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/usr/local"), home: home) != nil)
+        #expect(ScanRootPolicy.refusal(for: home, home: home) == nil, "the home folder itself is the default big-file location")
+        #expect(ScanRootPolicy.refusal(for: home.appendingPathComponent("dev"), home: home) == nil)
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/Users/Shared/projects"), home: home) == nil)
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/opt/projects"), home: home) == nil)
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/Volumes/Work/code"), home: home) == nil)
+        #expect(ScanRootPolicy.refusal(for: URL(fileURLWithPath: "/private/var/folders/zz/T/x"), home: home) == nil)
+    }
 }

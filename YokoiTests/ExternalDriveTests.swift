@@ -46,4 +46,25 @@ struct ExternalDriveTests {
         #expect(f.exists("Volumes/Stick"), "never the volume itself")
         #expect(out.failures.count == 2)
     }
+
+    @Test func timeMachineDestinationsComeFromTmutil() throws {
+        let plist = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0"><dict><key>Destinations</key><array>
+        <dict><key>Kind</key><string>Local</string><key>Name</key><string>Backup SSD</string>
+              <key>MountPoint</key><string>/Volumes/Backup SSD/</string><key>ID</key><string>ABC</string></dict>
+        <dict><key>Kind</key><string>Network</string><key>Name</key><string>NAS</string><key>ID</key><string>DEF</string></dict>
+        </array></dict></plist>
+        """
+        #expect(ExternalDrives.parseDestinations(plist) == ["/Volumes/Backup SSD"])
+        #expect(ExternalDrives.parseDestinations("not a plist").isEmpty)
+
+        let f = try Fixture()
+        try f.dir("Volumes/Backup SSD/2026-01-01-010101.backup")
+        try f.dir("Volumes/Photos")
+        #expect(ExternalDrives.drive(at: f.url("Volumes/Backup SSD"), timeMachine: [PathFormat.canonical(f.url("Volumes/Backup SSD").path)]).isTimeMachine)
+        #expect(ExternalDrives.isTimeMachine(f.url("Volumes/Backup SSD")), "APFS backup sets are also recognized by name")
+        #expect(!ExternalDrives.drive(at: f.url("Volumes/Photos"), timeMachine: [PathFormat.canonical(f.url("Volumes/Backup SSD").path)]).isTimeMachine)
+    }
 }

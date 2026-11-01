@@ -113,8 +113,8 @@ final class ScanIndex: Sendable {
             }
         }
         guard let data = try? JSONEncoder().encode(out) else { return }
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
+        try? FileManager.default.createPrivateDirectory(at: url.deletingLastPathComponent())
+        try? FileManager.default.writePrivately(data, to: url)
     }
 
     // MARK: Cached work

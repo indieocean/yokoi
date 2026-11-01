@@ -31,7 +31,25 @@ struct PathGuard: Sendable {
         }
     }
 
-    static let protectedPrefixes = ["/System", "/Library", "/bin", "/sbin", "/usr", "/etc", "/private/etc", "/cores", "/dev", "/opt/homebrew/Cellar"]
+    /// System locations never touched, whatever the roots say. Includes the writable parts of the
+    /// system (`/var`, Homebrew's and MacPorts' install trees) that SIP doesn't cover, so a wide scan
+    /// root such as `/opt` can't reach the global npm tree or Homebrew's state.
+    static let protectedPrefixes = [
+        "/System", "/Library", "/bin", "/sbin", "/usr", "/etc", "/private/etc", "/cores", "/dev",
+        "/var", "/private/var", "/nix", "/opt/local",
+        "/opt/homebrew/Cellar", "/opt/homebrew/Caskroom", "/opt/homebrew/bin", "/opt/homebrew/sbin", "/opt/homebrew/lib",
+        "/opt/homebrew/opt", "/opt/homebrew/etc", "/opt/homebrew/share", "/opt/homebrew/include", "/opt/homebrew/var",
+        "/opt/homebrew/Frameworks", "/opt/homebrew/Library",
+    ]
+    /// Inside a protected prefix but owned by the user: the per-user temporary folders.
+    static let userWritableSystemPaths = ["/var/folders", "/var/tmp", "/private/var/folders", "/private/var/tmp"]
+
+    /// `path` (already folded) is a protected system location.
+    static func isProtectedSystemPath(_ path: String) -> Bool {
+        guard path != "/" else { return true }
+        guard protectedPrefixes.contains(where: { isAtOrInside(path, fold($0)) }) else { return false }
+        return !userWritableSystemPaths.contains(where: { isAtOrInside(path, fold($0)) })
+    }
 
     /// Personal data that is never touched, whatever the roots say (paths relative to home).
     /// Matching is per path component, so `Library/Mail` doesn't also protect `Library/Mailspring`.
@@ -40,6 +58,15 @@ struct PathGuard: Sendable {
         "Library/CloudStorage", "Library/Calendars", "Library/Safari", "Library/Accounts",
         "Library/Photos", "Library/Containers/com.apple.mail", "Library/Group Containers/group.com.apple.notes",
         "Library/Application Support/AddressBook", "Library/Application Support/MobileSync",
+    ]
+    /// Apple's own app data under `~/Library`, as globs relative to home. Apple apps can't be
+    /// uninstalled from Yokoi, so nothing should ever reach their containers, preferences or storage.
+    /// (`Library/Caches/com.apple.*` is not here: Xcode's and the Simulator's caches are cleanable.)
+    static let protectedHomeGlobs = [
+        "Library/Containers/com.apple.*", "Library/Group Containers/*com.apple.*",
+        "Library/Application Support/com.apple.*", "Library/Preferences/com.apple.*",
+        "Library/Preferences/ByHost/com.apple.*", "Library/HTTPStorages/com.apple.*",
+        "Library/Saved Application State/com.apple.*", "Library/WebKit/com.apple.*", "Library/Cookies/com.apple.*",
     ]
     /// Folders that may contain removable things but must never be removed themselves.
     static let protectedHomeFolders = [
@@ -77,6 +104,11 @@ struct PathGuard: Sendable {
             return true
         }
         if PathGuard.protectedHomePaths.contains(where: { Self.isAtOrInside(path, home + "/" + Self.fold($0)) }) { return true }
+        // A glob matches the item itself or, with "/*" appended, anything below it (`*` spans `/` without FNM_PATHNAME).
+        if PathGuard.protectedHomeGlobs.contains(where: { glob in
+            let full = home + "/" + Self.fold(glob)
+            return fnmatch(full, path, FNM_CASEFOLD) == 0 || fnmatch(full + "/*", path, FNM_CASEFOLD) == 0
+        }) { return true }
         return path.split(separator: "/").contains { comp in PathGuard.protectedSuffixes.contains { comp.hasSuffix($0) } }
     }
 
@@ -86,9 +118,7 @@ struct PathGuard: Sendable {
             .appendingPathComponent(url.lastPathComponent).path)
 
         for path in Set([literal, resolved].map(Self.fold)) {
-            if path == "/" || Self.protectedPrefixes.contains(where: { Self.isAtOrInside(path, Self.fold($0)) }) {
-                return .protectedSystemPath
-            }
+            if Self.isProtectedSystemPath(path) { return .protectedSystemPath }
             if path.split(separator: "/").contains(".git") { return .insideGitFolder }
             if isProtectedUserData(path) { return .protectedUserData }
         }

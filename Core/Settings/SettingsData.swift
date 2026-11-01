@@ -12,6 +12,20 @@ enum ScanFrequency: String, Codable, Sendable, CaseIterable {
     case daily, weekly, monthly
 }
 
+/// Which folders may be scan or big-file locations. A location is also the boundary cleanup may
+/// reach, so the disk root, anything above the home folder and system locations are refused.
+enum ScanRootPolicy {
+    /// Why `url` can't be a location, or nil when it can.
+    static func refusal(for url: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> String? {
+        let path = PathFormat.canonical(url.standardizedFileURL.path)
+        let homePath = PathFormat.canonical(home.path)
+        if path == "/" { return "The whole disk can't be a scan location." }
+        if homePath.hasPrefix(path + "/") { return "Folders above your home folder can't be scan locations." }
+        if PathGuard.isProtectedSystemPath(PathGuard.fold(path)) { return "System folders can't be scan locations." }
+        return nil
+    }
+}
+
 /// Everything the user can configure. Plain `Codable` value so it's easy to persist and test.
 struct SettingsData: Codable, Sendable, Equatable {
     var scanRoots: [ScanRoot]
