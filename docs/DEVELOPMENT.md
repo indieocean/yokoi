@@ -111,6 +111,12 @@ takes a full scan from about 14 s to about 3 s.
 notarizes it with `notarytool` and staples it. One-time setup is at the top of the script.
 `SKIP_NOTARIZE=1` stops after signing.
 
+The DMG window (background, icon positions, volume icon) is laid out by `dmgbuild` from `scripts/dmg-settings.py`,
+installed into `build/dmgbuild-venv` on first use. The background is `assets/dmg/background.tiff` (1x + 2x), drawn by
+`scripts/make-dmg-background.py`. To change it, edit that script (it needs Pillow), then:
+`python3 scripts/make-dmg-background.py && tiffutil -cathidpicheck assets/dmg/background.png assets/dmg/background@2x.png -out assets/dmg/background.tiff`.
+Icon positions are set in both scripts and must match.
+
 ### From GitHub Actions
 
 `.github/workflows/release.yml` runs the same script when a version tag is pushed, then publishes the release:

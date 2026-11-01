@@ -61,11 +61,17 @@ codesign -d --entitlements - --verbose=2 "$APP" 2>&1 | grep -E "Authority=Develo
   || { echo "error: not signed with Developer ID + hardened runtime" >&2; exit 1; }
 
 echo "› Building $DMG"
-STAGE="$OUT/dmg"
-mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Yokoi $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+# dmgbuild lays out the window (background, icon positions) and sets the volume icon without scripting
+# Finder, so it also works on headless CI. Installed once into a venv under build/.
+VENV="build/dmgbuild-venv"
+if [[ ! -x "$VENV/bin/dmgbuild" ]]; then
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install --quiet "dmgbuild==1.6.7"
+fi
+cp "$APP/Contents/Resources/AppIcon.icns" "$OUT/VolumeIcon.icns"
+"$VENV/bin/dmgbuild" -s scripts/dmg-settings.py \
+  -D app="$APP" -D icon="$OUT/VolumeIcon.icns" -D background=assets/dmg/background.tiff \
+  "Yokoi $VERSION" "$DMG" >/dev/null
 codesign --sign "Developer ID Application" --timestamp "$DMG"
 
 if [[ -n "${SKIP_NOTARIZE:-}" ]]; then

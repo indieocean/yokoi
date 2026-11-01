@@ -128,7 +128,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 
 ### Download
 
-**[Download Yokoi 1.1.2](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
+**[Download Yokoi 1.1.3](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
 
 Every release is on the [Releases](https://github.com/indieocean/yokoi/releases) page, with a SHA-256 checksum.
 
