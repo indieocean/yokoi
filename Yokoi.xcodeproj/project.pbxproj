@@ -239,7 +239,7 @@
 				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Yokoi looks for screenshots and large files on your Desktop.";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Yokoi scans your project folders for rebuildable files.";
 				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Yokoi looks for large files in Downloads.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 The Ranch STEAM Lab. Free software under the GNU GPL v3.";
 				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Yokoi can move large files to an external drive.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -269,7 +269,7 @@
 				INFOPLIST_KEY_NSDesktopFolderUsageDescription = "Yokoi looks for screenshots and large files on your Desktop.";
 				INFOPLIST_KEY_NSDocumentsFolderUsageDescription = "Yokoi scans your project folders for rebuildable files.";
 				INFOPLIST_KEY_NSDownloadsFolderUsageDescription = "Yokoi looks for large files in Downloads.";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 The Ranch STEAM Lab. Free software under the GNU GPL v3.";
 				INFOPLIST_KEY_NSRemovableVolumesUsageDescription = "Yokoi can move large files to an external drive.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

@@ -14,6 +14,7 @@
   <img alt="100% local" src="https://img.shields.io/badge/data-100%25%20local-34D399?style=flat-square">
   <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-22D3EE?style=flat-square">
   <img alt="No sudo" src="https://img.shields.io/badge/sudo-never-F0565E?style=flat-square">
+  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square"></a>
 </p>
 
 <p align="center">
@@ -236,6 +237,14 @@ It's the same idea as in a runtime: find what's no longer reachable from your ac
 ## Contributing
 
 Issues and pull requests are welcome. Start with [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the architecture, the rule tables and how to run the test suite (`⌘U`).
+
+<br>
+
+## License
+
+Copyright © 2026 [The Ranch STEAM Lab](https://theranchsteamlab.com/).
+
+Yokoi is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License v3.0](LICENSE) as published by the Free Software Foundation. It is distributed in the hope that it will be useful, but **without any warranty**; without even the implied warranty of merchantability or fitness for a particular purpose. See [LICENSE](LICENSE) for the full text.
 
 <br>
 

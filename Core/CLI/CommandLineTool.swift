@@ -104,6 +104,7 @@ enum CommandLineTool {
         case .version:
             let info = Bundle.main.infoDictionary
             print("yokoi \(info?["CFBundleShortVersionString"] as? String ?? "dev") (\(info?["CFBundleVersion"] as? String ?? "0"))")
+            print(Legal.notice)
             return 0
         case .scan(let options):
             let settings = loadSettings()

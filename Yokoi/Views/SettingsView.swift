@@ -421,6 +421,16 @@ private struct AboutCard: View {
                     .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
             }
             Text(PathFormat.abbreviate(app.store.logURL)).font(Theme.mono(11)).foregroundStyle(Theme.textTertiary).textSelection(.enabled)
+            Divider().padding(.vertical, 4)
+            // GPL-3.0 §5(d): show the copyright, the lack of warranty and where the license is.
+            Text(Legal.notice)
+                .font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 14) {
+                Link("Source code", destination: Legal.sourceURL)
+                Link("License (GPL-3.0)", destination: Legal.licenseURL)
+            }
+            .font(.system(size: 11.5))
         }
         .card(padding: 22)
     }
