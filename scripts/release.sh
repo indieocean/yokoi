@@ -84,6 +84,7 @@ xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 
-shasum -a 256 "$DMG" | tee "$DMG.sha256"
+# Name only, so `shasum -c` works next to the downloaded DMG.
+(cd "$OUT" && shasum -a 256 "$(basename "$DMG")") | tee "$DMG.sha256"
 echo "✓ Ready to upload: $DMG"
 echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' --title 'Yokoi $VERSION' --generate-notes"
