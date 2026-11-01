@@ -101,9 +101,16 @@ enum PackageManagerKind: String, Codable, Sendable, CaseIterable, Identifiable {
         }
     }
 
-    /// nil when the manager can't update a single package without root.
+    /// False for names a tool could read as an option (`-x`, `--force`) or that can't be passed safely.
+    /// Targets come from the tools' own output, so this should never trip; it's a backstop.
+    static func isSafeTarget(_ target: String) -> Bool {
+        !target.isEmpty && !target.hasPrefix("-") && !target.contains(where: { $0 == "\0" || $0.isNewline })
+    }
+
+    /// nil when the manager can't update a single package without root (or the name isn't safe to pass).
     func updateCommand(_ target: String) -> [String]? {
-        switch self {
+        guard Self.isSafeTarget(target) else { return nil }
+        return switch self {
         case .npm: ["npm", "install", "-g", "\(target)@latest"]
         case .pnpm: ["pnpm", "add", "-g", "\(target)@latest"]
         case .yarn: ["yarn", "global", "add", "\(target)@latest"]
@@ -122,9 +129,10 @@ enum PackageManagerKind: String, Codable, Sendable, CaseIterable, Identifiable {
         }
     }
 
-    /// nil when there's no safe, root-free uninstall command.
+    /// nil when there's no safe, root-free uninstall command (or the name isn't safe to pass).
     func uninstallCommand(_ target: String) -> [String]? {
-        switch self {
+        guard Self.isSafeTarget(target) else { return nil }
+        return switch self {
         case .npm: ["npm", "uninstall", "-g", target]
         case .pnpm: ["pnpm", "remove", "-g", target]
         case .yarn: ["yarn", "global", "remove", target]

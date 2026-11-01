@@ -6,6 +6,10 @@ import Foundation
 /// locations), is not excluded, isn't part of a `.git` folder, and isn't under a protected system folder.
 /// Checks run on both the literal path and the path with parent symlinks resolved, so a symlink
 /// can't be used to escape a root.
+///
+/// The deny checks (system folders, personal data, `.git`, exclusions) ignore case, because the default
+/// APFS volume does: `~/library/keychains` is the same folder as `~/Library/Keychains`. The allow check
+/// (inside a root) stays exact, so a case mismatch there refuses rather than permits.
 struct PathGuard: Sendable {
     enum Violation: Error, Equatable, CustomStringConvertible, Sendable {
         case outsideAllowedRoots
@@ -55,14 +59,24 @@ struct PathGuard: Sendable {
         self.home = PathFormat.canonical(home.path)
     }
 
+    /// Case- and normalization-insensitive form of a path, for the deny checks.
+    static func fold(_ path: String) -> String {
+        path.precomposedStringWithCanonicalMapping.lowercased()
+    }
+
+    /// `path` is `prefix` or inside it. Both must already be folded.
+    private static func isAtOrInside(_ path: String, _ prefix: String) -> Bool {
+        path == prefix || path.hasPrefix(prefix + "/")
+    }
+
+    /// - Parameter path: an already-folded path.
     private func isProtectedUserData(_ path: String) -> Bool {
-        if path == home || PathGuard.protectedHomeFolders.contains(where: { path == home + "/" + $0 }) || path == "/Applications" {
+        let home = Self.fold(self.home)
+        if path == home || path == "/applications"
+            || PathGuard.protectedHomeFolders.contains(where: { path == home + "/" + Self.fold($0) }) {
             return true
         }
-        for rel in PathGuard.protectedHomePaths {
-            let p = home + "/" + rel
-            if path == p || path.hasPrefix(p + "/") { return true }
-        }
+        if PathGuard.protectedHomePaths.contains(where: { Self.isAtOrInside(path, home + "/" + Self.fold($0)) }) { return true }
         return path.split(separator: "/").contains { comp in PathGuard.protectedSuffixes.contains { comp.hasSuffix($0) } }
     }
 
@@ -71,8 +85,8 @@ struct PathGuard: Sendable {
         let resolved = PathFormat.canonical(url.deletingLastPathComponent().resolvingSymlinksInPath()
             .appendingPathComponent(url.lastPathComponent).path)
 
-        for path in Set([literal, resolved]) {
-            if path == "/" || Self.protectedPrefixes.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) {
+        for path in Set([literal, resolved].map(Self.fold)) {
+            if path == "/" || Self.protectedPrefixes.contains(where: { Self.isAtOrInside(path, Self.fold($0)) }) {
                 return .protectedSystemPath
             }
             if path.split(separator: "/").contains(".git") { return .insideGitFolder }

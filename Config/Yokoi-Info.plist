@@ -9,6 +9,12 @@
 	<!-- Public half of the EdDSA key that signs each DMG (private half: login keychain, account "yokoi"). -->
 	<key>SUPublicEDKey</key>
 	<string>H6prUy3WGLtDdDYfpgLraRpzC5fPvwhaawNaoEKM+zk=</string>
+	<!-- Check the EdDSA signature before an update is even unpacked, not only before it's installed. -->
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
+	<!-- The appcast itself is EdDSA-signed by scripts/release.sh; an unsigned or altered feed is ignored. -->
+	<key>SURequireSignedFeed</key>
+	<true/>
 	<!-- Never send a system profile with update checks. -->
 	<key>SUEnableSystemProfiling</key>
 	<false/>

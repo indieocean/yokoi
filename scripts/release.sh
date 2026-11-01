@@ -130,6 +130,13 @@ cat > "$OUT/appcast.xml" <<XML
 </rss>
 XML
 xmllint --noout "$OUT/appcast.xml"
+# Sign the feed too (the app sets SURequireSignedFeed). sign_update embeds the signature in the XML.
+if [[ -n "${SPARKLE_KEY_PATH:-}" ]]; then
+  "$SIGN_UPDATE" --ed-key-file "$SPARKLE_KEY_PATH" "$OUT/appcast.xml"
+else
+  "$SIGN_UPDATE" --account yokoi "$OUT/appcast.xml"
+fi
+grep -q 'sparkle-signatures' "$OUT/appcast.xml" || { echo "error: appcast.xml wasn't signed" >&2; exit 1; }
 
 echo "✓ Ready to upload: $DMG"
 echo "  gh release create v$VERSION '$DMG' '$DMG.sha256' '$OUT/appcast.xml' --title 'Yokoi $VERSION' --generate-notes"

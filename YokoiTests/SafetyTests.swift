@@ -43,6 +43,35 @@ struct SafetyTests {
         #expect(g.check(URL(fileURLWithPath: "/Library/Caches/x")) == .protectedSystemPath)
     }
 
+    @Test func exclusionsIgnoreCase() {
+        let g = GlobMatcher(patterns: ["~/Work/Client", "*.KEEP", "~/dev/Acme/prod-*"], home: home)
+        #expect(g.matches(path: "/Users/maya/work/client/node_modules"))
+        #expect(g.matches(path: "/Users/maya/WORK/CLIENT"))
+        #expect(g.matches(path: "/Users/maya/dev/a.keep"))
+        #expect(g.matches(path: "/Users/maya/dev/acme/PROD-api/target"))
+        #expect(!g.matches(path: "/Users/maya/work/clients"))
+        #expect(!g.matches(path: "/Users/maya/dev/acme/staging/target"))
+    }
+
+    @Test func guardDenyChecksIgnoreCase() {
+        let g = PathGuard(allowedRoots: [home], exclusions: GlobMatcher(patterns: ["~/Dev/Keep"], home: home), home: home)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/library/keychains/login.keychain-db")) == .protectedUserData)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/LIBRARY/Mail/V10/x")) == .protectedUserData)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/pictures/x.PhotosLibrary/db")) == .protectedUserData)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/documents")) == .protectedUserData)
+        #expect(g.check(URL(fileURLWithPath: "/system/library/x")) == .protectedSystemPath)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/dev/repo/.GIT/objects")) == .insideGitFolder)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/dev/keep/node_modules")) == .excluded)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/library/mailspring/cache")) == nil, "lookalikes still aren't protected")
+    }
+
+    @Test func allowCheckStaysExact() {
+        // Folding the allow check would widen it on case-sensitive volumes: a case mismatch refuses instead.
+        let g = PathGuard(allowedRoots: [home.appendingPathComponent("dev")], exclusions: GlobMatcher(patterns: []), home: home)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/dev/web/node_modules")) == nil)
+        #expect(g.check(URL(fileURLWithPath: "/Users/maya/DEV/web/node_modules")) == .outsideAllowedRoots)
+    }
+
     @Test func guardRejectsSymlinkEscape() throws {
         let f = try Fixture()
         try f.dir("dev")

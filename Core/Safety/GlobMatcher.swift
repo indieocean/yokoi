@@ -5,6 +5,8 @@ import Foundation
 /// - A pattern without `/` matches any single path component (`*.keep`, `.git`).
 /// - A pattern with `/` is matched against the whole path; `**` spans directories, `*` and `?` don't.
 /// - A match on a folder also covers everything inside it.
+/// - Matching ignores case, like the default (case-insensitive) APFS volume: an exclusion typed as
+///   `~/Work/Client` must also protect `~/work/client`. Exclusions only ever protect, so erring wide is safe.
 struct GlobMatcher: Sendable {
     private struct Compiled: Sendable {
         let raw: String
@@ -42,13 +44,13 @@ struct GlobMatcher: Sendable {
         let components = path.split(separator: "/").map(String.init)
         for c in compiled {
             if let glob = c.componentGlob {
-                if components.contains(where: { fnmatch(glob, $0, 0) == 0 }) { return true }
+                if components.contains(where: { fnmatch(glob, $0, FNM_CASEFOLD) == 0 }) { return true }
             } else if let regex = c.regex {
                 // Test the path and each ancestor, so a match on a folder covers its contents.
                 var prefix = ""
                 for comp in components {
                     prefix += "/" + comp
-                    if prefix.range(of: regex, options: .regularExpression) != nil { return true }
+                    if prefix.range(of: regex, options: [.regularExpression, .caseInsensitive]) != nil { return true }
                 }
             }
         }

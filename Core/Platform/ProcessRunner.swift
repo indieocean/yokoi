@@ -5,8 +5,10 @@ import Foundation
 /// - Executables are launched directly via `/usr/bin/env`, never through a shell, and every argument is
 ///   passed separately, so package names can't inject commands.
 /// - `PATH` comes from the user's login shell (Homebrew, nvm, asdf shims), resolved once.
-/// - Privilege escalation is refused outright: Yokoi never runs `sudo`, `su`, `doas` or `osascript`.
-/// - Every run has a timeout and keeps its output so the UI can show it.
+/// - Only the package-manager and developer tools Yokoi knows (`knownTools`) can be launched. Privilege
+///   escalation, shells, interpreters and launchers that run another program (`env`, `xargs`…) are refused.
+/// - Every run has a timeout (SIGTERM, then SIGKILL) and keeps its output so the UI can show it. A child
+///   process that keeps the output pipe open can't hang a run either.
 actor ProcessRunner {
     struct Result: Sendable, Equatable {
         let command: [String]
@@ -33,13 +35,44 @@ actor ProcessRunner {
     }
 
     static let shared = ProcessRunner()
-    static let forbidden: Set<String> = ["sudo", "su", "doas", "osascript", "launchctl", "rm", "sh", "bash", "zsh"]
+    /// Never run, even when `allowedTools` is nil: privilege escalation, shells, interpreters, and
+    /// launchers that would run some other program named in their arguments.
+    static let forbidden: Set<String> = [
+        "sudo", "su", "doas", "osascript", "launchctl", "rm",
+        "sh", "bash", "zsh", "dash", "ksh", "csh", "tcsh", "fish",
+        "env", "xargs", "nohup", "nice", "exec", "command", "script", "time", "timeout", "caffeinate",
+        "perl", "ruby", "osacompile",
+    ]
+    /// Every tool Yokoi itself runs (package managers and the CLIs behind tool actions).
+    static let knownTools: Set<String> = [
+        "npm", "pnpm", "yarn", "bun", "brew", "port", "mas", "cargo", "go", "dotnet", "python3", "pipx", "uv",
+        "conda", "gem", "composer", "xcrun", "tmutil", "docker",
+    ]
+    /// After SIGTERM, how long a timed-out process gets before SIGKILL.
+    static let killGrace: TimeInterval = 2
+    /// After the process exits, how long to wait for the rest of its output (a background child may hold the pipe).
+    static let drainTimeout: TimeInterval = 2
 
     private var resolvedPath: String?
     private let pathOverride: String?
+    private let allowedTools: Set<String>?
 
-    init(path: String? = nil) {
+    /// - Parameter allowedTools: tools that may be launched; nil allows anything not `forbidden` (tests only).
+    init(path: String? = nil, allowedTools: Set<String>? = ProcessRunner.knownTools) {
         self.pathOverride = path
+        self.allowedTools = allowedTools
+    }
+
+    /// Why `command` would be refused, or nil when it may run.
+    nonisolated func refusal(_ command: [String]) -> String? {
+        guard let tool = command.first, !tool.isEmpty else { return "empty command" }
+        let name = (tool as NSString).lastPathComponent
+        if Self.forbidden.contains(name) { return "\(name) is never run by Yokoi" }
+        if let allowedTools, !allowedTools.contains(name) { return "\(name) isn't a tool Yokoi runs" }
+        // python3 is only ever used for pip.
+        if name == "python3", Array(command.dropFirst().prefix(2)) != ["-m", "pip"] { return "python3 only runs pip" }
+        if command.contains(where: { $0.contains("\0") }) { return "argument contains a NUL byte" }
+        return nil
     }
 
     /// Login-shell PATH plus common tool locations, so GUI launches find `brew`, `npm`, `cargo`…
@@ -94,9 +127,7 @@ actor ProcessRunner {
     }
 
     func run(_ command: [String], timeout: TimeInterval = 120, environment extra: [String: String] = [:]) async throws -> Result {
-        guard let tool = command.first, !tool.isEmpty else { throw RunnerError.refused("empty command") }
-        let name = (tool as NSString).lastPathComponent
-        guard !Self.forbidden.contains(name) else { throw RunnerError.refused("\(name) is never run by Yokoi") }
+        if let why = refusal(command) { throw RunnerError.refused(why) }
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = await searchPath()
         env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
@@ -120,9 +151,26 @@ actor ProcessRunner {
         process.standardError = err
         process.standardInput = FileHandle.nullDevice
 
+        // Output is collected by the handlers until EOF; nothing ever blocks on reading the pipe.
         let outData = DataBox(), errData = DataBox()
-        out.fileHandleForReading.readabilityHandler = { h in outData.append(h.availableData) }
-        err.fileHandleForReading.readabilityHandler = { h in errData.append(h.availableData) }
+        let drained = DispatchGroup()
+        for (pipe, box) in [(out, outData), (err, errData)] {
+            drained.enter()
+            let eof = Once()
+            pipe.fileHandleForReading.readabilityHandler = { h in
+                let d = h.availableData
+                if d.isEmpty {
+                    h.readabilityHandler = nil
+                    if eof.claim() { drained.leave() }
+                } else {
+                    box.append(d)
+                }
+            }
+        }
+        func stopReading() {
+            out.fileHandleForReading.readabilityHandler = nil
+            err.fileHandleForReading.readabilityHandler = nil
+        }
 
         let timedOut = DataBox()
         do {
@@ -136,21 +184,26 @@ actor ProcessRunner {
                     return
                 }
                 DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                    if process.isRunning {
-                        timedOut.append(Data([1]))
-                        process.terminate()
+                    guard process.isRunning else { return }
+                    timedOut.append(Data([1]))
+                    process.terminate()
+                    // A process that ignores SIGTERM is killed.
+                    DispatchQueue.global().asyncAfter(deadline: .now() + killGrace) {
+                        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
                     }
                 }
             }
         } catch {
-            out.fileHandleForReading.readabilityHandler = nil
-            err.fileHandleForReading.readabilityHandler = nil
+            stopReading()
             throw error
         }
-        out.fileHandleForReading.readabilityHandler = nil
-        err.fileHandleForReading.readabilityHandler = nil
-        outData.append(out.fileHandleForReading.readDataToEndOfFile())
-        errData.append(err.fileHandleForReading.readDataToEndOfFile())
+        // Wait for EOF on both pipes, but not forever: a background child can keep them open.
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            let resumed = Once()
+            drained.notify(queue: .global()) { if resumed.claim() { cont.resume() } }
+            DispatchQueue.global().asyncAfter(deadline: .now() + drainTimeout) { if resumed.claim() { cont.resume() } }
+        }
+        stopReading()
 
         return Result(command: display ?? [executable] + arguments,
                       exitCode: process.terminationStatus,
@@ -164,6 +217,19 @@ actor ProcessRunner {
         let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./=:@,+%^"))
         if !arg.isEmpty, arg.unicodeScalars.allSatisfy({ safe.contains($0) }) { return arg }
         return "'" + arg.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+}
+
+/// True for the first caller of `claim()` only.
+final class Once: @unchecked Sendable {
+    private var claimed = false
+    private let lock = NSLock()
+
+    func claim() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if claimed { return false }
+        claimed = true
+        return true
     }
 }
 

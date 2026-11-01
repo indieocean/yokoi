@@ -121,6 +121,57 @@ struct FeatureTests {
         _ = out
     }
 
+    @Test func putBackRefusesLogEntriesThatDontComeFromATrash() async throws {
+        let f = try Fixture.standard()
+        try f.file("Documents/secret.txt")
+        let log = CleanupLog(url: f.url("support/cleanup.log"))
+        let svc = CleanupService(context: f.context(), log: log)
+        // A hand-edited log: "put back" ~/Documents/secret.txt into a project folder.
+        let forged = CleanupRecord(batchID: "forged", timestamp: Date(), action: "trash", dryRun: false, category: .nodeModules,
+                                   label: "x", path: "~/dev/web/stolen", size: 1,
+                                   items: [.init(original: f.url("dev/web/stolen").path, destination: f.url("Documents/secret.txt").path)],
+                                   failed: 0)
+        let out = await svc.restore(batch: [forged])
+        #expect(out.failures.count == 1)
+        #expect(out.failures.first?.reason.hasPrefix("Refused") == true)
+        #expect(f.exists("Documents/secret.txt"))
+        #expect(!f.exists("dev/web/stolen"))
+    }
+
+    @Test func putBackRefusesOriginalsOutsideTheCategorysRoots() async throws {
+        let f = try Fixture.standard()
+        let log = CleanupLog(url: f.url("support/cleanup.log"))
+        let svc = CleanupService(context: f.context(), log: log)
+        let entry = CleanupEntry(id: "x", category: .nodeModules, label: "web", displayPath: "~/dev/web/node_modules",
+                                 urls: [f.url("dev/web/node_modules")], size: 10)
+        _ = await svc.perform([entry], action: .trash, dryRun: false)
+        let real = try #require(await log.readAll().batches.first?.records.first)
+        let trashed = try #require(real.items.first?.destination)
+        defer { try? FileManager.default.removeItem(atPath: trashed) }
+        // Same Trash item, but the log now says it came from ~/Library/LaunchAgents.
+        let forged = CleanupRecord(batchID: real.batchID, timestamp: real.timestamp, action: "trash", dryRun: false,
+                                   category: .nodeModules, label: real.label, path: real.path, size: real.size,
+                                   items: [.init(original: f.url("Library/LaunchAgents/evil").path, destination: trashed)], failed: 0)
+        let out = await svc.restore(batch: [forged])
+        #expect(out.failures.first?.reason.hasPrefix("Refused") == true)
+        #expect(!f.exists("Library/LaunchAgents/evil"))
+        #expect(FileManager.default.fileExists(atPath: trashed), "left in the Trash")
+    }
+
+    @Test func recognizesTrashLocations() {
+        let home = URL(fileURLWithPath: "/Users/maya")
+        func inTrash(_ p: String) -> Bool { CleanupService.isInTrash(URL(fileURLWithPath: p), home: home, uid: 501) }
+        #expect(inTrash("/Users/maya/.Trash/node_modules"))
+        #expect(inTrash("/Users/maya/.Trash/node_modules 2/a/b"))
+        #expect(inTrash("/Volumes/USB/.Trashes/501/big.mov"))
+        #expect(!inTrash("/Users/maya/.Trash"), "the Trash itself")
+        #expect(!inTrash("/Users/maya/.Trash/../Documents/x"))
+        #expect(!inTrash("/Users/maya/Documents/x"))
+        #expect(!inTrash("/Users/other/.Trash/x"))
+        #expect(!inTrash("/Volumes/USB/.Trashes/0/x"), "someone else's Trash")
+        #expect(!inTrash("/Volumes/USB/.Trashes/501"))
+    }
+
     @Test func putBackNeverOverwrites() async throws {
         let f = try Fixture.standard()
         let log = CleanupLog(url: f.url("support/cleanup.log"))
@@ -139,6 +190,20 @@ struct FeatureTests {
 
 @Suite("Package manager and tool parsers")
 struct ParserTests {
+    @Test(arguments: ["-rf", "--force", "--prefix=/", "", "a\nb", "a\0b"])
+    func refusesTargetsThatLookLikeOptions(_ target: String) {
+        for kind in PackageManagerKind.allCases {
+            #expect(kind.updateCommand(target) == nil, "\(kind) update \(target)")
+            #expect(kind.uninstallCommand(target) == nil, "\(kind) uninstall \(target)")
+        }
+    }
+
+    @Test func normalTargetsStillWork() {
+        #expect(PackageManagerKind.npm.uninstallCommand("@scope/left-pad") == ["npm", "uninstall", "-g", "@scope/left-pad"])
+        #expect(PackageManagerKind.homebrew.updateCommand("ffmpeg") == ["brew", "upgrade", "ffmpeg"])
+        #expect(PackageManagerKind.conda.uninstallCommand("/opt/miniconda3/envs/ml") == ["conda", "env", "remove", "-p", "/opt/miniconda3/envs/ml", "-y"])
+    }
+
     @Test func npm() {
         let ls = #"{"dependencies":{"typescript":{"version":"5.4.5"},"eslint":{"version":"8.57.0"}}}"#
         let pkgs = PackageParsers.installed(.npm, ls)

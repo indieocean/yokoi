@@ -66,6 +66,45 @@ struct CleanupTests {
         #expect(f.exists("dev"))
     }
 
+    @Test func refusesExclusionsTypedInADifferentCase() async throws {
+        let f = try Fixture.standard()
+        let (svc, _) = service(f, ctx: f.context(exclusions: ["~/DEV/Web"]))
+        let outcome = await svc.perform([entry(f, "dev/web/node_modules")], action: .delete, dryRun: false)
+        #expect(outcome.completedIDs.isEmpty)
+        #expect(outcome.failures.first?.reason.contains("excluded") == true)
+        #expect(f.exists("dev/web/node_modules/a/index.js"))
+    }
+
+    @Test func permanentDeleteRechecksTheParentsRealLocation() throws {
+        let f = try Fixture()
+        try f.file("outside/node_modules/precious.js")
+        try f.dir("dev")
+        // dev/p was checked as a real folder, then swapped for a symlink to somewhere else.
+        try FileManager.default.createSymbolicLink(at: f.url("dev/p"), withDestinationURL: f.url("outside"))
+        let pathGuard = PathGuard(allowedRoots: [f.url("dev")], exclusions: GlobMatcher(patterns: []), home: f.home)
+        var judged: [String] = []
+        #expect(throws: (any Error).self) {
+            try SystemFileOperations().remove(f.url("dev/p/node_modules"), allowed: { url in
+                judged.append(url.path)
+                return pathGuard.check(url) == nil
+            }, onFile: nil)
+        }
+        #expect(f.exists("outside/node_modules/precious.js"))
+        #expect(judged.count == 1)
+        #expect(judged.first?.hasSuffix("/outside/node_modules") == true, "judged at the real location, not the literal path")
+    }
+
+    @Test func permanentDeleteRemovesRelativeToTheCheckedFolder() throws {
+        let f = try Fixture()
+        for i in 0..<5 { try f.file("dev/p/node_modules/pkg\(i)/index.js") }
+        var reported: [String] = []
+        try SystemFileOperations().remove(f.url("dev/p/node_modules"), allowed: { _ in true }, onFile: { reported.append($0) })
+        #expect(!f.exists("dev/p/node_modules"))
+        #expect(f.exists("dev/p"))
+        #expect(reported.count >= 5)
+        #expect(reported.allSatisfy { $0.hasPrefix("/") }, "paths are reported in full")
+    }
+
     @Test func categoriesAreScopedToTheirOwnRoots() async throws {
         let f = try Fixture.standard()
         let (svc, _) = service(f)

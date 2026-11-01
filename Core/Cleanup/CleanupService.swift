@@ -101,8 +101,10 @@ struct CleanupOutcome: Sendable {
 /// The file operations behind a cleanup. Abstracted so tests can observe or fake them.
 protocol FileOperations: Sendable {
     func trash(_ url: URL) throws -> URL?
-    /// Permanently removes `url` (recursively), calling `onFile` for each path as it goes.
-    func remove(_ url: URL, onFile: ((String) -> Void)?) throws
+    /// Permanently removes `url` (recursively), calling `onFile` for each path as it goes. Just before
+    /// removing, `allowed` is asked again about the item at its parent folder's real location, and the
+    /// removal is refused if it says no.
+    func remove(_ url: URL, allowed: (URL) -> Bool, onFile: ((String) -> Void)?) throws
     func move(_ url: URL, to destination: URL) throws
     func createDirectory(_ url: URL) throws
     func exists(_ url: URL) -> Bool
@@ -118,6 +120,8 @@ private struct RemoveFile: Sendable {
     let free: @convention(c) (State?) -> Int32
     let set: @convention(c) (State?, UInt32, UnsafeRawPointer?) -> Int32
     let remove: @convention(c) (UnsafePointer<CChar>?, State?, UInt32) -> Int32
+    /// `removefileat(3)`: removes a name relative to an open folder.
+    let removeAt: (@convention(c) (Int32, UnsafePointer<CChar>?, State?, UInt32) -> Int32)?
 
     static let recursive: UInt32 = 1        // REMOVEFILE_RECURSIVE
     static let confirmCallback: UInt32 = 1  // REMOVEFILE_STATE_CONFIRM_CALLBACK
@@ -134,7 +138,8 @@ private struct RemoveFile: Sendable {
               let set = load("removefile_state_set", as: (@convention(c) (State?, UInt32, UnsafeRawPointer?) -> Int32).self),
               let remove = load("removefile", as: (@convention(c) (UnsafePointer<CChar>?, State?, UInt32) -> Int32).self)
         else { return nil }
-        return RemoveFile(alloc: alloc, free: free, set: set, remove: remove)
+        let removeAt = load("removefileat", as: (@convention(c) (Int32, UnsafePointer<CChar>?, State?, UInt32) -> Int32).self)
+        return RemoveFile(alloc: alloc, free: free, set: set, remove: remove, removeAt: removeAt)
     }()
 }
 
@@ -146,27 +151,57 @@ struct SystemFileOperations: FileOperations {
     }
 
     /// Uses `removefile(3)`: recursive, never follows symlinks, and reports every path it removes.
-    func remove(_ url: URL, onFile: ((String) -> Void)?) throws {
-        guard let onFile else { return try FileManager.default.removeItem(at: url) }
-        guard let api = RemoveFile.api, let state = api.alloc() else { return try FileManager.default.removeItem(at: url) }
-        defer { _ = api.free(state) }
-        let box = Unmanaged.passRetained(RemoveCallbackBox(onFile))
-        defer { box.release() }
-        let callback: RemoveFile.Callback = { _, path, ctx in
-            if let path, let ctx {
-                Unmanaged<RemoveCallbackBox>.fromOpaque(ctx).takeUnretainedValue().onFile(String(cString: path))
-            }
-            return RemoveFile.proceed
+    ///
+    /// The parent folder is opened first, and `allowed` judges the item at that folder's real path
+    /// (`F_GETPATH`). The removal then runs relative to the open folder (`removefileat`), so swapping a
+    /// parent for a symlink after the PathGuard check can't redirect a permanent delete somewhere else.
+    func remove(_ url: URL, allowed: (URL) -> Bool, onFile: ((String) -> Void)?) throws {
+        let name = url.lastPathComponent
+        guard !name.isEmpty, name != ".", name != "..", name != "/" else { throw Self.posixError(EINVAL, url.path) }
+        let dir = open(url.deletingLastPathComponent().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard dir >= 0 else { throw Self.posixError(errno, url.path) }
+        defer { close(dir) }
+        var buf = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard fcntl(dir, F_GETPATH, &buf) != -1 else { throw Self.posixError(errno, url.path) }
+        let parent = String(cString: buf)
+        let real = URL(fileURLWithPath: parent).appendingPathComponent(name)
+        guard allowed(real) else {
+            throw NSError(domain: "Yokoi.Cleanup", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Refused: \(real.path) is not where the item was checked",
+                NSFilePathErrorKey: url.path,
+            ])
         }
-        _ = api.set(state, RemoveFile.confirmCallback, unsafeBitCast(callback, to: UnsafeRawPointer.self))
-        _ = api.set(state, RemoveFile.confirmContext, box.toOpaque())
-        if api.remove(url.path, state, RemoveFile.recursive) != 0 {
+
+        guard let api = RemoveFile.api, let removeAt = api.removeAt, let state = api.alloc() else {
+            // No removefileat: fall back to the path (re-checked just above).
+            return try FileManager.default.removeItem(at: real)
+        }
+        defer { _ = api.free(state) }
+        var box: Unmanaged<RemoveCallbackBox>?
+        if let onFile {
+            // removefileat reports paths relative to the open folder; show them in full.
+            let b = Unmanaged.passRetained(RemoveCallbackBox { path in onFile(path.hasPrefix("/") ? path : parent + "/" + path) })
+            box = b
+            let callback: RemoveFile.Callback = { _, path, ctx in
+                if let path, let ctx {
+                    Unmanaged<RemoveCallbackBox>.fromOpaque(ctx).takeUnretainedValue().onFile(String(cString: path))
+                }
+                return RemoveFile.proceed
+            }
+            _ = api.set(state, RemoveFile.confirmCallback, unsafeBitCast(callback, to: UnsafeRawPointer.self))
+            _ = api.set(state, RemoveFile.confirmContext, b.toOpaque())
+        }
+        defer { box?.release() }
+        if removeAt(dir, name, state, RemoveFile.recursive) != 0 {
             let code = errno
             // removefile reports ENOENT if something vanished mid-way; only fail if the item is still there.
-            if (try? FileManager.default.attributesOfItem(atPath: url.path)) != nil {
-                throw NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: url.path])
-            }
+            var st = stat()
+            if fstatat(dir, name, &st, AT_SYMLINK_NOFOLLOW) == 0 { throw Self.posixError(code, url.path) }
         }
+    }
+
+    private static func posixError(_ code: Int32, _ path: String) -> NSError {
+        NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: path])
     }
 
     func move(_ url: URL, to destination: URL) throws { try FileManager.default.moveItem(at: url, to: destination) }
@@ -193,16 +228,35 @@ actor CleanupService {
     private let guards: [CleanCategory: PathGuard]
     private let log: CleanupLog
     private let ops: FileOperations
+    /// Whose `~/.Trash` restores may come out of.
+    private let home: URL
 
     /// - Parameter guards: the allowed roots for each category. A category without a guard can't be cleaned.
-    init(guards: [CleanCategory: PathGuard], log: CleanupLog, fileOperations: FileOperations = SystemFileOperations()) {
+    init(guards: [CleanCategory: PathGuard], log: CleanupLog, fileOperations: FileOperations = SystemFileOperations(),
+         home: URL = FileManager.default.homeDirectoryForCurrentUser) {
         self.guards = guards
         self.log = log
         self.ops = fileOperations
+        self.home = home
     }
 
     init(context: ScanContext, log: CleanupLog, fileOperations: FileOperations = SystemFileOperations()) {
         self.init(guards: context.pathGuards(), log: log, fileOperations: fileOperations)
+    }
+
+    /// True when `url` is strictly inside the user's Trash: `~/.Trash`, or `/Volumes/<drive>/.Trashes/<uid>`.
+    static func isInTrash(_ url: URL, home: URL, uid: uid_t = getuid()) -> Bool {
+        let resolved = url.deletingLastPathComponent().resolvingSymlinksInPath().appendingPathComponent(url.lastPathComponent)
+        for path in Set([url.path, resolved.path].map(PathFormat.canonical)) {
+            let parts = path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+            guard !parts.contains(".."), !parts.contains(".") else { return false }
+            let homeParts = PathFormat.canonical(home.path).split(separator: "/").map(String.init)
+            let inHomeTrash = parts.count > homeParts.count + 1
+                && Array(parts.prefix(homeParts.count)) == homeParts && parts[homeParts.count] == ".Trash"
+            let inVolumeTrash = parts.count > 4 && parts[0] == "Volumes" && parts[2] == ".Trashes" && parts[3] == String(uid)
+            if !(inHomeTrash || inVolumeTrash) { return false }
+        }
+        return true
     }
 
     func perform(_ entries: [CleanupEntry], action: CleanupAction, dryRun: Bool, now: Date = Date(),
@@ -261,7 +315,7 @@ actor CleanupService {
                     case .delete:
                         progress?.touched(url.path)
                         var n = 0
-                        try ops.remove(url, onFile: progress.map { p in
+                        try ops.remove(url, allowed: { pathGuard.check($0) == nil }, onFile: progress.map { p in
                             { path in
                                 n += 1
                                 p.touched(path, countsAsFile: true)
@@ -317,7 +371,14 @@ actor CleanupService {
             for item in record.items {
                 guard let trashed = item.destination.map(URL.init(fileURLWithPath:)) else { failed += 1; continue }
                 let original = URL(fileURLWithPath: item.original)
-                if !ops.exists(trashed) {
+                // The log is a plain file: only move things out of a Trash, back to a place cleanup may touch.
+                if !Self.isInTrash(trashed, home: home) {
+                    failures.append(.init(path: item.original, reason: "Refused: the logged Trash location isn't in a Trash"))
+                    failed += 1
+                } else if let violation = (guards[record.category] ?? PathGuard(allowedRoots: [], exclusions: GlobMatcher(patterns: []))).check(original) {
+                    failures.append(.init(path: item.original, reason: "Refused: \(violation.description)"))
+                    failed += 1
+                } else if !ops.exists(trashed) {
                     failures.append(.init(path: item.original, reason: "No longer in the Trash"))
                     failed += 1
                 } else if ops.exists(original) {
