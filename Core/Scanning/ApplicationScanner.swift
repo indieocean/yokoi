@@ -69,7 +69,7 @@ struct ApplicationScanner: CategoryScanner {
             let ownID = Bundle.main.bundleIdentifier ?? "com.yokoi.Yokoi"
             for await item in FileWalker.concurrentMap(apps, limit: context.concurrency, { (info: Info) -> AppItem? in
                 guard !Task.isCancelled else { return nil }
-                let m = FileWalker.measure(info.url, progress: progress)
+                let m = context.measure(info.url, progress: progress)
                 let uniqueName = (names[info.name.lowercased()]?.count ?? 0) == 1
                 let leftovers = Self.leftovers(for: info, home: context.home, matchName: uniqueName, context: context)
                 let reason: String? = info.bundleID.hasPrefix("com.apple.") ? "Apple app"

@@ -54,7 +54,7 @@ struct ScanReclaimableSpaceIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {
         let wanted = categories.map { Set($0.map(\.category)) }.flatMap { $0.isEmpty ? nil : $0 } ?? Set(ScanReport.scannable)
-        let report = await ScanReport.run(settings: SettingsStore.loadStandard(), categories: wanted)
+        let report = await ScanReport.run(settings: SettingsStore.loadStandard(), categories: wanted, index: ScanIndex.defaultURL)
         let top = report.categories.filter { $0.reclaimableBytes > 0 }.sorted { $0.reclaimableBytes > $1.reclaimableBytes }.prefix(3)
         let breakdown = top.map { "\($0.title) \(ByteFormat.string($0.reclaimableBytes))" }.joined(separator: ", ")
         let dialog = report.reclaimableBytes == 0

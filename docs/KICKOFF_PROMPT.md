@@ -1,6 +1,6 @@
-# Disk Keeper — Build Kickoff Prompt
+# Yokoi — Build Kickoff Prompt
 
-You are a senior macOS engineer. Build **Disk Keeper**, a native SwiftUI macOS app that keeps a MacBook tidy for software engineers and game developers. The full spec is in `PRD.md`, the visual system is in `DESIGN.md`, and the target screens are the PNGs `01-dashboard.png` through `09-settings.png`. Read all three before writing code, and treat the PNGs as the visual source of truth.
+You are a senior macOS engineer. Build **Yokoi**, a native SwiftUI macOS app that keeps a MacBook tidy for software engineers and game developers. The full spec is in `PRD.md`, the visual system is in `DESIGN.md`, and the target screens are the PNGs `01-dashboard.png` through `09-settings.png`. Read all three before writing code, and treat the PNGs as the visual source of truth.
 
 ## Scope for this first pass (MVP from PRD.md)
 1. **Dashboard**: disk usage ring, reclaimable space by category, Scan and Clean actions, recent cleanups.
@@ -15,7 +15,7 @@ You are a senior macOS engineer. Build **Disk Keeper**, a native SwiftUI macOS a
 Package managers (npm -g, pnpm, brew, casks, cargo, pip, gem) are **v1.1**. Stub the sidebar item and the data model, but don't run any CLI yet.
 
 ## Tech requirements
-- Swift 5.10+, SwiftUI, macOS 14+, built from an Xcode project named `DiskKeeper`.
+- Swift 5.10+, SwiftUI, macOS 14+, built from an Xcode project named `Yokoi`.
 - `NavigationSplitView` with a translucent sidebar, and `Table` for lists. Use Swift Charts for the dashboard ring.
 - Swift Concurrency for scanning: an `actor`-based scanner, `TaskGroup` for parallel directory walks, cancellable, with live progress. Use `FileManager` enumerators and `URLResourceValues` (`totalFileAllocatedSize`, `contentModificationDate`) for sizes and dates.
 - Architecture: one `Scanner` protocol per category (`NodeModulesScanner`, `BuildArtifactScanner`, `CacheScanner`, `BigFileScanner`, `ScreenshotScanner`), a `CleanupService` that does trash, delete, and move, and an `@Observable` view model for each screen.
@@ -26,7 +26,7 @@ Package managers (npm -g, pnpm, brew, casks, cargo, pip, gem) are **v1.1**. Stub
 - Move to Trash by default. Permanent delete always needs the confirmation sheet.
 - Never delete anything outside the scan roots, or inside excluded folders, `/System`, or `/Library`.
 - Warn before touching a project that changed in the last 14 days.
-- Write every cleanup to a local log (`~/Library/Application Support/DiskKeeper/cleanup.log`) with path, size, action, and timestamp.
+- Write every cleanup to a local log (`~/Library/Application Support/Yokoi/cleanup.log`) with path, size, action, and timestamp.
 - Include a Dry Run toggle that shows what would happen without changing anything.
 - No network calls and no telemetry.
 

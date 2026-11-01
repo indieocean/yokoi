@@ -27,6 +27,8 @@ struct ScanContext: Sendable {
     var bigFileFloor: Int64 = 100_000_000
     /// How many folders are sized at once.
     var concurrency: Int = 8
+    /// The previous scan's measurements, for incremental rescans. `nil` measures everything.
+    var index: ScanIndex?
 
     func rootURLs() -> [(url: URL, maxDepth: Int?)] {
         roots.map { ($0.url(home: home), $0.maxDepth) }
@@ -64,6 +66,17 @@ struct ScanContext: Sendable {
     }
 
     func isExcluded(_ url: URL) -> Bool { exclusions.matches(url) }
+
+    /// `FileWalker.measure`, reusing the last scan's result when nothing under `url` changed.
+    func measure(_ url: URL, progress: ScanProgress? = nil) -> FileWalker.Measurement {
+        index?.measure(url, progress: progress) ?? FileWalker.measure(url, progress: progress)
+    }
+
+    /// `FileWalker.lastTouched`, reusing the last scan's result when nothing in the project changed.
+    func lastTouched(project: URL, skipping skip: Set<String>) -> Date? {
+        guard let index else { return FileWalker.lastTouched(project: project, skipping: skip) }
+        return index.lastTouched(project: project, skipping: skip)
+    }
 }
 
 /// Live, thread-safe scan progress. Scanners bump counters; the UI polls `snapshot`.

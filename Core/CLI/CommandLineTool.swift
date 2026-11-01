@@ -112,7 +112,7 @@ enum CommandLineTool {
             let box = ReportBox()
             let done = DispatchSemaphore(value: 0)
             Task.detached {
-                box.report = await ScanReport.run(settings: settings, categories: options.categories)
+                box.report = await ScanReport.run(settings: settings, categories: options.categories, index: ScanIndex.defaultURL)
                 done.signal()
             }
             done.wait()

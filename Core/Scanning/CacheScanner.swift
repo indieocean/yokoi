@@ -51,7 +51,7 @@ struct CacheScanner: CategoryScanner {
                 && !context.isExcluded(child.url)
         }.map(\.url)
 
-        let m = contents.reduce(FileWalker.Measurement()) { $0 + FileWalker.measure($1, progress: progress) }
+        let m = contents.reduce(FileWalker.Measurement()) { $0 + context.measure($1, progress: progress) }
         return CacheItem(
             locationID: location.id, name: location.name, section: location.section, url: url,
             contents: contents, safety: location.safety, badge: location.badge, colorHex: location.colorHex,

@@ -1,4 +1,4 @@
-# Disk Keeper: Product Requirements Document
+# Yokoi: Product Requirements Document
 
 | | |
 |---|---|
@@ -14,7 +14,7 @@
 ## 1. Overview & problem
 Developers' Macs fill up with files they can rebuild or re-download: `node_modules`, Rust `target/`, Xcode DerivedData, Unity `Library/`, Unreal `DerivedDataCache`, package-manager caches, simulator runtimes, old global packages, and a desktop full of screenshots. Today this means scattered commands (`rm -rf`, `brew cleanup`, `xcrun simctl delete unavailable`), guesswork about what's safe to delete, and generic cleaners that don't understand dev tooling.
 
-**Disk Keeper** is a native Mac app that finds this developer clutter, explains it, and removes it safely. It's built for software engineers and game developers and should look the part.
+**Yokoi** is a native Mac app that finds this developer clutter, explains it, and removes it safely. It's built for software engineers and game developers and should look the part.
 
 ## 2. Goals / Non-goals
 **Goals**
@@ -163,7 +163,7 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 - Screenshot auto rule (mirrors §5.6).
 
 ## 8. Menu bar helper
-- `MenuBarExtra` showing free space and reclaimable space, last scan, **Scan now**, **Clean safe items** (opens a confirmation), and Open Disk Keeper.
+- `MenuBarExtra` showing free space and reclaimable space, last scan, **Scan now**, **Clean safe items** (opens a confirmation), and Open Yokoi.
 - Runs scheduled scans and the screenshot rule while the main window is closed. Launch at login via `SMAppService.mainApp`.
 - User notifications for threshold alerts and finished auto-actions.
 
@@ -219,7 +219,7 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 |---|---|
 | **MVP (v1.0)** | Dashboard, node_modules, Build Artifacts (Rust, Xcode, Swift PM, Gradle, Python, Unity, Unreal), Caches (Safe + Re-download levels), Big Files, Screenshots (manual move/delete), confirmation sheet, Trash default + dry run + exclusions + active-project protection + log, Settings (locations, exclusions, safety), direct distribution, macOS 14+ |
 | **v1.1** | Package managers (npm -g, pnpm -g, Homebrew formulae/casks, Cargo, pip, gem) with update/uninstall confirmation, screenshot auto rule, scheduling + menu bar helper + notifications, Go/.NET/CMake detectors, Xcode simulators/archives (Review level), undo from log, light mode |
-| **Later (v1.2+)** | FSEvents incremental index, duplicate finder, Docker images/volumes, Android SDK/emulators, conda/poetry/uv, per-project "archive & restore" (lockfile kept, deps removed), CLI companion (`diskkeeper scan --json`), App Store Lite edition, Shortcuts/AppIntents |
+| **Later (v1.2+)** | FSEvents incremental index, duplicate finder, Docker images/volumes, Android SDK/emulators, conda/poetry/uv, per-project "archive & restore" (lockfile kept, deps removed), CLI companion (`yokoi scan --json`), App Store Lite edition, Shortcuts/AppIntents |
 
 ## 13. Risks & open questions
 **Risks**

@@ -1,4 +1,4 @@
-# Disk Keeper: UI Design Spec (mock content only)
+# Yokoi: UI Design Spec (mock content only)
 
 ## Direction
 Dark-first, native macOS developer tool. Translucent sidebar, a violet→cyan accent, monospace for every path, size, version and command. Category colors double as language/tool badges. It should feel close to Xcode, Raycast and Linear.
@@ -40,7 +40,7 @@ Sidebar nav item (icon, label, mono count badge), disk-usage capsule, KPI tile, 
 - Big Files: `Slider` on a log scale. Reveal uses `NSWorkspace.shared.activateFileViewerSelecting`.
 - Screenshots: `LazyVGrid(.adaptive(min:150))`, `QLThumbnailGenerator`, and `NSOpenPanel` (canChooseDirectories) for "Move to folder…". The auto rule runs on a background schedule.
 - Package managers: shell out via `Process` (`npm outdated -g --json`, `brew outdated --json=v2`, `cargo install --list`, `pip list --outdated --format=json`, `gem outdated`). Always confirm before uninstalling.
-- Menu bar helper: `MenuBarExtra("Disk Keeper", systemImage: "internaldrive")`, plus `SMAppService.mainApp` for launch at login.
+- Menu bar helper: `MenuBarExtra("Yokoi", systemImage: "internaldrive")`, plus `SMAppService.mainApp` for launch at login.
 - Scheduling: `NSBackgroundActivityScheduler`. Exclusions are stored as globs. Ask for Full Disk Access on first run.
 
 ## SF Symbols (sidebar)

@@ -17,7 +17,7 @@ struct NodeModulesScanner: CategoryScanner {
             let roots = context.rootURLs().map(\.url)
             let skip = Self.lastTouchedSkips
             for await item in FileWalker.concurrentMap(projects, limit: context.concurrency, { project in
-                Self.makeItem(project: project, roots: roots, skip: skip, progress: progress)
+                Self.makeItem(project: project, roots: roots, skip: skip, context: context, progress: progress)
             }) {
                 yield(item)
             }
@@ -31,10 +31,10 @@ struct NodeModulesScanner: CategoryScanner {
         return s
     }()
 
-    static func makeItem(project: URL, roots: [URL], skip: Set<String>, progress: ScanProgress?) -> NodeModulesItem? {
+    static func makeItem(project: URL, roots: [URL], skip: Set<String>, context: ScanContext, progress: ScanProgress?) -> NodeModulesItem? {
         if Task.isCancelled { return nil }
         let nm = project.appendingPathComponent("node_modules")
-        let m = FileWalker.measure(nm, progress: progress)
+        let m = context.measure(nm, progress: progress)
         let pkg = readPackageJSON(project)
         return NodeModulesItem(
             url: nm,
@@ -44,7 +44,7 @@ struct NodeModulesScanner: CategoryScanner {
             packageManager: packageManager(project: project, roots: roots),
             size: m.size,
             fileCount: m.files,
-            lastTouched: FileWalker.lastTouched(project: project, skipping: skip)
+            lastTouched: context.lastTouched(project: project, skipping: skip)
         )
     }
 

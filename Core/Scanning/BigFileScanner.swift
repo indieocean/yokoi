@@ -44,7 +44,7 @@ struct BigFileScanner: CategoryScanner {
                             yield(item)
                         } else if Self.shouldDescend(entry, context: context, home: home) {
                             let url = entry.url
-                            group.addTask { Self.walk(url, context: context, home: home, progress: progress, yield: yield) }
+                            group.addTask { Self.walkCached(url, depth: 1, context: context, home: home, progress: progress, yield: yield) }
                         }
                     }
                 }
@@ -69,6 +69,42 @@ struct BigFileScanner: CategoryScanner {
         guard m.size >= context.bigFileFloor else { return nil }
         let modified = (try? e.url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         return BigFileItem(url: e.url, kind: kind(for: e.url), size: m.size, modified: modified, isBundle: e.isDirectory)
+    }
+
+    /// Folders this many levels below a big-file location (e.g. `~/Documents/Projects/game`) are the
+    /// smallest units reused by incremental rescans, so one busy project doesn't force a rewalk of the rest.
+    static let cachedDepth = 3
+
+    /// `walk`, reusing the last scan's results for folders where nothing changed. Returns what it found.
+    @discardableResult
+    static func walkCached(_ dir: URL, depth: Int, context: ScanContext, home: URL, progress: ScanProgress,
+                           yield: (BigFileItem) -> Void) -> [BigFileItem] {
+        guard let index = context.index else {
+            walk(dir, context: context, home: home, progress: progress, yield: yield)
+            return []
+        }
+        if let cached = index.bigFiles(under: dir) {
+            cached.forEach(yield)
+            return cached
+        }
+        var found: [BigFileItem] = []
+        if depth >= cachedDepth {
+            walk(dir, context: context, home: home, progress: progress) { found.append($0); yield($0) }
+        } else {
+            let entries = FileWalker.list(dir)
+            progress.visited(files: entries.count, path: dir.path)
+            for entry in entries {
+                if Task.isCancelled { break }
+                if let item = check(entry: entry, context: context, home: home, progress: progress) {
+                    found.append(item)
+                    yield(item)
+                } else if shouldDescend(entry, context: context, home: home) {
+                    found += walkCached(entry.url, depth: depth + 1, context: context, home: home, progress: progress, yield: yield)
+                }
+            }
+        }
+        index.store(bigFiles: found, under: dir)
+        return found
     }
 
     static func walk(_ dir: URL, context: ScanContext, home: URL, progress: ScanProgress, yield: (BigFileItem) -> Void) {

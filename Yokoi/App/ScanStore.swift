@@ -153,6 +153,10 @@ final class ScanStore {
 
         scanTask = Task { [weak self] in
             guard let self else { return }
+            let indexURL = ScanIndex.defaultURL
+            let index = await ScanIndex.prepare(stored: indexURL, context: context)
+            var context = context
+            context.index = index
             let stream = await engine.run(context, progress: progress, categories: categories)
             for await event in stream {
                 switch event {
@@ -168,6 +172,8 @@ final class ScanStore {
             poller.cancel()
             self.progress = progress.snapshot
             let cancelled = Task.isCancelled
+            let partial = cancelled || !categories.isSuperset(of: ScanReport.scannable)
+            Task.detached(priority: .utility) { index.save(to: indexURL, carryOver: partial) }
             isScanning = false
             scanningCategories = []
             refreshDisk()

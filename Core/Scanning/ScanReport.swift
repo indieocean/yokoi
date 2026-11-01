@@ -37,12 +37,14 @@ struct ScanReport: Codable, Sendable {
     static let scannable: [CleanCategory] = [.nodeModules, .buildArtifacts, .caches, .bigFiles, .screenshots, .applications]
 
     /// Runs a scan of `categories` with the user's settings. Never deletes, moves or runs tools.
+    /// With `index`, unchanged folders reuse the last scan's measurements (see `ScanIndex`).
     static func run(settings: SettingsData, categories: Set<CleanCategory> = Set(scannable),
                     home: URL = FileManager.default.homeDirectoryForCurrentUser,
-                    progress: ScanProgress = ScanProgress()) async -> ScanReport {
+                    progress: ScanProgress = ScanProgress(), index indexURL: URL? = nil) async -> ScanReport {
         let start = Date()
-        let context = settings.makeContext(home: home)
+        var context = settings.makeContext(home: home)
         let wanted = categories.intersection(scannable)
+        if let indexURL { context.index = await ScanIndex.prepare(stored: indexURL, context: context) }
         var nodeModules: [NodeModulesItem] = [], artifacts: [ArtifactItem] = [], caches: [CacheItem] = []
         var bigFiles: [BigFileItem] = [], screenshots: [ScreenshotItem] = [], apps: [AppItem] = []
         for await event in await ScanEngine().run(context, progress: progress, categories: wanted) {
@@ -55,6 +57,10 @@ struct ScanReport: Codable, Sendable {
             case .application(let i): apps.append(i)
             case .finished: break
             }
+        }
+
+        if let indexURL, let index = context.index {
+            index.save(to: indexURL, carryOver: wanted != Set(scannable))
         }
 
         func item(_ r: some Reclaimable, path: URL, note: String? = nil) -> Item {

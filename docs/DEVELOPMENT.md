@@ -87,6 +87,24 @@ Extra safety added with these:
 
 None of these can delete. Cleaning always goes through the confirmation sheet.
 
+## Incremental rescans
+
+Rescans reuse the last scan's measurements for anything FSEvents says hasn't changed. On a real home folder this
+takes a full scan from about 14 s to about 3 s.
+
+- `Core/Scanning/ChangeJournal.swift`: replays FSEvents history since a saved event ID and returns the folders that
+  changed (`ChangeSet`). It returns `nil` (measure everything) if IDs wrapped, a root moved, or there's no answer.
+- `Core/Scanning/ScanIndex.swift`: the saved measurements, in `scan-index.json` next to `last-scan.json`, shared by the
+  app, the CLI and Shortcuts. A value is reused only if nothing at or under its path changed and the path's inode
+  is the same (a folder swapped in by a move has a new inode). Scanners go through `ScanContext.measure` and
+  `ScanContext.lastTouched`. Big files are cached per folder, up to `BigFileScanner.cachedDepth` levels below each
+  location.
+- The project walk itself (finding `node_modules` and build folders) always runs; it only lists folders.
+- Everything is measured from scratch on the first scan, when the FSEvents database or volume changes, when the
+  exclusions or big-file floor change (big files only), and every 7 days (`ScanIndex.maxAge`). The 7-day rescan
+  catches small drift such as APFS settling the allocated size of files written just before a scan.
+- Other volumes (`/Volumes/...`) are always measured in full.
+
 ## Releasing
 
 `scripts/release.sh` archives with the Developer ID certificate, exports, verifies the hardened runtime, builds a DMG,
