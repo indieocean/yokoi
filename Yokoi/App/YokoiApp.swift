@@ -87,7 +87,7 @@ struct YokoiApp: App {
                 }
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1280, height: 820)
+        .defaultSize(width: 1280, height: 920)
         .commands {
             CommandGroup(after: .appInfo) {
                 if app.updater.isAvailable {

@@ -223,6 +223,12 @@ struct ParserTests {
         let out = #"{"formulae":[{"name":"wget","installed_versions":["1.24.5"],"current_version":"1.25.0"}],"casks":[{"name":"iterm2","installed_versions":["3.5"],"current_version":"3.6"}]}"#
         #expect(PackageParsers.outdated(.homebrew, out) == ["wget": "1.25.0", "iterm2": "3.6"])
         #expect(PackageParsers.installed(.casks, "iterm2 3.5.4\nvisual-studio-code 1.95.0\n").map(\.name) == ["iterm2", "visual-studio-code"])
+        let refused = """
+        Error: Refusing to load cask nikitabobko/tap/aerospace from untrusted tap nikitabobko/tap.
+        Run `brew trust --cask nikitabobko/tap/aerospace` or `brew trust nikitabobko/tap` to trust it.
+        """
+        #expect(PackageParsers.untrustedCasks(refused) == ["aerospace": "nikitabobko/tap"])
+        #expect(PackageParsers.untrustedCasks("Error: something else").isEmpty)
     }
 
     @Test func cargo() {

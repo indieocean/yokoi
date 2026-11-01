@@ -40,8 +40,11 @@ final class PackagesStore {
     var checkedOutdated: Set<PackageManagerKind> = []
     var readOnly: [PackageManagerKind: String] = [:]
     var loading: Set<PackageManagerKind> = []
-    var lastCommand: ProcessRunner.Result?
-    var errorMessage: String?
+    /// The last command run and the last error, per manager, so the strip matches the selected tab.
+    var lastCommands: [PackageManagerKind: ProcessRunner.Result] = [:]
+    var errors: [PackageManagerKind: String] = [:]
+    var lastCommand: ProcessRunner.Result? { lastCommands[selected] }
+    var errorMessage: String? { errors[selected] }
     var filter: Filter = .all
     var checked: Set<String> = []
     var pending: PendingAction?
@@ -65,8 +68,10 @@ final class PackagesStore {
             npmToolFound = true
             installed = [.npm, .pnpm, .bun, .homebrew, .casks, .cargo, .go, .pip, .pipx, .uv]
             checkedOutdated = Set(demo.keys)
-            lastCommand = ProcessRunner.Result(command: ["npm", "outdated", "-g", "--json"], exitCode: 0, stdout: "", stderr: "",
-                                               duration: 1.4, timedOut: false)
+            for kind in installed {
+                lastCommands[kind] = ProcessRunner.Result(command: kind.outdatedCommand ?? kind.listCommand, exitCode: 0, stdout: "",
+                                                          stderr: "", duration: 1.4, timedOut: false)
+            }
             return
         }
         var found: [PackageManagerKind] = [.npm]
@@ -98,12 +103,12 @@ final class PackagesStore {
         if store.isDemo { return }
         loading.insert(kind)
         defer { loading.remove(kind) }
-        errorMessage = nil
+        errors[kind] = nil
         do {
             let (list, result) = try await service(kind).list()
-            lastCommand = result
+            lastCommands[kind] = result
             if !result.succeeded && list.isEmpty {
-                errorMessage = result.stderr.split(separator: "\n").prefix(3).joined(separator: "\n")
+                errors[kind] = result.stderr.split(separator: "\n").prefix(3).joined(separator: "\n")
             }
             var merged = list
             // Keep update info from an earlier check.
@@ -121,7 +126,7 @@ final class PackagesStore {
             packages[kind] = merged
             updateReclaimable()
         } catch {
-            errorMessage = error.localizedDescription
+            errors[kind] = error.localizedDescription
         }
     }
 
@@ -132,10 +137,10 @@ final class PackagesStore {
         defer { loading.remove(kind) }
         do {
             guard let (latest, result) = try await service(kind).outdated() else {
-                errorMessage = kind == .cargo ? "Install cargo-update (`cargo install cargo-update`) to check Cargo packages." : nil
+                errors[kind] = kind == .cargo ? "Install cargo-update (`cargo install cargo-update`) to check Cargo packages." : nil
                 return
             }
-            lastCommand = result
+            lastCommands[kind] = result
             checkedOutdated.insert(kind)
             packages[kind] = (packages[kind] ?? []).map { p in
                 var p = p
@@ -149,7 +154,7 @@ final class PackagesStore {
                 return p
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errors[kind] = error.localizedDescription
         }
     }
 
@@ -200,7 +205,7 @@ final class PackagesStore {
             do {
                 let r = try await runner.run(command, timeout: 900)
                 runLog.append(CommandLog(package: pkg.name, result: r, error: nil))
-                lastCommand = r
+                lastCommands[action.kind] = r
                 await store.logCommand(r, category: .packages, label: "\(action.action.rawValue) \(pkg.name)",
                                        size: action.action == .uninstall ? (pkg.size ?? 0) : 0)
             } catch {

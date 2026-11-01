@@ -406,6 +406,22 @@ enum PackageParsers {
     }
 
     /// Latest versions by package name (or by `identifier` where that's what's printed).
+    /// Casks Homebrew refused to load, by name, with their tap:
+    /// "Error: Refusing to load cask nikitabobko/tap/aerospace from untrusted tap nikitabobko/tap."
+    static func untrustedCasks(_ stderr: String) -> [String: String] {
+        var out: [String: String] = [:]
+        for line in stderr.split(separator: "\n") {
+            let words = line.split(separator: " ")
+            guard let at = words.firstIndex(of: "cask"), at > 0, words[at - 1] == "load",
+                  let tapAt = words.firstIndex(of: "tap"), tapAt > at, words[tapAt - 1] == "untrusted",
+                  words.indices.contains(at + 1), words.indices.contains(tapAt + 1) else { continue }
+            let token = words[at + 1]
+            let tap = words[tapAt + 1].trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            out[String(token.split(separator: "/").last ?? token)] = tap
+        }
+        return out
+    }
+
     static func outdated(_ kind: PackageManagerKind, _ output: String) -> [String: String] {
         var out: [String: String] = [:]
         let lines = output.split(separator: "\n")
@@ -500,7 +516,39 @@ struct PackageManagerService: Sendable {
         var command = kind.listCommand
         if kind == .go { command = ["go", "version", "-m", await goBin().path] }
         let r = try await runner.run(command, timeout: 90)
+        if kind == .casks, !r.succeeded, let fallback = try await casksWithoutLoading(after: r) { return fallback }
         let packages = await enrich(PackageParsers.installed(kind, r.stdout))
+        return (packages, r)
+    }
+
+    /// Homebrew 7 refuses `brew list --cask --versions` outright when any installed cask comes from an
+    /// untrusted tap. Plain `brew list --cask` still works, so take the names from it and each version
+    /// from its Caskroom folder. The cask Homebrew named is locked until its tap is trusted.
+    private func casksWithoutLoading(after failed: ProcessRunner.Result) async throws -> ([InstalledPackage], ProcessRunner.Result)? {
+        let untrusted = PackageParsers.untrustedCasks(failed.stderr)
+        guard !untrusted.isEmpty, let prefix = await firstLine(["brew", "--prefix"]) else { return nil }
+        let r = try await runner.run(["brew", "list", "--cask"], timeout: 90)
+        guard r.succeeded else { return nil }
+        let caskroom = URL(fileURLWithPath: prefix).appendingPathComponent("Caskroom")
+        let fm = FileManager.default
+        let lines = r.stdout.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.map { name in
+            // Newest version folder; hidden entries like .metadata are skipped.
+            let dir = caskroom.appendingPathComponent(name)
+            let versions = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey],
+                                                        options: .skipsHiddenFiles)) ?? []
+            let newest = versions.max { a, b in
+                let da = (try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                let db = (try? b.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                return da < db
+            }
+            return "\(name) \(newest?.lastPathComponent ?? "?")"
+        }
+        var packages = await enrich(PackageParsers.installed(.casks, lines.joined(separator: "\n")))
+        for i in packages.indices {
+            if let tap = untrusted[packages[i].name] {
+                packages[i].locked = "Homebrew won't load this cask until you trust its tap: brew trust \(tap)"
+            }
+        }
         return (packages, r)
     }
 
