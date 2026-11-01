@@ -111,6 +111,28 @@ takes a full scan from about 14 s to about 3 s.
 notarizes it with `notarytool` and staples it. One-time setup is at the top of the script.
 `SKIP_NOTARIZE=1` stops after signing.
 
+### From GitHub Actions
+
+`.github/workflows/release.yml` runs the same script when a version tag is pushed, then publishes the release:
+
+```sh
+# bump MARKETING_VERSION (and CURRENT_PROJECT_VERSION) first; the tag must match
+git tag v1.2 && git push origin v1.2
+```
+
+It needs these repository secrets (Settings › Secrets and variables › Actions):
+
+| Secret | Value |
+|---|---|
+| `DEVELOPER_ID_P12` | The Developer ID Application certificate and private key, exported from Keychain Access as `.p12`, then `base64 -i cert.p12 \| pbcopy` |
+| `DEVELOPER_ID_P12_PASSWORD` | The password chosen when exporting |
+| `NOTARY_API_KEY` | The full text of the App Store Connect API key (`AuthKey_XXXX.p8`) |
+| `NOTARY_KEY_ID` | That key's ID |
+| `NOTARY_ISSUER_ID` | The issuer ID shown above the keys list in App Store Connect |
+
+The certificate goes into a temporary keychain that is deleted at the end of the run.
+`.github/workflows/test.yml` runs the tests (unsigned) on pushes to `main` and on pull requests.
+
 ## README screenshots
 
 Screenshots come from **demo mode**: the real app, filled with sample data. It never scans, deletes, runs tools,

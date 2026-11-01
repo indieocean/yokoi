@@ -6,6 +6,9 @@
 #   2. Store notarization credentials (an app-specific password from appleid.apple.com):
 #        xcrun notarytool store-credentials yokoi-notary --apple-id you@example.com --team-id 3P2Q7V729Y
 #
+#   Or, instead of step 2 (used by GitHub Actions), an App Store Connect API key:
+#        NOTARY_KEY_PATH=AuthKey.p8 NOTARY_KEY_ID=ABC123 NOTARY_ISSUER_ID=uuid scripts/release.sh
+#
 # Usage:
 #   scripts/release.sh                 # uses MARKETING_VERSION from the project
 #   NOTARY_PROFILE=other scripts/release.sh
@@ -71,7 +74,12 @@ if [[ -n "${SKIP_NOTARIZE:-}" ]]; then
 fi
 
 echo "› Notarizing (this usually takes a few minutes)"
-xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+if [[ -n "${NOTARY_KEY_PATH:-}" ]]; then
+  NOTARY_AUTH=(--key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID")
+else
+  NOTARY_AUTH=(--keychain-profile "$NOTARY_PROFILE")
+fi
+xcrun notarytool submit "$DMG" "${NOTARY_AUTH[@]}" --wait
 xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 spctl --assess --type open --context context:primary-signature --verbose "$DMG"
