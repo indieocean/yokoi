@@ -58,12 +58,16 @@ struct PlatformTests {
         try script(f, "stubborn", "trap '' TERM\necho started\nwhile :; do sleep 1; done")
         let runner = ProcessRunner(path: f.home.path + ":/usr/bin:/bin", allowedTools: nil)
         let clock = ContinuousClock(), start = clock.now
-        let r = try await runner.run(["stubborn"], timeout: 0.5)
+        // Long enough for the script to reach its trap: the first launch of a freshly written script can
+        // take a moment while macOS assesses it, and a SIGTERM before the trap would just end it.
+        let timeout: TimeInterval = 2.5
+        let r = try await runner.run(["stubborn"], timeout: timeout)
         let elapsed = clock.now - start
         #expect(r.timedOut)
         #expect(!r.succeeded)
-        #expect(r.stdout.contains("started"))
-        #expect(elapsed < .seconds(0.5 + ProcessRunner.killGrace + ProcessRunner.drainTimeout + 3))
+        #expect(r.stdout.contains("started"), "the script ran, ignored SIGTERM, and was killed")
+        #expect(elapsed >= .seconds(timeout + ProcessRunner.killGrace - 0.5), "SIGTERM alone didn't end it")
+        #expect(elapsed < .seconds(timeout + ProcessRunner.killGrace + ProcessRunner.drainTimeout + 3))
     }
 
     @Test func returnsWhenABackgroundChildKeepsThePipeOpen() async throws {

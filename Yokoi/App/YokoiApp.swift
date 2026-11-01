@@ -34,7 +34,31 @@ enum SingleInstance {
     }
 }
 
+/// Keeps Yokoi alive in the menu bar after its window is closed (otherwise closing the last window quits).
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    static weak var model: AppModel?
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        !(Self.model?.settings.data.showInMenuBar ?? false)
+    }
+}
+
+/// With the window closed and the menu bar item on, Yokoi lives in the menu bar only: no Dock icon,
+/// no app menu. Opening the window (menu bar, Dock, Spotlight, Shortcuts) makes it a regular app again.
+@MainActor
+enum DockPresence {
+    static func windowOpened() {
+        if NSApp.activationPolicy() != .regular { NSApp.setActivationPolicy(.regular) }
+    }
+
+    static func windowClosed(menuBarShown: Bool) {
+        if menuBarShown { NSApp.setActivationPolicy(.accessory) }
+    }
+}
+
 struct YokoiApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var app = AppModel()
 
     var body: some Scene {
@@ -47,6 +71,8 @@ struct YokoiApp: App {
                 .frame(minWidth: 1080, minHeight: 680)
                 .onChange(of: app.settings.data) { app.scheduler.configure() }
                 .onAppear {
+                    app.isMainWindowOpen = true
+                    DockPresence.windowOpened()
                     #if DEBUG
                     if SnapshotDriver.outputDirectory != nil {
                         Task { await SnapshotDriver.run(app) }
@@ -54,6 +80,10 @@ struct YokoiApp: App {
                     }
                     #endif
                     app.onLaunch()
+                }
+                .onDisappear {
+                    app.isMainWindowOpen = false
+                    DockPresence.windowClosed(menuBarShown: app.settings.data.showInMenuBar)
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -92,8 +122,12 @@ struct YokoiApp: App {
 
         // Only write when the value really changes: MenuBarExtra pushes the value back on every
         // scene update, and an unconditional write re-renders the scene forever (froze the app).
-        MenuBarExtra(isInserted: Binding(get: { app.settings.data.showInMenuBar },
-                                         set: { if app.settings.data.showInMenuBar != $0 { app.settings.data.showInMenuBar = $0 } })) {
+        MenuBarExtra(isInserted: Binding(get: { app.settings.data.showInMenuBar }, set: { shown in
+            guard app.settings.data.showInMenuBar != shown else { return }
+            app.settings.data.showInMenuBar = shown
+            // ⌘-dragged out of the menu bar while the window is closed: nothing would be left to reach Yokoi.
+            if !shown && !app.isMainWindowOpen { NSApp.terminate(nil) }
+        })) {
             MenuBarContent()
                 .environment(app)
                 .preferredColorScheme(.dark)

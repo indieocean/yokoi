@@ -115,6 +115,8 @@ final class AppModel {
     /// The cleanup currently shown in the progress overlay.
     var activity: CleanupActivity?
     var showOnboarding = false
+    /// True while the main window is on screen. With it closed, the menu bar item is the only way in.
+    var isMainWindowOpen = false
     var fullDiskAccess = FullDiskAccess.isGranted
 
     let nodeModulesVM: NodeModulesViewModel
@@ -155,6 +157,7 @@ final class AppModel {
         showOnboarding = !fullDiskAccess && !settings.data.hasCompletedOnboarding
         scheduler.configure()
         IntentRouter.attach(self)
+        AppDelegate.model = self
     }
 
     func onLaunch() {
