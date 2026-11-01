@@ -15,6 +15,7 @@
   <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-22D3EE?style=flat-square">
   <img alt="No sudo" src="https://img.shields.io/badge/sudo-never-F0565E?style=flat-square">
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square"></a>
+  <a href="https://buymeacoffee.com/theranchsteamlab"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat-square&logo=buymeacoffee&logoColor=black"></a>
 </p>
 
 <p align="center">
