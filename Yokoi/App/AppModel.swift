@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum Screen: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, nodeModules, buildArtifacts, caches, bigFiles, screenshots, applications, externalDrives, packageManagers, settings
+    case dashboard, nodeModules, buildArtifacts, caches, bigFiles, downloads, screenshots, applications, externalDrives, packageManagers, settings
 
     var id: String { rawValue }
 
@@ -13,6 +13,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .buildArtifacts: "Build Artifacts"
         case .caches: "Caches"
         case .bigFiles: "Big Files"
+        case .downloads: "Downloads"
         case .screenshots: "Screenshots"
         case .applications: "Applications"
         case .externalDrives: "External Drives"
@@ -28,6 +29,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .buildArtifacts: "hammer"
         case .caches: "archivebox"
         case .bigFiles: "externaldrive.badge.exclamationmark"
+        case .downloads: "arrow.down.circle"
         case .screenshots: "camera.viewfinder"
         case .applications: "app.dashed"
         case .externalDrives: "externaldrive.connected.to.line.below"
@@ -42,6 +44,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .buildArtifacts: .buildArtifacts
         case .caches: .caches
         case .bigFiles: .bigFiles
+        case .downloads: .downloads
         case .screenshots: .screenshots
         case .applications: .applications
         case .externalDrives: .externalDrives
@@ -119,6 +122,7 @@ final class AppModel {
     let cachesVM: CachesViewModel
     let bigFilesVM: BigFilesViewModel
     let screenshotsVM: ScreenshotsViewModel
+    let downloadsVM: DownloadsViewModel
     let applicationsVM: ApplicationsViewModel
     let packages: PackagesStore
     let tools: ToolActionsModel
@@ -139,13 +143,14 @@ final class AppModel {
         cachesVM = CachesViewModel(store: store)
         bigFilesVM = BigFilesViewModel(store: store)
         screenshotsVM = ScreenshotsViewModel(store: store)
+        downloadsVM = DownloadsViewModel(store: store)
         applicationsVM = ApplicationsViewModel(store: store)
         packages = PackagesStore(store: store)
         tools = ToolActionsModel(store: store)
         scheduler = BackgroundScheduler(settings: settings, store: store)
         drivesVM = ExternalDrivesViewModel(settings: settings)
-        updater = Updater(enabled: !demo)
-        settings.refreshDrives()
+        updater = Updater(demo: demo)
+        settings.loadDrivesAtLaunch()
         if demo { fullDiskAccess = true }
         showOnboarding = !fullDiskAccess && !settings.data.hasCompletedOnboarding
         scheduler.configure()
@@ -245,7 +250,7 @@ final class AppModel {
         activity.outcome = outcome
         lastOutcome = outcome
 
-        for vm in [nodeModulesVM as any SelectionPruning, artifactsVM, cachesVM, bigFilesVM, screenshotsVM, applicationsVM] {
+        for vm in [nodeModulesVM as any SelectionPruning, artifactsVM, cachesVM, bigFilesVM, downloadsVM, screenshotsVM, applicationsVM] {
             vm.prune(outcome.completedIDs)
         }
     }

@@ -9,6 +9,7 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
         case xcode = "Xcode"
         case android = "Android"
         case aiModels = "AI models"
+        /// No longer used: installers in Downloads moved to the Downloads screen. Kept so older scan caches decode.
         case downloads = "Downloads"
         case browsers = "Browsers"
     }
@@ -100,10 +101,6 @@ extension CacheLocation {
                       safety: .redownload, badge: "hf", colorHex: 0xFACC15, restoreHint: "models are downloaded again on next use"),
         CacheLocation(id: "lmstudio", name: "LM Studio models", section: .aiModels, relativePath: ".lmstudio/models",
                       safety: .review, badge: "lm", colorHex: 0xA78BFA, restoreHint: "download models again in LM Studio"),
-        // Downloads
-        CacheLocation(id: "installers", name: "Installers (.dmg, .pkg, .xip)", section: .downloads, relativePath: "Downloads",
-                      safety: .review, badge: "dmg", colorHex: 0x60A5FA, restoreHint: "download the installer again if you need it",
-                      onlyExtensions: ["dmg", "pkg", "mpkg", "xip"]),
         // Browsers
         CacheLocation(id: "chrome", name: "Chrome", section: .browsers, relativePath: "Library/Caches/Google/Chrome",
                       safety: .safe, badge: "ch", colorHex: 0x34D399, restoreHint: "the browser rebuilds it"),

@@ -93,6 +93,10 @@ enum SnapshotDriver {
         await app.tools.refresh()
         await shot("caches")
 
+        app.screen = .downloads
+        app.downloadsVM.selectLeftovers()
+        await shot("downloads")
+
         app.screen = .applications
         await shot("applications")
 

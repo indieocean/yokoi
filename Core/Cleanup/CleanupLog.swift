@@ -128,6 +128,7 @@ struct CleanupBatch: Identifiable, Sendable, Hashable {
         case .buildArtifacts: noun = count == 1 ? "build folder" : "build folders"
         case .caches: noun = count == 1 ? "cache" : "caches"
         case .bigFiles: noun = count == 1 ? "big file" : "big files"
+        case .downloads: noun = count == 1 ? "download" : "downloads"
         case .screenshots: noun = count == 1 ? "screenshot" : "screenshots"
         case .applications: noun = count == 1 ? "app" : "apps"
         case .externalDrives: noun = "drive items"

@@ -2,7 +2,7 @@ import Foundation
 
 /// Top-level reclaimable categories shown on the dashboard and sidebar.
 enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
-    case nodeModules, buildArtifacts, caches, bigFiles, screenshots, applications, externalDrives, packages
+    case nodeModules, buildArtifacts, caches, bigFiles, downloads, screenshots, applications, externalDrives, packages
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .buildArtifacts: "Build artifacts"
         case .caches: "Caches"
         case .bigFiles: "Big files"
+        case .downloads: "Downloads"
         case .screenshots: "Screenshots"
         case .applications: "Applications"
         case .externalDrives: "External drives"
@@ -26,6 +27,7 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .buildArtifacts: "BA"
         case .caches: "CA"
         case .bigFiles: "BF"
+        case .downloads: "DL"
         case .screenshots: "SS"
         case .applications: "AP"
         case .externalDrives: "EX"
@@ -39,6 +41,7 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .buildArtifacts: 0x7C5CFF
         case .caches: 0x22D3EE
         case .bigFiles: 0xF59E0B
+        case .downloads: 0xA3E635
         case .screenshots: 0xF472B6
         case .applications: 0xA78BFA
         case .externalDrives: 0xFB923C

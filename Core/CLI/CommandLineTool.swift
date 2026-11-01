@@ -23,7 +23,7 @@ enum CommandLineTool {
     OPTIONS
       --json              Print the full report as JSON (sizes in bytes, dates in ISO 8601)
       --category <names>  Comma-separated: node-modules, build-artifacts, caches, big-files,
-                          screenshots, applications (default: all)
+                          downloads, screenshots, applications (default: all)
       --top <n>           Show at most n items per category (default: 5 in text, all in JSON)
 
     Scans use the roots, exclusions and thresholds from Yokoi's Settings.

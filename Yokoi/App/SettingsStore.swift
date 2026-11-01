@@ -41,9 +41,25 @@ final class SettingsStore {
     /// Set in demo mode instead of reading real volumes.
     var demoDrives: [ExternalDrive]?
 
+    @ObservationIgnored private var driveRefreshes = 0
+
+    /// Re-reads the mounted volumes off the main thread. Listing touches each volume, and a drive that is
+    /// spinning up or busy unmounting can take seconds to answer, so this must never block the UI.
     func refreshDrives() {
-        let drives = demoDrives ?? ExternalDrives.mounted()
-        if drives != externalDrives { externalDrives = drives }
+        if let demoDrives { if demoDrives != externalDrives { externalDrives = demoDrives }; return }
+        driveRefreshes += 1
+        let generation = driveRefreshes
+        Task {
+            let drives = await Task.detached(priority: .userInitiated) { ExternalDrives.mounted() }.value
+            // A newer refresh (another mount or unmount) has started; let that one win.
+            guard generation == driveRefreshes, drives != externalDrives else { return }
+            externalDrives = drives
+        }
+    }
+
+    /// Synchronous first read at launch, so the first scan already knows the external volumes.
+    func loadDrivesAtLaunch() {
+        externalDrives = demoDrives ?? ExternalDrives.mounted()
     }
 
     func context() -> ScanContext {

@@ -9,6 +9,8 @@ final class ExternalDrivesViewModel {
     var scanning: Set<String> = []
     var progress: [String: Int] = [:]
     var ejectError: String?
+    /// Drives being unmounted right now (the button shows a spinner).
+    var ejecting: Set<String> = []
 
     let settings: SettingsStore
     init(settings: SettingsStore) { self.settings = settings }
@@ -77,14 +79,21 @@ final class ExternalDrivesViewModel {
 
     func clearResults(for drive: ExternalDrive) { junk[drive.id] = nil }
 
+    /// Unmounts in the background: macOS flushes pending writes and waits for the disk first, which can take
+    /// several seconds (it used to run on the main thread and froze the window meanwhile).
     func eject(_ drive: ExternalDrive) {
-        if settings.demoDrives != nil { return }
-        do {
-            try NSWorkspace.shared.unmountAndEjectDevice(at: drive.url)
-            ejectError = nil
+        if settings.demoDrives != nil || ejecting.contains(drive.id) { return }
+        ejecting.insert(drive.id)
+        ejectError = nil
+        Task {
+            do {
+                try await FileManager.default.unmountVolume(at: drive.url, options: [.allPartitionsAndEjectDisk, .withoutUI])
+                junk[drive.id] = nil
+            } catch {
+                ejectError = "Couldn't eject \(drive.name): \(error.localizedDescription)"
+            }
+            ejecting.remove(drive.id)
             settings.refreshDrives()
-        } catch {
-            ejectError = "Couldn't eject \(drive.name): \(error.localizedDescription)"
         }
     }
 }
@@ -154,8 +163,17 @@ private struct DriveCard: View {
                 }
                 Spacer()
                 if drive.isEjectable {
-                    Button { vm.eject(drive) } label: { Label("Eject", systemImage: "eject") }
-                        .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
+                    let ejecting = vm.ejecting.contains(drive.id)
+                    Button { vm.eject(drive) } label: {
+                        if ejecting {
+                            HStack(spacing: 6) { ProgressView().controlSize(.mini); Text("Ejecting…") }
+                        } else {
+                            Label("Eject", systemImage: "eject")
+                        }
+                    }
+                    .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
+                    .disabled(ejecting || vm.scanning.contains(drive.id))
+                    .help(vm.scanning.contains(drive.id) ? "Wait for the scan of this drive to finish" : "")
                 }
             }
 

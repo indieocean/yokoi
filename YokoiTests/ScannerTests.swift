@@ -146,6 +146,73 @@ struct ScannerTests {
         #expect(!items.contains { $0.title == "notes.txt" })
     }
 
+    // MARK: Downloads
+
+    @Test func downloadsListsTopLevelItems() async throws {
+        let f = try Fixture()
+        try f.file("Downloads/tool.dmg", contents: String(repeating: "x", count: 5000))
+        try f.file("Downloads/assets.zip", contents: "zip")
+        try f.file("Downloads/assets/a.png", contents: "a")
+        try f.file("Downloads/assets/b.png", contents: "b")
+        try f.file("Downloads/notes.pdf", contents: "pdf")
+        try f.file("Downloads/big.tar.gz", contents: "tgz")
+        try f.file("Downloads/data.csv.crdownload", contents: "part")
+        try f.file("Downloads/.DS_Store", contents: "ds")
+        let items = await DownloadsScanner().collect(f.context())
+        let byName = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0) })
+
+        #expect(Set(byName.keys) == ["tool.dmg", "assets.zip", "assets", "notes.pdf", "big.tar.gz", "data.csv.crdownload"],
+                "direct children only, hidden files skipped")
+        #expect(byName["assets"]?.kind == .folder)
+        #expect(byName["assets"]?.fileCount == 2, "a folder is one item with its total size")
+        #expect(byName["assets.zip"]?.isExtracted == true)
+        #expect(byName["assets.zip"]?.safety == .safe)
+        #expect(byName["big.tar.gz"]?.isExtracted == false, "no big/ folder next to it")
+        #expect(byName["tool.dmg"]?.kind == .installer)
+        #expect(byName["tool.dmg"]?.safety == .redownload)
+        #expect(byName["data.csv.crdownload"]?.kind == .incomplete)
+        #expect(byName["notes.pdf"]?.safety == .review, "your own files are never preselected as safe")
+        #expect(items.allSatisfy { !$0.isOld(days: 30) }, "just added")
+    }
+
+    @Test func downloadsExtractedNames() {
+        #expect(DownloadsScanner.extractedName("foo.zip") == "foo")
+        #expect(DownloadsScanner.extractedName("foo.tar.gz") == "foo")
+        #expect(DownloadsScanner.extractedName("foo.pdf") == nil)
+        #expect(DownloadsScanner.extractedName(".zip") == nil)
+    }
+
+    @Test func downloadsAge() {
+        let now = Date()
+        let old = DownloadItem(url: URL(fileURLWithPath: "/d/a"), kind: .other, size: 1, fileCount: 1,
+                               added: now.addingTimeInterval(-40 * 86_400), lastOpened: nil, isExtracted: false)
+        let reopened = DownloadItem(url: URL(fileURLWithPath: "/d/b"), kind: .other, size: 1, fileCount: 1,
+                                    added: now.addingTimeInterval(-40 * 86_400), lastOpened: now.addingTimeInterval(-2 * 86_400), isExtracted: false)
+        let unknown = DownloadItem(url: URL(fileURLWithPath: "/d/c"), kind: .other, size: 1, fileCount: 1,
+                                   added: nil, lastOpened: nil, isExtracted: false)
+        #expect(old.isOld(days: 30, now: now))
+        #expect(!reopened.isOld(days: 30, now: now), "opening a download makes it recent again")
+        #expect(!unknown.isOld(days: 30, now: now))
+    }
+
+    @Test func bigFilesInsideOldDownloadsAreCountedOnce() {
+        let old = Date().addingTimeInterval(-90 * 86_400)
+        let downloads = [
+            DownloadItem(url: URL(fileURLWithPath: "/h/Downloads/x.iso"), kind: .installer, size: 500, fileCount: 1, added: old, lastOpened: nil, isExtracted: false),
+            DownloadItem(url: URL(fileURLWithPath: "/h/Downloads/pack"), kind: .folder, size: 900, fileCount: 2, added: old, lastOpened: nil, isExtracted: false),
+            DownloadItem(url: URL(fileURLWithPath: "/h/Downloads/new.mov"), kind: .video, size: 700, fileCount: 1, added: Date(), lastOpened: nil, isExtracted: false),
+        ]
+        let big = [
+            BigFileItem(url: URL(fileURLWithPath: "/h/Downloads/x.iso"), kind: .diskImage, size: 500, modified: nil, isBundle: false),
+            BigFileItem(url: URL(fileURLWithPath: "/h/Downloads/pack/inner.zip"), kind: .archive, size: 300, modified: nil, isBundle: false),
+            BigFileItem(url: URL(fileURLWithPath: "/h/Downloads/new.mov"), kind: .video, size: 700, modified: nil, isBundle: false),
+            BigFileItem(url: URL(fileURLWithPath: "/h/Downloads/package.dmg"), kind: .diskImage, size: 400, modified: nil, isBundle: false),
+            BigFileItem(url: URL(fileURLWithPath: "/h/Movies/m.mov"), kind: .video, size: 800, modified: nil, isBundle: false),
+        ]
+        // x.iso and the file inside pack/ overlap; new.mov isn't old; package.dmg isn't inside "pack".
+        #expect(Overlap.bigFileBytesInDownloads(big, threshold: 100, downloads: downloads, ageDays: 30) == 800)
+    }
+
     // MARK: Engine
 
     @Test func engineStreamsAllCategories() async throws {
@@ -156,7 +223,7 @@ struct ScannerTests {
         for await event in await ScanEngine().run(f.context(), progress: progress) {
             if case .finished(let c) = event { finished.insert(c) } else { count += 1 }
         }
-        #expect(finished == [.nodeModules, .buildArtifacts, .caches, .bigFiles, .screenshots, .applications])
+        #expect(finished == [.nodeModules, .buildArtifacts, .caches, .bigFiles, .downloads, .screenshots, .applications])
         #expect(count > 10)
         #expect(progress.snapshot.itemsFound == count)
     }

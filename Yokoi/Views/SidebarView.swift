@@ -14,6 +14,7 @@ struct SidebarView: View {
                 row(.buildArtifacts)
                 row(.caches)
                 row(.bigFiles)
+                row(.downloads)
                 row(.screenshots)
                 row(.applications)
                 row(.externalDrives)

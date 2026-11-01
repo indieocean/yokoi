@@ -34,7 +34,7 @@ struct ScanReport: Codable, Sendable {
     var categories: [Category]
 
     /// Categories a headless scan can cover (packages and external drives need the app).
-    static let scannable: [CleanCategory] = [.nodeModules, .buildArtifacts, .caches, .bigFiles, .screenshots, .applications]
+    static let scannable: [CleanCategory] = [.nodeModules, .buildArtifacts, .caches, .bigFiles, .downloads, .screenshots, .applications]
 
     /// Runs a scan of `categories` with the user's settings. Never deletes, moves or runs tools.
     /// With `index`, unchanged folders reuse the last scan's measurements (see `ScanIndex`).
@@ -46,7 +46,7 @@ struct ScanReport: Codable, Sendable {
         let wanted = categories.intersection(scannable)
         if let indexURL { context.index = await ScanIndex.prepare(stored: indexURL, context: context) }
         var nodeModules: [NodeModulesItem] = [], artifacts: [ArtifactItem] = [], caches: [CacheItem] = []
-        var bigFiles: [BigFileItem] = [], screenshots: [ScreenshotItem] = [], apps: [AppItem] = []
+        var bigFiles: [BigFileItem] = [], downloads: [DownloadItem] = [], screenshots: [ScreenshotItem] = [], apps: [AppItem] = []
         for await event in await ScanEngine().run(context, progress: progress, categories: wanted) {
             switch event {
             case .nodeModules(let i): nodeModules.append(i)
@@ -54,6 +54,7 @@ struct ScanReport: Codable, Sendable {
             case .cache(let i): caches.append(i)
             case .bigFile(let i): bigFiles.append(i)
             case .screenshot(let i): screenshots.append(i)
+            case .download(let i): downloads.append(i)
             case .application(let i): apps.append(i)
             case .finished: break
             }
@@ -77,11 +78,17 @@ struct ScanReport: Codable, Sendable {
         add(.buildArtifacts, artifacts.filter { !$0.optIn }.map { item($0, path: $0.projectURL, note: $0.displayPath) })
         add(.caches, caches.map { item($0, path: $0.url, note: $0.permanentOnly ? "permanent delete only" : nil) })
         add(.bigFiles, bigFiles.filter { $0.size >= settings.bigFileThreshold }.map { item($0, path: $0.url, note: $0.kind.rawValue) })
+        add(.downloads, downloads.filter { $0.isOld(days: settings.downloadsAgeDays) }
+            .map { item($0, path: $0.url, note: $0.note ?? $0.kind.rawValue) })
         add(.screenshots, screenshots.map { item($0, path: $0.url) })
         add(.applications, apps.filter { $0.protectedReason == nil && $0.isUnused(days: 180) }.map { item($0, path: $0.url, note: "unused 180+ days") })
 
+        // Big files inside old downloads are in both lists; count those bytes once.
+        let overlap = wanted.isSuperset(of: [.bigFiles, .downloads])
+            ? Overlap.bigFileBytesInDownloads(bigFiles, threshold: settings.bigFileThreshold, downloads: downloads, ageDays: settings.downloadsAgeDays)
+            : 0
         return ScanReport(version: 1, scannedAt: Date(), durationSeconds: Date().timeIntervalSince(start),
-                          disk: currentDisk(home: home), reclaimableBytes: out.reduce(0) { $0 + $1.reclaimableBytes },
+                          disk: currentDisk(home: home), reclaimableBytes: out.reduce(0) { $0 + $1.reclaimableBytes } - overlap,
                           categories: out)
     }
 

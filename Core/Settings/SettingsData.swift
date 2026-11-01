@@ -36,6 +36,8 @@ struct SettingsData: Codable, Sendable, Equatable {
     var screenshotDestination: String = "~/Pictures/Screenshots"
     var screenshotOrganizeByDate: Bool = true
     var screenshotAgeDays: Int = 7
+    /// Downloads untouched (not added or opened) for this many days count as reclaimable.
+    var downloadsAgeDays: Int = 30
 
     // v1.1 — stored so the Settings UI is ready, not acted on yet.
     var autoScan: Bool = false

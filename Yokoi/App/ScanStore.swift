@@ -19,6 +19,7 @@ private struct ScanCache: Codable {
     var bigFiles: [BigFileItem]
     var screenshots: [ScreenshotItem]
     var applications: [AppItem]?
+    var downloads: [DownloadItem]?
     var summary: ScanSummary?
 }
 
@@ -31,6 +32,7 @@ final class ScanStore {
     var caches: [CacheItem] = []
     var bigFiles: [BigFileItem] = []
     var screenshots: [ScreenshotItem] = []
+    var downloads: [DownloadItem] = []
     var applications: [AppItem] = []
 
     var isScanning = false
@@ -73,6 +75,7 @@ final class ScanStore {
         caches = DemoData.caches
         bigFiles = DemoData.bigFiles
         screenshots = DemoData.screenshots()
+        downloads = DemoData.downloads
         applications = DemoData.applications
         records = DemoData.records
         disk = DemoData.disk
@@ -91,6 +94,7 @@ final class ScanStore {
         case .buildArtifacts: artifacts.filter { !$0.optIn }.reduce(0) { $0 + $1.size }
         case .caches: caches.reduce(0) { $0 + $1.size }
         case .bigFiles: bigFiles.filter { $0.size >= settings.data.bigFileThreshold }.reduce(0) { $0 + $1.size }
+        case .downloads: downloads.filter { $0.isOld(days: settings.data.downloadsAgeDays) }.reduce(0) { $0 + $1.size }
         case .screenshots: screenshots.reduce(0) { $0 + $1.size }
         case .externalDrives: 0  // a different disk: shown on its own screen, not in the Mac's total
         case .applications: applications.filter { $0.protectedReason == nil && $0.isUnused(days: 180) }.reduce(0) { $0 + $1.size }
@@ -101,7 +105,12 @@ final class ScanStore {
     /// Size of global packages unused for over a year (set by the Package Managers screen).
     var packagesReclaimable: Int64 = 0
 
-    var reclaimableTotal: Int64 { CleanCategory.allCases.reduce(0) { $0 + total($1) } }
+    /// Big files inside old downloads appear in both lists; their bytes are counted once.
+    var reclaimableTotal: Int64 {
+        let d = settings.data
+        let overlap = Overlap.bigFileBytesInDownloads(bigFiles, threshold: d.bigFileThreshold, downloads: downloads, ageDays: d.downloadsAgeDays)
+        return CleanCategory.allCases.reduce(0) { $0 + total($1) } - overlap
+    }
 
     var projectCount: Int {
         Set(nodeModules.map(\.projectURL.path) + artifacts.filter { !$0.isGlobal }.map(\.projectURL.path)).count
@@ -142,6 +151,7 @@ final class ScanStore {
         if categories.contains(.caches) { caches = [] }
         if categories.contains(.bigFiles) { bigFiles = [] }
         if categories.contains(.screenshots) { screenshots = [] }
+        if categories.contains(.downloads) { downloads = [] }
         if categories.contains(.applications) { applications = [] }
 
         let poller = Task { [weak self] in
@@ -165,6 +175,7 @@ final class ScanStore {
                 case .cache(let i): caches.append(i)
                 case .bigFile(let i): bigFiles.append(i)
                 case .screenshot(let i): screenshots.append(i)
+                case .download(let i): downloads.append(i)
                 case .application(let i): applications.append(i)
                 case .finished(let c): scanningCategories.remove(c)
                 }
@@ -215,6 +226,7 @@ final class ScanStore {
         caches.removeAll { ids.contains($0.id) }
         bigFiles.removeAll { ids.contains($0.id) }
         screenshots.removeAll { ids.contains($0.id) }
+        downloads.removeAll { ids.contains($0.id) }
         applications.removeAll { ids.contains($0.id) }
         lastScan?.reclaimable = reclaimableTotal
     }
@@ -256,12 +268,13 @@ final class ScanStore {
         bigFiles = cache.bigFiles
         screenshots = cache.screenshots.filter { FileManager.default.fileExists(atPath: $0.url.path) }
         applications = cache.applications ?? []
+        downloads = (cache.downloads ?? []).filter { FileManager.default.fileExists(atPath: $0.url.path) }
         lastScan = cache.summary
     }
 
     private func saveCache() {
         let cache = ScanCache(nodeModules: nodeModules, artifacts: artifacts, caches: caches,
-                              bigFiles: bigFiles, screenshots: screenshots, applications: applications, summary: lastScan)
+                              bigFiles: bigFiles, screenshots: screenshots, applications: applications, downloads: downloads, summary: lastScan)
         let url = Self.cacheURL
         Task.detached(priority: .utility) {
             guard let data = try? JSONEncoder().encode(cache) else { return }

@@ -81,15 +81,20 @@ struct FeatureTests {
         #expect(f.exists(".Trash"))
     }
 
-    @Test func installersOnlyMatchInstallerFiles() async throws {
+    @Test func installersLiveInDownloadsNotCaches() async throws {
         let f = try Fixture()
         try f.file("Downloads/Xcode.xip", bytes: 3_000)
         try f.file("Downloads/Docker.dmg", bytes: 3_000)
         try f.file("Downloads/taxes.pdf", bytes: 3_000)
         try f.file("Downloads/project/setup.pkg", bytes: 3_000)
-        let installers = try #require(await CacheScanner().collect(f.context()).first { $0.id == "installers" })
-        #expect(Set(installers.contents.map(\.lastPathComponent)) == ["Xcode.xip", "Docker.dmg"])
-        #expect(installers.safety == .review)
+        let caches = await CacheScanner().collect(f.context())
+        #expect(!caches.contains { $0.url.path.hasSuffix("/Downloads") }, "Downloads is its own category, so it isn't counted twice")
+
+        let downloads = await DownloadsScanner().collect(f.context())
+        let installers = downloads.filter { $0.kind == .installer }
+        #expect(Set(installers.map(\.name)) == ["Xcode.xip", "Docker.dmg"], "top level only")
+        #expect(installers.allSatisfy { $0.safety == .redownload })
+        #expect(downloads.first { $0.name == "project" }?.kind == .folder)
     }
 
     @Test func putBackRestoresATrashBatch() async throws {

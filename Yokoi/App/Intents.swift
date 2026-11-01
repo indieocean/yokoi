@@ -5,7 +5,7 @@ import Foundation
 // Cleaning always goes through the app's confirmation sheet.
 
 enum ScanCategoryOption: String, AppEnum {
-    case nodeModules, buildArtifacts, caches, bigFiles, screenshots, applications
+    case nodeModules, buildArtifacts, caches, bigFiles, downloads, screenshots, applications
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Category"
     static let caseDisplayRepresentations: [ScanCategoryOption: DisplayRepresentation] = [
@@ -13,6 +13,7 @@ enum ScanCategoryOption: String, AppEnum {
         .buildArtifacts: "Build artifacts",
         .caches: "Caches",
         .bigFiles: "Big files",
+        .downloads: "Downloads",
         .screenshots: "Screenshots",
         .applications: "Applications",
     ]
@@ -21,7 +22,7 @@ enum ScanCategoryOption: String, AppEnum {
 }
 
 enum ScreenOption: String, AppEnum {
-    case dashboard, caches, buildArtifacts, packageManagers, bigFiles, screenshots, applications, externalDrives
+    case dashboard, caches, buildArtifacts, packageManagers, bigFiles, downloads, screenshots, applications, externalDrives
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Screen"
     static let caseDisplayRepresentations: [ScreenOption: DisplayRepresentation] = [
@@ -30,6 +31,7 @@ enum ScreenOption: String, AppEnum {
         .buildArtifacts: "Build Artifacts",
         .packageManagers: "Package Managers",
         .bigFiles: "Big Files",
+        .downloads: "Downloads",
         .screenshots: "Screenshots",
         .applications: "Applications",
         .externalDrives: "External Drives",

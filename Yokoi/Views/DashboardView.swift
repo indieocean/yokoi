@@ -34,6 +34,7 @@ struct DashboardView: View {
                         RecentCleanupsCard()
                             .frame(width: 340)
                     }
+                    UpdateStatusBar()
                 }
                 .padding(Theme.Metrics.contentPadding)
             }
@@ -114,7 +115,7 @@ struct CategoryRingCard: View {
         let store = app.store
         // node_modules belongs to the package managers (npm, pnpm, yarn, bun), so it's counted in that row
         // together with unused global packages. External drives are a different disk and stay out.
-        let shown: [CleanCategory] = [.packages, .buildArtifacts, .caches, .bigFiles, .screenshots, .applications]
+        let shown: [CleanCategory] = [.packages, .buildArtifacts, .caches, .bigFiles, .downloads, .screenshots, .applications]
         let slices = shown.map { c in
             Slice(category: c, size: c == .packages ? store.total(.nodeModules) + store.total(.packages) : store.total(c))
         }
@@ -210,6 +211,7 @@ struct CategoryRingCard: View {
         case .buildArtifacts: .buildArtifacts
         case .caches: .caches
         case .bigFiles: .bigFiles
+        case .downloads: .downloads
         case .screenshots: .screenshots
         case .applications: .applications
         case .externalDrives: .externalDrives
@@ -368,6 +370,103 @@ struct RecentCleanupsCard: View {
     private func dateLabel(_ date: Date) -> String {
         let r = RelativeDate.string(date)
         return r == "Today" || r == "Yesterday" ? r : RelativeDate.short(date)
+    }
+}
+
+// MARK: - Version and updates
+
+/// The bottom of the dashboard: the running version, and whether a newer one is out.
+/// Quiet when up to date; tinted with the accent and offering "Update…" when there's a new version.
+struct UpdateStatusBar: View {
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        let updater = app.updater
+        let available: String? = if case .available(let version) = updater.status { version } else { nil }
+
+        HStack(spacing: 12) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 22, height: 22)
+                .accessibilityHidden(true)
+            HStack(spacing: 6) {
+                Text("Yokoi").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                Tag(text: updater.currentVersion)
+            }
+            Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
+            status(updater)
+            Spacer(minLength: 12)
+            actions(updater, available: available)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+            if available != nil {
+                shape.fill(LinearGradient(colors: [Theme.accent.opacity(0.16), Theme.accent2.opacity(0.06)],
+                                          startPoint: .leading, endPoint: .trailing))
+            } else {
+                shape.fill(Color.black.opacity(0.18))
+            }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(available != nil ? Theme.accent.opacity(0.35) : Color.white.opacity(0.04))
+        }
+        .animation(.easeOut(duration: 0.25), value: updater.status)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private func status(_ updater: Updater) -> some View {
+        HStack(spacing: 7) {
+            switch updater.status {
+            case .development:
+                Image(systemName: "hammer").foregroundStyle(Theme.textTertiary)
+                Text("Development build").foregroundStyle(Theme.textSecondary)
+            case .off:
+                Circle().fill(Theme.textTertiary).frame(width: 7, height: 7)
+                Text("Automatic update checks are off").foregroundStyle(Theme.textSecondary)
+            case .checking:
+                ProgressView().controlSize(.mini)
+                Text("Checking for updates…").foregroundStyle(Theme.textSecondary)
+            case .upToDate:
+                Circle().fill(Theme.success).frame(width: 7, height: 7)
+                Text("Up to date").foregroundStyle(Theme.success).fontWeight(.medium)
+                if let at = updater.checkedAt {
+                    TimelineView(.everyMinute) { context in
+                        Text("· checked \(RelativeDate.ago(at, now: context.date))").foregroundStyle(Theme.textTertiary)
+                    }
+                }
+            case .available(let version):
+                Image(systemName: "arrow.down.circle.fill").foregroundStyle(Theme.accentLight)
+                Text("Yokoi \(version) is available").foregroundStyle(Theme.textPrimary).fontWeight(.semibold)
+                StatusPill(text: "NEW", color: Theme.accentLight)
+            case .failed:
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning)
+                Text("Couldn't check for updates").foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .font(.system(size: 12.5))
+        .lineLimit(1)
+    }
+
+    @ViewBuilder private func actions(_ updater: Updater, available: String?) -> some View {
+        if available != nil {
+            HStack(spacing: 8) {
+                Link("What's new", destination: URL(string: "https://github.com/indieocean/yokoi/releases/latest")!)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                Button("Update…") { updater.checkForUpdates() }
+                    .buttonStyle(DKButtonStyle(kind: .primary, compact: true))
+                    .disabled(!updater.canCheckForUpdates)
+            }
+        } else if updater.isAvailable && updater.status != .checking {
+            Button(updater.status == .failed ? "Try Again" : "Check Now") { updater.refreshStatus() }
+                .buttonStyle(.plain)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.accentLight)
+                .disabled(!updater.canCheckForUpdates)
+        }
     }
 }
 

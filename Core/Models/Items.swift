@@ -174,3 +174,113 @@ struct ScreenshotItem: Reclaimable, Codable, Hashable {
 
     func ageInDays(now: Date = Date()) -> Int { Int(now.timeIntervalSince(created) / 86_400) }
 }
+
+enum DownloadKind: String, Codable, Sendable, CaseIterable {
+    case installer, archive, image, video, audio, document, folder, incomplete, other
+
+    var filterTitle: String {
+        switch self {
+        case .installer: "Installers"
+        case .archive: "Archives"
+        case .image: "Images"
+        case .video: "Video"
+        case .audio: "Audio"
+        case .document: "Documents"
+        case .folder: "Folders"
+        case .incomplete: "Incomplete"
+        case .other: "Other"
+        }
+    }
+
+    var colorHex: UInt32 {
+        switch self {
+        case .installer: 0x60A5FA
+        case .archive: 0xFACC15
+        case .image: 0xF472B6
+        case .video: 0xFB7185
+        case .audio: 0x34D399
+        case .document: 0xA78BFA
+        case .folder: 0x7DD3FC
+        case .incomplete: 0xF97316
+        case .other: 0x7D8597
+        }
+    }
+
+    static let filters: [DownloadKind] = [.installer, .archive, .image, .video, .document, .folder]
+
+    static func of(_ url: URL, isDirectory: Bool, isPackage: Bool) -> DownloadKind {
+        let ext = url.pathExtension.lowercased()
+        if incompleteExtensions.contains(ext) { return .incomplete }
+        if installerExtensions.contains(ext) { return .installer }
+        if isDirectory && !isPackage { return .folder }
+        if archiveExtensions.contains(ext) { return .archive }
+        if ["png", "jpg", "jpeg", "heic", "gif", "webp", "tiff", "tif", "svg", "psd", "bmp", "raw", "avif"].contains(ext) { return .image }
+        if ["mov", "mp4", "m4v", "mkv", "avi", "webm"].contains(ext) { return .video }
+        if ["mp3", "wav", "m4a", "aac", "flac", "aiff", "ogg"].contains(ext) { return .audio }
+        if ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "key", "pages", "numbers", "txt", "md", "rtf",
+            "csv", "epub", "json", "xml", "html"].contains(ext) { return .document }
+        return .other
+    }
+
+    /// Browsers' partial files (Chrome, Firefox, Safari's `.download` bundle, Opera).
+    static let incompleteExtensions: Set<String> = ["crdownload", "part", "download", "opdownload", "partial"]
+    static let installerExtensions: Set<String> = ["dmg", "pkg", "mpkg", "iso", "xip", "app"]
+    static let archiveExtensions: Set<String> = ["zip", "tar", "gz", "tgz", "bz2", "xz", "7z", "rar", "zst"]
+}
+
+/// A top-level item in `~/Downloads`. Folders are one item with their total size.
+struct DownloadItem: Reclaimable, Codable, Hashable {
+    var id: String { url.path }
+    let url: URL
+    let kind: DownloadKind
+    let size: Int64
+    let fileCount: Int
+    /// When it landed in Downloads (`addedToDirectoryDate`, falling back to the creation date).
+    let added: Date?
+    /// When it was last opened (Spotlight `kMDItemLastUsedDate`), if ever.
+    let lastOpened: Date?
+    /// The archive's contents sit next to it (`foo.zip` and `foo/`).
+    let isExtracted: Bool
+
+    var category: CleanCategory { .downloads }
+    var title: String { url.lastPathComponent }
+    var name: String { url.lastPathComponent }
+    var urls: [URL] { [url] }
+    var restoreHint: String { "restore from the Trash if you change your mind" }
+
+    /// Safe: leftovers with no value of their own. Re-download: installers. Everything else is yours to review.
+    var safety: SafetyLevel {
+        if kind == .incomplete || isExtracted { return .safe }
+        if kind == .installer { return .redownload }
+        return .review
+    }
+
+    /// Why it's probably clutter, shown next to the name.
+    var note: String? {
+        if kind == .incomplete { return "Incomplete download" }
+        if isExtracted { return "Already extracted" }
+        if kind == .installer { return "Installer" }
+        return nil
+    }
+
+    /// The newer of "added" and "last opened".
+    var lastTouched: Date? { [added, lastOpened].compactMap { $0 }.max() }
+
+    /// Unknown age is not old: when in doubt, don't count it or preselect it.
+    func isOld(days: Int, now: Date = Date()) -> Bool {
+        guard let lastTouched else { return false }
+        return now.timeIntervalSince(lastTouched) > Double(days) * 86_400
+    }
+}
+
+enum Overlap {
+    /// Big files already counted inside a reclaimable download (the file itself, or a file in a downloaded
+    /// folder). Subtracted from totals so the same bytes aren't counted twice.
+    static func bigFileBytesInDownloads(_ bigFiles: [BigFileItem], threshold: Int64, downloads: [DownloadItem], ageDays: Int) -> Int64 {
+        let counted = downloads.filter { $0.isOld(days: ageDays) }.map(\.url.path)
+        guard !counted.isEmpty else { return 0 }
+        return bigFiles.filter { f in
+            f.size >= threshold && counted.contains { f.url.path == $0 || f.url.path.hasPrefix($0 + "/") }
+        }.reduce(0) { $0 + $1.size }
+    }
+}

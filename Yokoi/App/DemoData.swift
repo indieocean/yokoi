@@ -101,7 +101,7 @@ enum DemoData {
             let sizes: [String: Int64] = [
                 "user-caches": 4_820 * MB, "logs": 612 * MB, "trash": 2_300 * MB, "npm": 3_410 * MB, "pnpm": 2_960 * MB,
                 "yarn": 1_120 * MB, "homebrew": 2_040 * MB, "cargo-registry": 1_780 * MB, "cocoapods": 884 * MB, "pip": 702 * MB,
-                "simulator-devices": 3_270 * MB, "xcode-archives": 1_060 * MB, "ollama": 7_400 * MB, "installers": 9_100 * MB,
+                "simulator-devices": 3_270 * MB, "xcode-archives": 1_060 * MB, "ollama": 7_400 * MB,
                 "chrome": 1_310 * MB, "arc": 822 * MB,
             ]
             guard let size = sizes[loc.id] else { return nil }
@@ -127,6 +127,29 @@ enum DemoData {
             f("work/backups/pg_dump_prod_2025.tar.gz", .archive, 1_880 * MB, 262),
             f("games/Orbital/Raw/city_block_hipoly.fbx", .art, 1_420 * MB, 31),
             f("Music/Projects/ost_stems_final.wav", .audio, 1_210 * MB, 108),
+        ]
+    }
+
+    static var downloads: [DownloadItem] {
+        func d(_ name: String, _ kind: DownloadKind, _ size: Int64, added: Double, opened: Double? = nil,
+               files: Int = 1, extracted: Bool = false) -> DownloadItem {
+            DownloadItem(url: url("Downloads/" + name), kind: kind, size: size, fileCount: files, added: days(added),
+                         lastOpened: opened.map(days), isExtracted: extracted)
+        }
+        return [
+            d("ubuntu-24.04-desktop-arm64.iso", .installer, 5_710 * MB, added: 286),
+            d("Xcode_16.1.xip", .installer, 4_620 * MB, added: 340),
+            d("Blender-4.2-arm64.dmg", .installer, 412 * MB, added: 120),
+            d("Docker.dmg", .installer, 598 * MB, added: 64, opened: 63),
+            d("unreal-sample-pack.zip", .archive, 2_140 * MB, added: 95, extracted: true),
+            d("unreal-sample-pack", .folder, 2_380 * MB, added: 95, opened: 40, files: 3_412),
+            d("fonts-inter-4.0.zip", .archive, 38 * MB, added: 51, extracted: true),
+            d("node-v22.11.0.pkg", .installer, 96 * MB, added: 210),
+            d("conference-talk-final.mov", .video, 1_270 * MB, added: 44, opened: 44),
+            d("invoice-2026-10.pdf", .document, 2 * MB, added: 6, opened: 6),
+            d("brand-kit-v3.zip", .archive, 184 * MB, added: 3),
+            d("dataset-cities.csv.crdownload", .incomplete, 312 * MB, added: 12),
+            d("IMG_4021.HEIC", .image, 3 * MB, added: 2, opened: 1),
         ]
     }
 

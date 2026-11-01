@@ -29,6 +29,7 @@ struct IncrementalScanTests {
             case .cache(let i): out.append("cache \(i.url.path) \(i.size)")
             case .bigFile(let i): out.append("big \(i.url.path) \(i.size)")
             case .screenshot(let i): out.append("shot \(i.url.path) \(i.size)")
+            case .download(let i): out.append("dl \(i.url.path) \(i.size)")
             case .application(let i): out.append("app \(i.url.path) \(i.appSize)")
             case .finished: break
             }

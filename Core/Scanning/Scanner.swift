@@ -125,6 +125,7 @@ enum ScanEvent: Sendable {
     case cache(CacheItem)
     case bigFile(BigFileItem)
     case screenshot(ScreenshotItem)
+    case download(DownloadItem)
     case application(AppItem)
     case finished(CleanCategory)
 }
@@ -151,6 +152,9 @@ actor ScanEngine {
                 }
                 if categories.contains(.bigFiles) {
                     group.addTask { await Self.forward(BigFileScanner(), context, progress, continuation, ScanEvent.bigFile) }
+                }
+                if categories.contains(.downloads) {
+                    group.addTask { await Self.forward(DownloadsScanner(), context, progress, continuation, ScanEvent.download) }
                 }
                 if categories.contains(.screenshots) {
                     group.addTask { await Self.forward(ScreenshotScanner(), context, progress, continuation, ScanEvent.screenshot) }

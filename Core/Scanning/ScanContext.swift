@@ -19,6 +19,8 @@ struct ScanContext: Sendable {
     var bigFileRoots: [URL]
     var exclusions: GlobMatcher
     var screenshotFolder: URL
+    /// `~/Downloads`. Only its direct children are listed; folders count as one item.
+    var downloadsFolder: URL? = nil
     /// Where installed apps live (`/Applications`, `~/Applications`).
     var applicationFolders: [URL] = []
     /// Mounted external volumes that may be cleaned (not read-only, not Time Machine).
@@ -46,6 +48,8 @@ struct ScanContext: Sendable {
             return CacheLocation.all.map { $0.url(home: home) }
         case .bigFiles:
             return bigFileRoots
+        case .downloads:
+            return [downloadsURL]
         case .screenshots:
             return [screenshotFolder]
         case .applications:
@@ -56,6 +60,8 @@ struct ScanContext: Sendable {
             return []
         }
     }
+
+    var downloadsURL: URL { downloadsFolder ?? home.appendingPathComponent("Downloads") }
 
     func pathGuard(for category: CleanCategory) -> PathGuard {
         PathGuard(allowedRoots: allowedRoots(for: category), exclusions: exclusions, home: home)
