@@ -90,3 +90,19 @@ struct StackCoverageTests {
         #expect(pods.optIn, "Pods/ is sometimes committed")
     }
 }
+
+@Suite("Big files leave the Music library alone")
+struct MusicLibraryTests {
+    @Test func musicLibraryIsNotWalked() async throws {
+        let f = try Fixture()
+        try f.file("Music/Music/Media.localized/Music/album/track.wav", bytes: 2_000_000)
+        try f.file("Music/iTunes/iTunes Media/song.aiff", bytes: 2_000_000)
+        try f.file("Music/Projects/mixdown.wav", bytes: 2_000_000)
+        let items = await BigFileScanner().collect(f.context(bigFileRoots: ["~"]))
+        #expect(items.map(\.url.lastPathComponent) == ["mixdown.wav"])
+
+        // Not even when the Music folder itself is a big-file location.
+        let deep = await BigFileScanner().collect(f.context(bigFileRoots: ["~/Music"]))
+        #expect(deep.map(\.url.lastPathComponent) == ["mixdown.wav"])
+    }
+}

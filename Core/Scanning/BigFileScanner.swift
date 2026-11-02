@@ -1,11 +1,21 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// Finds large files under the big-file locations (home by default). Skips `~/Library`, the Trash,
-/// hidden folders, `node_modules` and app bundle internals (PRD FR-F5). VM and media bundles
+/// Finds large files under the big-file locations (home by default). Skips `~/Library`, the Music library,
+/// the Trash, hidden folders, `node_modules` and app bundle internals (PRD FR-F5). VM and media bundles
 /// (`.utm`, `.sparsebundle`…) are reported as single items.
 struct BigFileScanner: CategoryScanner {
     var category: CleanCategory { .bigFiles }
+
+    /// Folders under home that are never walked. `~/Library` holds no user files worth listing here. The Music
+    /// library is the user's own media, and macOS asks for the "Media & Apple Music" permission as soon as
+    /// anything reads inside it, which is a confusing prompt from a developer tool.
+    static let skippedHomeFolders = ["Library", "Music/Music", "Music/iTunes"]
+
+    static func isSkippedHomeFolder(_ url: URL, home: URL) -> Bool {
+        let path = PathFormat.canonical(url.path)
+        return skippedHomeFolders.contains { path == PathFormat.canonical(home.appendingPathComponent($0).path) }
+    }
 
     static let bundleExtensions: Set<String> = ["utm", "pvm", "vmwarevm", "sparsebundle", "fcpbundle", "logicx", "band"]
 
@@ -37,7 +47,7 @@ struct BigFileScanner: CategoryScanner {
             let roots = context.bigFileRoots.map(\.standardizedFileURL)
             let unique = roots.filter { r in !roots.contains { o in o != r && r.path.hasPrefix(o.path + "/") } }
             await withTaskGroup(of: Void.self) { group in
-                for root in unique where !context.isExcluded(root) {
+                for root in unique where !context.isExcluded(root) && !Self.isSkippedHomeFolder(root, home: home) {
                     for entry in FileWalker.list(root) {
                         if Task.isCancelled { break }
                         if let item = Self.check(entry: entry, context: context, home: home, progress: progress) {
@@ -55,7 +65,7 @@ struct BigFileScanner: CategoryScanner {
     static func shouldDescend(_ e: FileWalker.Entry, context: ScanContext, home: URL) -> Bool {
         e.isDirectory && !e.isSymlink && !e.isPackage && !e.name.hasPrefix(".")
             && !ArtifactRule.skippedDirectoryNames.contains(e.name)
-            && PathFormat.canonical(e.url.path) != PathFormat.canonical(home.appendingPathComponent("Library").path)
+            && !isSkippedHomeFolder(e.url, home: home)
             && !context.isExcluded(e.url)
     }
 
@@ -133,7 +143,7 @@ struct BigFileScanner: CategoryScanner {
                     }
                     continue
                 }
-                if ArtifactRule.skippedDirectoryNames.contains(name) || context.isExcluded(url) {
+                if ArtifactRule.skippedDirectoryNames.contains(name) || context.isExcluded(url) || isSkippedHomeFolder(url, home: home) {
                     e.skipDescendants()
                 }
                 continue
