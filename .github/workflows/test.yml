@@ -11,7 +11,7 @@ on:
 
 jobs:
   test:
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       # Actions are pinned to commit SHAs: a moved tag can't change what runs next to the signing secrets.
@@ -19,9 +19,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # Pinned, with the runner image above: a new Xcode only arrives through a reviewed change here.
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: latest-stable
+          xcode-version: "26.6"
 
       - name: Test
         run: xcodebuild test -project Yokoi.xcodeproj -scheme Yokoi -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO -quiet

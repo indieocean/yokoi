@@ -134,7 +134,7 @@ automatically any more, so keep a backup:
 `build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account yokoi -x sparkle-private.key`.
 
 The DMG window (background, icon positions, volume icon) is laid out by `dmgbuild` from `scripts/dmg-settings.py`,
-installed into `build/dmgbuild-venv` on first use. The background is `assets/dmg/background.tiff` (1x + 2x), drawn by
+installed into `build/dmgbuild-venv` on first use from `scripts/dmgbuild-requirements.txt`, whose versions and hashes are pinned (`pip install --require-hashes`). The background is `assets/dmg/background.tiff` (1x + 2x), drawn by
 `scripts/make-dmg-background.py`. To change it, edit that script (it needs Pillow), then:
 `python3 scripts/make-dmg-background.py && tiffutil -cathidpicheck assets/dmg/background.png assets/dmg/background@2x.png -out assets/dmg/background.tiff`.
 Icon positions are set in both scripts and must match.
@@ -148,7 +148,20 @@ Icon positions are set in both scripts and must match.
 git tag v1.2 && git push origin v1.2
 ```
 
-It needs these repository secrets (Settings › Secrets and variables › Actions):
+The workflow has two jobs. `verify` checks the tag against the version and runs the tests; it has no secrets and
+read-only access. `release` then signs, notarizes and publishes. It runs in the `release` **environment**, which must
+require a reviewer: the job waits until someone approves it in the Actions tab. Set this up once:
+
+1. Settings › Environments › New environment `release` › **Required reviewers**: add yourself. Under *Deployment
+   branches and tags*, allow only tags matching `v*`.
+2. Settings › Rules › Rulesets › New tag ruleset: target `v*`, restrict creations, updates and deletions, and bypass
+   only for repository admins. Then nobody else can push a tag that starts a release.
+3. Put the secrets below in the `release` environment (not as repository secrets), so only that job can read them.
+
+Both jobs run on GitHub-hosted runners with a pinned image (`macos-26`) and Xcode version; change them together, in
+`test.yml` as well. Never point `release` at a self-hosted runner: it writes signing keys to `$RUNNER_TEMP`.
+
+The secrets (in the `release` environment):
 
 | Secret | Value |
 |---|---|

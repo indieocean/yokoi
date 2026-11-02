@@ -70,11 +70,12 @@ codesign -d --entitlements - --verbose=2 "$APP" 2>&1 | grep -E "Authority=Develo
 
 echo "› Building $DMG"
 # dmgbuild lays out the window (background, icon positions) and sets the volume icon without scripting
-# Finder, so it also works on headless CI. Installed once into a venv under build/.
+# Finder, so it also works on headless CI. Installed once into a venv under build/, from pinned versions
+# whose hashes must match (scripts/dmgbuild-requirements.txt).
 VENV="build/dmgbuild-venv"
 if [[ ! -x "$VENV/bin/dmgbuild" ]]; then
   python3 -m venv "$VENV"
-  "$VENV/bin/pip" install --quiet "dmgbuild==1.6.7"
+  "$VENV/bin/pip" install --quiet --disable-pip-version-check --require-hashes -r scripts/dmgbuild-requirements.txt
 fi
 cp "$APP/Contents/Resources/AppIcon.icns" "$OUT/VolumeIcon.icns"
 "$VENV/bin/dmgbuild" -s scripts/dmg-settings.py \

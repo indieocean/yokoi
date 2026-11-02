@@ -8,21 +8,23 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    runs-on: macos-latest
-    timeout-minutes: 60
+  # Checks and tests run first, in a job that can't see any secret and can't write to the repo.
+  verify:
+    runs-on: macos-26
+    timeout-minutes: 30
     steps:
       # Actions are pinned to commit SHAs: a moved tag can't change what runs next to the signing secrets.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
 
+      # Pinned, with the runner image above: a new Xcode only arrives through a reviewed change here.
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: latest-stable
+          xcode-version: "26.6"
 
       - name: Check the tag matches the app version
         run: |
@@ -42,6 +44,28 @@ jobs:
 
       - name: Test
         run: xcodebuild test -project Yokoi.xcodeproj -scheme Yokoi -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO -quiet
+
+  # Signs, notarizes and publishes. Its secrets live in the `release` environment, which waits for a
+  # reviewer's approval before the job starts.
+  #
+  # Must only ever run on GitHub-hosted runners: signing keys are written to $RUNNER_TEMP below, and a
+  # self-hosted machine would keep them (and the keychain) around between jobs.
+  release:
+    needs: verify
+    runs-on: macos-26
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # Pinned, with the runner image above: a new Xcode only arrives through a reviewed change here.
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: "26.6"
 
       - name: Import the Developer ID certificate
         env:
