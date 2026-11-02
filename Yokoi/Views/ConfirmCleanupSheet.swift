@@ -28,6 +28,7 @@ struct ConfirmCleanupSheet: View {
             header
             stats
             pathPreview
+            if let tool = request.tool { commandPreview(tool) }
             if !request.blocked.isEmpty { blockedNotice }
             if !recentEntries.isEmpty { recentWarning }
             if dryRun { dryRunNotice }
@@ -39,7 +40,8 @@ struct ConfirmCleanupSheet: View {
                     } extra: { EmptyView() }
                 }
                 RadioCard(selected: mode == .permanent, title: "Delete permanently",
-                          subtitle: "Immediately frees space · cannot be undone", titleColor: Theme.danger) {
+                          subtitle: request.tool == nil ? "Immediately frees space · cannot be undone"
+                                                        : "The tool deletes them · they can't go to the Trash", titleColor: Theme.danger) {
                     mode = .permanent
                 } extra: {
                     Toggle(isOn: $acknowledgedPermanent) {
@@ -81,7 +83,9 @@ struct ConfirmCleanupSheet: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Total size").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
-                Text(ByteFormat.string(totalSize)).font(Theme.mono(24, .bold)).foregroundStyle(Theme.accentLight)
+                // macOS doesn't report a Time Machine snapshot's size.
+                Text(request.tool != nil && totalSize == 0 ? "Unknown" : ByteFormat.string(totalSize))
+                    .font(Theme.mono(24, .bold)).foregroundStyle(Theme.accentLight)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .card(padding: 14, radius: 10)
@@ -89,7 +93,9 @@ struct ConfirmCleanupSheet: View {
                 Text("Items").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(entries.count)").font(Theme.mono(24, .bold)).foregroundStyle(Theme.textPrimary)
-                    Text("· \(CountFormat.compact(fileCount)) files").font(Theme.mono(12.5)).foregroundStyle(Theme.textSecondary)
+                    if request.tool == nil {
+                        Text("· \(CountFormat.compact(fileCount)) files").font(Theme.mono(12.5)).foregroundStyle(Theme.textSecondary)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -123,6 +129,26 @@ struct ConfirmCleanupSheet: View {
                     .buttonStyle(.plain)
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.25)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.cardStroke))
+    }
+
+    /// The exact commands a tool cleanup runs.
+    private func commandPreview(_ tool: ToolActionStatus) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(tool.commands.prefix(6).enumerated()), id: \.offset) { _, cmd in
+                Text("$ " + cmd.joined(separator: " ")).font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+            }
+            if tool.commands.count > 6 {
+                Text("+ \(tool.commands.count - 6) more").font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary)
+            }
+            if let note = tool.note {
+                Text(LocalizedStringKey(note)).font(.system(size: 12)).foregroundStyle(Theme.warning).padding(.top, 4)
             }
         }
         .padding(14)
@@ -214,6 +240,7 @@ struct ConfirmCleanupSheet: View {
         if running { return "Working…" }
         if dryRun { return "Preview · \(size)" }
         if let verb = request.confirmVerb { return "\(verb) · \(size)" }
+        if request.tool != nil && totalSize == 0 { return "Delete permanently" }
         return mode == .trash ? "Move to Trash · \(size)" : "Delete permanently · \(size)"
     }
 
@@ -221,6 +248,11 @@ struct ConfirmCleanupSheet: View {
         running = true
         if dontAskAgain && request.allSafe && mode == .trash {
             app.settings.data.skipConfirmForSafe = true
+        }
+        if let tool = request.tool {
+            dismiss()
+            Task { await app.tools.confirm(tool, app: app) }
+            return
         }
         let chosen = entries
         let action: CleanupAction = mode == .trash ? .trash : .delete

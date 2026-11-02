@@ -40,9 +40,6 @@ struct RootView: View {
         .sheet(isPresented: $app.showOnboarding) {
             OnboardingSheet()
         }
-        .sheet(item: Binding(get: { app.tools.pending }, set: { app.tools.pending = $0 })) { status in
-            ToolActionSheet(status: status)
-        }
         .background {
             // ⌘K focuses the search field.
             Button("Search") { app.searchFocusToken += 1 }

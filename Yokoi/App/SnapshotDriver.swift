@@ -93,6 +93,14 @@ enum SnapshotDriver {
         await app.tools.refresh()
         await shot("caches")
 
+        // The same screen with old simulators and archives opened and the old ones picked.
+        for id in ["simulator-devices", "xcode-archives"] {
+            guard let item = app.store.caches.first(where: { $0.id == id }) else { continue }
+            app.cachesVM.expanded.insert(id)
+            app.cachesVM.selectAllButNewest(item)
+        }
+        await shot("caches-items")
+
         app.screen = .downloads
         app.downloadsVM.selectLeftovers()
         await shot("downloads")

@@ -38,7 +38,25 @@ struct CachesView: View {
                                                 .disabled(item.contents.isEmpty)
                                         }
                                     } else {
-                                        CacheRow(item: item, checked: vm.checked.contains(item.id)) { vm.toggle(item.id) }
+                                        let open = vm.expanded.contains(item.id)
+                                        CacheRow(item: item, state: vm.state(of: item), toggle: { vm.toggle(item.id) },
+                                                 expanded: item.children?.isEmpty == false ? open : nil,
+                                                 toggleExpanded: { withAnimation(.easeOut(duration: 0.15)) { vm.toggleExpanded(item.id) } })
+                                        if open, let children = item.children {
+                                            ForEach(children) { child in
+                                                CacheChildRow(child: child, checked: vm.isChecked(child, in: item)) { vm.toggle(child, in: item) }
+                                            }
+                                            if CacheLocation.all.first(where: { $0.id == item.id })?.breakdown.sortsByDate == true, children.count > 1 {
+                                                HStack {
+                                                    Button("Select all but the newest") { vm.selectAllButNewest(item) }
+                                                        .buttonStyle(DKButtonStyle(kind: .ghost, compact: true))
+                                                    Spacer()
+                                                }
+                                                .padding(.leading, 70)
+                                                .padding(.vertical, 6)
+                                                .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -52,17 +70,17 @@ struct CachesView: View {
             .padding(Theme.Metrics.contentPadding)
 
             SelectionBar(state: vm.allState, toggleAll: vm.toggleAll,
-                         count: vm.checked.count, noun: vm.checked.count == 1 ? "cache" : "caches", size: vm.selectedSize) {
-                Button("Reveal in Finder") { Finder.reveal(vm.selectedItems.map(\.url)) }
+                         count: vm.selectedCount, noun: vm.selectedCount == 1 ? "cache" : "caches", size: vm.selectedSize) {
+                Button("Reveal in Finder") { Finder.reveal(vm.selectedURLs) }
                     .buttonStyle(.dkSecondary)
-                    .disabled(vm.checked.isEmpty)
+                    .disabled(vm.selectedCount == 0)
                 Button {
                     app.requestCleanup(vm.cleanupRequest())
                 } label: {
                     Label("Clear Caches", systemImage: "delete.left")
                 }
                 .buttonStyle(.dkDanger)
-                .disabled(vm.checked.isEmpty)
+                .disabled(vm.selectedCount == 0)
                 .keyboardShortcut(.delete, modifiers: .command)
             }
         }
@@ -73,22 +91,30 @@ struct CachesView: View {
 
 private struct CacheRow<Accessory: View>: View {
     let item: CacheItem
-    let checked: Bool
+    let state: CheckState
     let toggle: () -> Void
+    /// Nil when the location has no twisty.
+    var expanded: Bool?
+    var toggleExpanded: () -> Void
     var accessory: Accessory
     @State private var hovering = false
 
-    init(item: CacheItem, checked: Bool, toggle: @escaping () -> Void, @ViewBuilder accessory: () -> Accessory) {
+    init(item: CacheItem, state: CheckState, toggle: @escaping () -> Void, expanded: Bool? = nil,
+         toggleExpanded: @escaping () -> Void = {}, @ViewBuilder accessory: () -> Accessory) {
         self.item = item
-        self.checked = checked
+        self.state = state
         self.toggle = toggle
+        self.expanded = expanded
+        self.toggleExpanded = toggleExpanded
         self.accessory = accessory()
     }
 
     var body: some View {
         HStack(spacing: 14) {
+            Twisty(expanded: expanded, action: toggleExpanded)
+                .padding(.trailing, -8)
             if Accessory.self == EmptyView.self {
-                CheckBox(isOn: checked, action: toggle)
+                CheckBox(state: state, action: toggle)
             } else {
                 Image(systemName: "trash").font(.system(size: 11)).foregroundStyle(Theme.danger).frame(width: 16)
             }
@@ -102,10 +128,16 @@ private struct CacheRow<Accessory: View>: View {
                     Badge(text: item.badge, color: Color(hex: item.colorHex), size: 28, fontSize: 10.5)
                 }
             }
-            Text(item.name)
-                .font(.system(size: 13.5))
-                .foregroundStyle(Theme.textPrimary)
-                .frame(width: 280, alignment: .leading)
+            HStack(spacing: 6) {
+                Text(item.name)
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(Theme.textPrimary)
+                if let n = item.children?.count, n > 0 {
+                    Text("\(n)").font(Theme.mono(10.5)).foregroundStyle(Theme.textTertiary)
+                        .help(CountFormat.plural(n, "item"))
+                }
+            }
+            .frame(width: 280, alignment: .leading)
             Text(PathFormat.abbreviate(item.url))
                 .font(Theme.mono(11.5))
                 .foregroundStyle(Theme.textSecondary)
@@ -121,20 +153,96 @@ private struct CacheRow<Accessory: View>: View {
         }
         .padding(.horizontal, 20)
         .frame(height: 40)
-        .background(checked ? Theme.rowSelected : (hovering ? Theme.rowHover : .clear))
+        .background(state != .off ? Theme.rowSelected : (hovering ? Theme.rowHover : .clear))
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
         .contentShape(Rectangle())
         .onTapGesture(perform: toggle)
         .onHover { hovering = $0 }
         .contextMenu { Button("Reveal in Finder") { Finder.reveal([item.url]) } }
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(checked ? .isSelected : [])
+        .accessibilityAddTraits(state == .on ? .isSelected : [])
     }
 }
 
 extension CacheRow where Accessory == EmptyView {
-    init(item: CacheItem, checked: Bool, toggle: @escaping () -> Void) {
-        self.init(item: item, checked: checked, toggle: toggle) { EmptyView() }
+    init(item: CacheItem, state: CheckState, toggle: @escaping () -> Void, expanded: Bool? = nil, toggleExpanded: @escaping () -> Void = {}) {
+        self.init(item: item, state: state, toggle: toggle, expanded: expanded, toggleExpanded: toggleExpanded) { EmptyView() }
+    }
+
+}
+
+extension CacheRow {
+    init(item: CacheItem, checked: Bool, toggle: @escaping () -> Void, @ViewBuilder accessory: () -> Accessory) {
+        self.init(item: item, state: checked ? .on : .off, toggle: toggle, accessory: accessory)
+    }
+}
+
+/// A disclosure chevron, or a same-width gap so rows without one stay aligned.
+struct Twisty: View {
+    let expanded: Bool?
+    let action: () -> Void
+
+    var body: some View {
+        Group {
+            if let expanded {
+                Button(action: action) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Theme.textSecondary)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                        .frame(width: 14, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(expanded ? "Collapse" : "Expand")
+            } else {
+                Color.clear.frame(width: 14, height: 24)
+            }
+        }
+    }
+}
+
+/// One item inside a cache location: an old simulator, an archive, a model.
+private struct CacheChildRow: View {
+    let child: CacheChild
+    let checked: Bool
+    let toggle: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 14) {
+            CheckBox(isOn: checked, size: 14, action: toggle)
+            HStack(spacing: 8) {
+                Text(child.name)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if let detail = child.detail {
+                    Text(detail).font(Theme.mono(11)).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                }
+            }
+            .help(PathFormat.abbreviate(child.urls[0]))
+            Spacer(minLength: 12)
+            Text(child.date.map { RelativeDate.string($0) } ?? "")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.textTertiary)
+                .help(child.date.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "")
+                .frame(width: 110, alignment: .leading)
+            SizeText(bytes: child.size)
+                .frame(width: 80, alignment: .trailing)
+        }
+        .padding(.leading, 70)
+        .padding(.trailing, 20)
+        .frame(height: 32)
+        .background(checked ? Theme.rowSelected.opacity(0.7) : (hovering ? Theme.rowHover : Color.white.opacity(0.015)))
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline.opacity(0.6)).frame(height: 1) }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: toggle)
+        .onHover { hovering = $0 }
+        .contextMenu { Button("Reveal in Finder") { Finder.reveal([child.urls[0]]) } }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(checked ? .isSelected : [])
     }
 }
 
@@ -158,95 +266,94 @@ private struct ToolActionsSection: View {
             .padding(.bottom, 8)
             ForEach(ToolAction.allCases) { action in
                 let status = tools.statuses[action]
+                let selectable = status?.hasSelectableItems == true
+                let open = selectable && tools.expanded.contains(action)
+                let picked = tools.picked[action] ?? []
                 HStack(spacing: 14) {
+                    Twisty(expanded: selectable ? open : nil) {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            if tools.expanded.contains(action) { tools.expanded.remove(action) } else { tools.expanded.insert(action) }
+                        }
+                    }
+                    .padding(.trailing, -8)
                     Image(systemName: "terminal").font(.system(size: 11)).foregroundStyle(Theme.textSecondary).frame(width: 16)
                     Badge(text: action.badge, color: Theme.info, size: 28, fontSize: 10.5)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(action.title).font(.system(size: 13.5)).foregroundStyle(Theme.textPrimary)
                         Text(LocalizedStringKey(action.explanation)).font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary).lineLimit(1)
-                            .help(status == nil && action.isDocker && tools.loaded ? "Docker isn't installed or its engine isn't running." : "")
+                            .help(status == nil && action.isDocker && tools.loaded ? "Docker isn't installed or its engine isn't running." : action.explanation)
                     }
                     Spacer(minLength: 12)
                     Group {
                         if let status {
-                            Text(status.count == 0 ? "none" : CountFormat.plural(status.count, action.noun))
-                                .font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
+                            Text(status.count == 0 ? "none"
+                                 : picked.isEmpty ? CountFormat.plural(status.count, action.noun)
+                                 : "\(picked.count) of \(status.count) picked")
+                                .font(Theme.mono(11.5)).foregroundStyle(picked.isEmpty ? Theme.textSecondary : Theme.accentLight)
                         } else {
                             Text(tools.loaded ? "unavailable" : "not checked").font(Theme.mono(11.5)).foregroundStyle(Theme.textTertiary)
                         }
                     }
                     .frame(width: 110, alignment: .leading)
-                    Button("Delete…") { tools.pending = status }
+                    Button("Delete…") { if let r = status.flatMap({ tools.cleanupRequest(for: $0) }) { app.requestCleanup(r) } }
                         .buttonStyle(DKButtonStyle(kind: .danger, compact: true))
-                        .disabled((status?.count ?? 0) == 0 || tools.running)
+                        .disabled((status?.count ?? 0) == 0 || tools.running || status.flatMap { tools.cleanupRequest(for: $0) } == nil)
+                        .help(action.requiresSelection && picked.isEmpty ? "Open the list and pick the ones to delete." : "")
                     Text(status?.size.map(ByteFormat.string) ?? "—").font(Theme.mono(12, .medium)).foregroundStyle(Theme.textPrimary)
                         .frame(width: 80, alignment: .trailing)
                 }
                 .padding(.horizontal, 20)
                 .frame(height: 44)
                 .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+                if open, let status {
+                    ForEach(status.items) { item in
+                        ToolItemRow(item: item, checked: picked.contains(item.id)) { tools.togglePick(item, in: action) }
+                    }
+                }
             }
         }
         .task { if !tools.loaded { await tools.refresh() } }
     }
 }
 
-/// Confirmation for a tool cleanup: what's affected and the exact commands.
-struct ToolActionSheet: View {
-    @Environment(AppModel.self) private var app
-    @Environment(\.dismiss) private var dismiss
-    let status: ToolActionStatus
-    @State private var started = false
+/// One image, volume, simulator or snapshot under a tool cleanup's twisty.
+private struct ToolItemRow: View {
+    let item: ToolActionStatus.Item
+    let checked: Bool
+    let toggle: () -> Void
+    @State private var hovering = false
 
     var body: some View {
-        let tools = app.tools
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Delete \(status.action.title.lowercased())?").font(.system(size: 17, weight: .semibold))
-            Text(LocalizedStringKey(status.action.explanation)).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(status.items, id: \.self) { Text($0).font(Theme.mono(11.5)) }
-                    Divider().padding(.vertical, 6)
-                    ForEach(status.commands.prefix(20), id: \.self) { cmd in
-                        Text("$ " + cmd.joined(separator: " ")).font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary).textSelection(.enabled)
-                    }
-                    if status.commands.count > 20 { Text("+ \(status.commands.count - 20) more").font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary) }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-            }
-            .frame(maxHeight: 200)
-            .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.25)))
-            if let note = status.note {
-                Text(LocalizedStringKey(note)).font(.system(size: 12)).foregroundStyle(Theme.warning)
-            }
-            if started && !tools.running {
-                let failed = tools.results.filter { !$0.succeeded }
-                Text(failed.isEmpty ? "Done." : "\(failed.count) command\(failed.count == 1 ? "" : "s") failed: " + (failed.first?.stderr.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""))
-                    .font(Theme.mono(11.5))
-                    .foregroundStyle(failed.isEmpty ? Theme.success : Theme.danger)
-                    .textSelection(.enabled)
-            }
-            HStack {
-                if tools.running { ProgressView().controlSize(.small) }
-                Spacer()
-                Button(started && !tools.running ? "Done" : "Cancel") { dismiss() }
-                    .buttonStyle(.dkSecondary)
-                    .disabled(tools.running)
-                    .keyboardShortcut(.cancelAction)
-                if !started {
-                    Button("Delete") {
-                        started = true
-                        Task { await tools.run(status) }
-                    }
-                    .buttonStyle(.dkDanger)
-                    .keyboardShortcut(.defaultAction)
+        let enabled = item.command != nil
+        HStack(spacing: 14) {
+            CheckBox(isOn: checked, size: 14, action: toggle)
+                .disabled(!enabled)
+                .opacity(enabled ? 1 : 0.35)
+            HStack(spacing: 8) {
+                Text(item.label).font(.system(size: 12.5)).foregroundStyle(enabled ? Theme.textPrimary : Theme.textTertiary)
+                    .lineLimit(1).truncationMode(.middle)
+                if let detail = item.detail {
+                    Text(detail).font(Theme.mono(11)).foregroundStyle(Theme.textSecondary).lineLimit(1)
                 }
             }
+            .help(item.command.map { "$ " + $0.joined(separator: " ") } ?? "Can't be deleted on its own.")
+            Spacer(minLength: 12)
+            Text(item.date.map { RelativeDate.string($0) } ?? "")
+                .font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary)
+                .help(item.date.map { "Last used or created " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "")
+                .frame(width: 110, alignment: .leading)
+            Text(item.size.map(ByteFormat.string) ?? "—").font(Theme.mono(12, .medium)).foregroundStyle(Theme.textPrimary)
+                .frame(width: 80, alignment: .trailing)
         }
-        .padding(24)
-        .frame(width: 560)
-        .background(Color(hex: 0x1A1D27))
-        .interactiveDismissDisabled(tools.running)
+        .padding(.leading, 70)
+        .padding(.trailing, 20)
+        .frame(height: 32)
+        .background(checked ? Theme.rowSelected.opacity(0.7) : (hovering ? Theme.rowHover : Color.white.opacity(0.015)))
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline.opacity(0.6)).frame(height: 1) }
+        .contentShape(Rectangle())
+        .onTapGesture { if enabled { toggle() } }
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(checked ? .isSelected : [])
     }
 }

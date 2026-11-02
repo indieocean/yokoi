@@ -71,6 +71,9 @@ struct CleanupRequest: Identifiable {
     /// Only permanent delete is offered (emptying the Trash).
     var forcePermanent = false
     var confirmVerb: String? = nil
+    /// A cleanup the owning tool performs (`docker`, `xcrun simctl`, `tmutil`) instead of Yokoi moving files.
+    /// Always permanent: the tool deletes them, so they can't go to the Trash.
+    var tool: ToolActionStatus? = nil
 
     var totalSize: Int64 { entries.reduce(0) { $0 + $1.size } }
     var fileCount: Int { entries.reduce(0) { $0 + $1.fileCount } }

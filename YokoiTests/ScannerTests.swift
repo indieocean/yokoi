@@ -118,6 +118,88 @@ struct ScannerTests {
         #expect(byID["cargo-registry"] == nil, "missing locations aren't reported")
     }
 
+    @Test func cacheBreakdownNamesXcodeAndAndroidItems() async throws {
+        let f = try Fixture()
+        let old = Date(timeIntervalSinceNow: -300 * 86_400), recent = Date(timeIntervalSinceNow: -2 * 86_400)
+        func plist(_ path: String, _ dict: [String: Any]) throws {
+            let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+            try f.file(path, contents: String(decoding: data, as: UTF8.self))
+        }
+        // Two simulators, one old.
+        let sims = "Library/Developer/CoreSimulator/Devices"
+        try plist("\(sims)/AAA/device.plist", ["name": "iPhone 14", "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-16-4"])
+        try f.file("\(sims)/AAA/data/blob", bytes: 4_000, modified: old)
+        for path in ["\(sims)/AAA/device.plist", "\(sims)/AAA/data", "\(sims)/AAA"] { try f.setModified(path, old) }
+        try plist("\(sims)/BBB/device.plist", ["name": "iPhone 17", "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-26-0"])
+        try f.file("\(sims)/BBB/data/blob", bytes: 2_000, modified: recent)
+        try f.file("\(sims)/device_set.plist")
+        // Archives inside date folders.
+        let arch = "Library/Developer/Xcode/Archives"
+        try plist("\(arch)/2025-01-02/Orbital 1-2-25.xcarchive/Info.plist",
+                  ["Name": "Orbital", "CreationDate": old, "ApplicationProperties": ["CFBundleShortVersionString": "1.0", "CFBundleVersion": "7"]])
+        try plist("\(arch)/2026-10-01/Orbital 10-1-26.xcarchive/Info.plist",
+                  ["Name": "Orbital", "CreationDate": recent, "ApplicationProperties": ["CFBundleShortVersionString": "2.0", "CFBundleVersion": "40"]])
+        // An emulator is a folder plus an .ini; system images are three levels deep.
+        try f.file(".android/avd/Pixel_7.avd/config.ini")
+        try f.file(".android/avd/Pixel_7.ini")
+        try f.file("Library/Android/sdk/system-images/android-34/google_apis_playstore/arm64-v8a/system.img")
+        try f.file("Library/Developer/Xcode/iOS DeviceSupport/iPhone15,2 17.0 (21A329)/Symbols/x")
+
+        let items = await CacheScanner().collect(f.context())
+        let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+
+        let simItem = try #require(byID["simulator-devices"])
+        let simRows = try #require(simItem.children)
+        #expect(simRows.map(\.name) == ["iPhone 17", "iPhone 14"], "newest first")
+        #expect(simRows.map(\.detail) == ["iOS 26.0", "iOS 16.4"])
+        #expect(simItem.size == simRows.reduce(0) { $0 + $1.size }, "the location's size is the sum of its rows")
+        #expect(Set(simItem.contents) == Set(simRows.flatMap(\.urls)))
+
+        let archives = try #require(byID["xcode-archives"]?.children)
+        #expect(archives.map(\.detail) == ["2.0 (40)", "1.0 (7)"])
+        #expect(archives.allSatisfy { $0.urls[0].pathExtension == "xcarchive" }, "the archives, not their date folders")
+
+        let avd = try #require(byID["android-avd"]?.children)
+        #expect(avd.count == 1)
+        #expect(avd.first?.name == "Pixel 7")
+        #expect(avd.first?.urls.map(\.lastPathComponent) == ["Pixel_7.avd", "Pixel_7.ini"])
+
+        let image = try #require(byID["android-system-images"]?.children?.first)
+        #expect(image.name == "Android API 34")
+        #expect(image.detail == "Google Play · arm64-v8a")
+        #expect(byID["device-support"]?.children?.first?.name == "17.0 (21A329)")
+    }
+
+    @Test func cleaningOneCacheItemKeepsTheRest() async throws {
+        let f = try Fixture()
+        try f.file("Library/Developer/Xcode/iOS DeviceSupport/16.0 (20A362)/Symbols/x", bytes: 3_000)
+        try f.file("Library/Developer/Xcode/iOS DeviceSupport/17.0 (21A329)/Symbols/x", bytes: 1_000)
+        let item = try #require(await CacheScanner().collect(f.context()).first { $0.id == "device-support" })
+        let oldest = try #require(item.children?.first { $0.name.hasPrefix("16") })
+
+        let entry = item.entry(for: oldest)
+        let service = CleanupService(context: f.context(), log: CleanupLog(url: f.url("support/cleanup.log")))
+        let outcome = await service.perform([entry], action: .delete, dryRun: false)
+        #expect(outcome.failures.isEmpty)
+        #expect(outcome.completedIDs == [entry.id])
+        #expect(!f.exists("Library/Developer/Xcode/iOS DeviceSupport/16.0 (20A362)"))
+        #expect(f.exists("Library/Developer/Xcode/iOS DeviceSupport/17.0 (21A329)"))
+
+        let left = try #require(item.removingChildren(entryIDs: outcome.completedIDs))
+        #expect(left.children?.map(\.name) == ["17.0 (21A329)"])
+        #expect(left.size == item.size - oldest.size)
+        #expect(item.removingChildren(entryIDs: [item.id]) == nil, "a whole-location id isn't a child")
+    }
+
+    @Test func storesWithoutMeaningfulPartsAreNotBrokenDown() async throws {
+        let f = try Fixture()
+        try f.file(".npm/_cacache/content-v2/a")
+        try f.file(".npm/_cacache/index-v5/b")
+        let npm = try #require(await CacheScanner().collect(f.context()).first { $0.id == "npm" })
+        #expect(npm.children == nil)
+        #expect(npm.contents.count == 2)
+    }
+
     // MARK: Big files
 
     @Test func bigFiles() async throws {

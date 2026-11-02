@@ -93,18 +93,61 @@ struct CacheItem: Reclaimable, Codable, Hashable {
     let section: CacheLocation.Section
     let url: URL
     /// The children that will be removed (the folder itself is kept).
-    let contents: [URL]
+    var contents: [URL]
     let safety: SafetyLevel
     let badge: String
     let colorHex: UInt32
-    let size: Int64
-    let fileCount: Int
+    var size: Int64
+    var fileCount: Int
     let restoreHint: String
     var permanentOnly: Bool = false
+    /// The contents as individually selectable rows (an old simulator, one archive). Nil when the location
+    /// isn't broken down, or for scans cached before breakdowns existed.
+    var children: [CacheChild]? = nil
 
     var category: CleanCategory { .caches }
     var title: String { name }
     var urls: [URL] { contents }
+
+    /// Cleanup id of one child: distinct from the location's own id, so cleaning a child keeps the location.
+    func entryID(for child: CacheChild) -> String { "\(locationID)#\(child.id)" }
+
+    /// A cleanup of just `child`, with the location's safety and restore hint.
+    func entry(for child: CacheChild) -> CleanupEntry {
+        var entry = CleanupEntry(id: entryID(for: child), category: .caches, label: "\(name) · \(child.name)",
+                                 displayPath: PathFormat.abbreviate(child.urls[0]), urls: child.urls, size: child.size,
+                                 fileCount: child.fileCount, safety: safety, restoreHint: restoreHint)
+        entry.permanentOnly = permanentOnly
+        // Only the emulator using this AVD blocks it, not any running emulator.
+        if CacheLocation.inUseGuarded.contains(locationID) { entry.projectRoot = child.urls[0] }
+        return entry
+    }
+
+    /// This location without the children whose entry ids are in `ids`; nil when nothing changed.
+    func removingChildren(entryIDs ids: Set<String>) -> CacheItem? {
+        guard let children, children.contains(where: { ids.contains(entryID(for: $0)) }) else { return nil }
+        var copy = self
+        let kept = children.filter { !ids.contains(entryID(for: $0)) }
+        copy.children = kept
+        copy.contents = kept.flatMap(\.urls)
+        copy.size = kept.reduce(0) { $0 + $1.size }
+        copy.fileCount = kept.reduce(0) { $0 + $1.fileCount }
+        return copy
+    }
+}
+
+/// One selectable item inside a cache location: a simulator, an archive, a model, or a top-level folder.
+struct CacheChild: Codable, Hashable, Sendable, Identifiable {
+    var id: String { urls[0].path }
+    /// What gets removed. Usually one path; an Android emulator is its `.avd` folder plus its `.ini`.
+    let urls: [URL]
+    let name: String
+    /// Secondary text, e.g. "iOS 17.5" for a simulator or "1.2 (45)" for an archive.
+    let detail: String?
+    let size: Int64
+    let fileCount: Int
+    /// When it was made (archives) or last changed.
+    let date: Date?
 }
 
 enum BigFileKind: String, Codable, Sendable, CaseIterable {

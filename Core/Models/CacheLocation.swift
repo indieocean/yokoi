@@ -32,6 +32,31 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
     var onlyExtensions: [String]? = nil
     /// Moving to the Trash makes no sense (it *is* the Trash): only permanent delete is offered.
     var permanentOnly: Bool = false
+    /// How the location's contents are listed under its twisty so single items can be cleaned.
+    var breakdown: Breakdown = .children
+
+    /// How a location's contents become individually selectable rows.
+    enum Breakdown: String, Sendable, Codable {
+        /// Not broken down: the parts only make sense together (a content-addressed store, the Trash).
+        case none
+        /// One row per top-level item, largest first.
+        case children
+        /// One row per simulator, named from its `device.plist`.
+        case simulators
+        /// One row per `.xcarchive` inside the date folders, named from its `Info.plist`.
+        case archives
+        /// One row per OS version folder (`iPhone15,2 17.0 (21A329)`).
+        case deviceSupport
+        /// One row per emulator: `Name.avd` and `Name.ini` together.
+        case avds
+        /// One row per installed image (`android-34/google_apis/arm64-v8a`).
+        case systemImages
+        /// One row per model (`models--org--name`).
+        case huggingface
+
+        /// Versioned things read best newest first, so the old ones collect at the bottom.
+        var sortsByDate: Bool { [.simulators, .archives, .deviceSupport, .systemImages, .avds].contains(self) }
+    }
 
     func url(home: URL) -> URL { home.appendingPathComponent(relativePath) }
 
@@ -48,18 +73,18 @@ extension CacheLocation {
                       keepChildren: ["com.apple.*", "com.yokoi.*", "com.diskkeeper.*", "CloudKit", "FamilyCircle"], excludesNestedLocations: true),
         CacheLocation(id: "trash", name: "Trash", section: .systemUser, relativePath: ".Trash",
                       safety: .review, badge: "🗑", colorHex: 0xF0565E, restoreHint: "emptying the Trash can't be undone",
-                      permanentOnly: true),
+                      permanentOnly: true, breakdown: .none),
         CacheLocation(id: "logs", name: "Logs", section: .systemUser, relativePath: "Library/Logs",
                       safety: .safe, badge: "◎", colorHex: 0x7D8597, restoreHint: "logs are recreated as needed"),
         // JavaScript
         CacheLocation(id: "npm", name: "npm cache", section: .javascript, relativePath: ".npm/_cacache",
-                      safety: .safe, badge: "npm", colorHex: 0xF87171, restoreHint: "npm refills it on the next install"),
+                      safety: .safe, badge: "npm", colorHex: 0xF87171, restoreHint: "npm refills it on the next install", breakdown: .none),
         CacheLocation(id: "pnpm", name: "pnpm store", section: .javascript, relativePath: "Library/pnpm/store",
-                      safety: .redownload, badge: "pn", colorHex: 0xF59E0B, restoreHint: "pnpm re-downloads packages on the next install"),
+                      safety: .redownload, badge: "pn", colorHex: 0xF59E0B, restoreHint: "pnpm re-downloads packages on the next install", breakdown: .none),
         CacheLocation(id: "yarn", name: "Yarn cache", section: .javascript, relativePath: "Library/Caches/Yarn",
                       safety: .safe, badge: "y", colorHex: 0x60A5FA, restoreHint: "yarn refills it on the next install"),
         CacheLocation(id: "bun", name: "Bun cache", section: .javascript, relativePath: ".bun/install/cache",
-                      safety: .safe, badge: "bun", colorHex: 0xE6E8EE, restoreHint: "bun refills it on the next install"),
+                      safety: .safe, badge: "bun", colorHex: 0xE6E8EE, restoreHint: "bun refills it on the next install", breakdown: .none),
         // Native toolchains
         CacheLocation(id: "homebrew", name: "Homebrew downloads", section: .nativeToolchains, relativePath: "Library/Caches/Homebrew",
                       safety: .safe, badge: "br", colorHex: 0xF59E0B, restoreHint: "brew downloads bottles again when needed"),
@@ -80,25 +105,25 @@ extension CacheLocation {
                       safety: .safe, badge: "sim", colorHex: 0x60A5FA, restoreHint: "the Simulator rebuilds it"),
         CacheLocation(id: "simulator-devices", name: "iOS Simulators (devices)", section: .xcode, relativePath: "Library/Developer/CoreSimulator/Devices",
                       safety: .review, badge: "sim", colorHex: 0x60A5FA, restoreHint: "recreate simulators in Xcode › Devices (their app data is lost)",
-                      keepChildren: ["device_set.plist", ".*"]),
+                      keepChildren: ["device_set.plist", ".*"], breakdown: .simulators),
         CacheLocation(id: "xcode-archives", name: "Archives", section: .xcode, relativePath: "Library/Developer/Xcode/Archives",
-                      safety: .review, badge: "arc", colorHex: 0x60A5FA, restoreHint: "archives contain dSYMs and can't be recreated"),
+                      safety: .review, badge: "arc", colorHex: 0x60A5FA, restoreHint: "archives contain dSYMs and can't be recreated", breakdown: .archives),
         CacheLocation(id: "device-support", name: "Device support", section: .xcode, relativePath: "Library/Developer/Xcode/iOS DeviceSupport",
-                      safety: .review, badge: "dev", colorHex: 0x60A5FA, restoreHint: "Xcode re-copies symbols when a device connects"),
+                      safety: .review, badge: "dev", colorHex: 0x60A5FA, restoreHint: "Xcode re-copies symbols when a device connects", breakdown: .deviceSupport),
         // Android
         CacheLocation(id: "android-avd", name: "Android emulators (AVDs)", section: .android, relativePath: ".android/avd",
-                      safety: .review, badge: "avd", colorHex: 0x3DDC84, restoreHint: "recreate emulators in Android Studio › Device Manager (their app data is lost)"),
+                      safety: .review, badge: "avd", colorHex: 0x3DDC84, restoreHint: "recreate emulators in Android Studio › Device Manager (their app data is lost)", breakdown: .avds),
         CacheLocation(id: "android-system-images", name: "Android system images", section: .android, relativePath: "Library/Android/sdk/system-images",
-                      safety: .review, badge: "img", colorHex: 0x3DDC84, restoreHint: "reinstall them in Android Studio › SDK Manager; emulators that use them won't boot until then"),
+                      safety: .review, badge: "img", colorHex: 0x3DDC84, restoreHint: "reinstall them in Android Studio › SDK Manager; emulators that use them won't boot until then", breakdown: .systemImages),
         CacheLocation(id: "android-cache", name: "Android SDK cache", section: .android, relativePath: ".android/cache",
                       safety: .safe, badge: "and", colorHex: 0x3DDC84, restoreHint: "the SDK tools rebuild it"),
         CacheLocation(id: "android-build-cache", name: "Android build cache", section: .android, relativePath: ".android/build-cache",
                       safety: .safe, badge: "and", colorHex: 0x3DDC84, restoreHint: "the Android Gradle plugin rebuilds it on the next build"),
         // AI models (opt-in: unchecked by default)
         CacheLocation(id: "ollama", name: "Ollama models", section: .aiModels, relativePath: ".ollama/models",
-                      safety: .review, badge: "ol", colorHex: 0xE6E8EE, restoreHint: "`ollama pull` downloads models again"),
+                      safety: .review, badge: "ol", colorHex: 0xE6E8EE, restoreHint: "`ollama pull` downloads models again", breakdown: .none),
         CacheLocation(id: "huggingface", name: "Hugging Face cache", section: .aiModels, relativePath: ".cache/huggingface/hub",
-                      safety: .redownload, badge: "hf", colorHex: 0xFACC15, restoreHint: "models are downloaded again on next use"),
+                      safety: .redownload, badge: "hf", colorHex: 0xFACC15, restoreHint: "models are downloaded again on next use", breakdown: .huggingface),
         CacheLocation(id: "lmstudio", name: "LM Studio models", section: .aiModels, relativePath: ".lmstudio/models",
                       safety: .review, badge: "lm", colorHex: 0xA78BFA, restoreHint: "download models again in LM Studio"),
         // Browsers

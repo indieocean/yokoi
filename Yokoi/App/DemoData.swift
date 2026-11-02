@@ -106,9 +106,22 @@ enum DemoData {
             ]
             guard let size = sizes[loc.id] else { return nil }
             let u = loc.url(home: home)
-            return CacheItem(locationID: loc.id, name: loc.name, section: loc.section, url: u, contents: [u.appendingPathComponent("demo")],
-                             safety: loc.safety, badge: loc.badge, colorHex: loc.colorHex, size: size, fileCount: Int(size / 50_000),
-                             restoreHint: loc.restoreHint, permanentOnly: loc.permanentOnly)
+            // A few locations get believable rows under their twisty; the rest are one opaque item.
+            let rows: [(String, String?, Int64, Double)] = switch loc.id {
+            case "simulator-devices": [("iPhone 17 Pro", "iOS 26.0", 1_180 * MB, 2), ("iPhone 16", "iOS 18.2", 940 * MB, 96),
+                                       ("iPad Pro 11-inch (M4)", "iOS 18.2", 610 * MB, 140), ("iPhone 15", "iOS 17.5", 540 * MB, 301)]
+            case "xcode-archives": [("Orbital", "2.4 (112)", 312 * MB, 9), ("Orbital", "2.3 (104)", 298 * MB, 61),
+                                    ("Orbital", "2.0 (87)", 251 * MB, 212), ("PixelForge", "1.1 (14)", 199 * MB, 388)]
+            default: [("demo", nil, size, 30)]
+            }
+            let children = rows.enumerated().map { i, r in
+                CacheChild(urls: [u.appendingPathComponent("demo-\(i)")], name: r.0, detail: r.1, size: r.2, fileCount: Int(r.2 / 50_000), date: days(r.3))
+            }
+            return CacheItem(locationID: loc.id, name: loc.name, section: loc.section, url: u, contents: children.flatMap(\.urls),
+                             safety: loc.safety, badge: loc.badge, colorHex: loc.colorHex, size: children.reduce(0) { $0 + $1.size },
+                             fileCount: children.reduce(0) { $0 + $1.fileCount },
+                             restoreHint: loc.restoreHint, permanentOnly: loc.permanentOnly,
+                             children: rows.count > 1 ? children : nil)
         }
     }
 
@@ -282,15 +295,27 @@ enum DemoData {
     }
 
     static var toolStatuses: [ToolAction: ToolActionStatus] {
-        [.unavailableSimulators: ToolActionStatus(action: .unavailableSimulators, count: 6, size: 3_270 * MB,
-                                                  items: ["iPhone 14 (iOS-16-4)"], commands: [["xcrun", "simctl", "delete", "unavailable"]], note: nil),
-         .localSnapshots: ToolActionStatus(action: .localSnapshots, count: 3, size: nil, items: [], commands: [], note: nil),
-         .dockerImages: ToolActionStatus(action: .dockerImages, count: 11, size: 7_840 * MB, items: [],
-                                         commands: [["docker", "image", "prune", "--all", "--force"]], note: nil),
-         .dockerBuildCache: ToolActionStatus(action: .dockerBuildCache, count: 214, size: 4_120 * MB, items: [],
-                                             commands: [["docker", "builder", "prune", "--all", "--force"]], note: nil),
-         .dockerVolumes: ToolActionStatus(action: .dockerVolumes, count: 2, size: 1_310 * MB, items: ["orbital_pgdata", "3f9c1e7a2b"],
-                                          commands: [["docker", "volume", "rm", "orbital_pgdata", "3f9c1e7a2b"]], note: nil)]
+        typealias Item = ToolActionStatus.Item
+        let sims = [Item(id: "sim1", label: "iPhone 14", detail: "iOS 16.4", size: 1_420 * MB, date: days(410), command: ["xcrun", "simctl", "delete", "sim1"]),
+                    Item(id: "sim2", label: "iPad Air (5th generation)", detail: "iOS 16.4", size: 980 * MB, date: days(395), command: ["xcrun", "simctl", "delete", "sim2"]),
+                    Item(id: "sim3", label: "Apple Watch Series 8", detail: "watchOS 9.4", size: 870 * MB, date: days(388), command: ["xcrun", "simctl", "delete", "sim3"])]
+        let runtimes = [Item(id: "rt1", label: "iOS 26.0", detail: "23A343", size: 8_010 * MB, date: days(1), command: ["xcrun", "simctl", "runtime", "delete", "rt1"]),
+                        Item(id: "rt2", label: "iOS 18.2", detail: "22C150", size: 7_620 * MB, date: days(96), command: ["xcrun", "simctl", "runtime", "delete", "rt2"]),
+                        Item(id: "rt3", label: "iOS 17.5", detail: "21F79", size: 7_330 * MB, date: days(301), command: ["xcrun", "simctl", "runtime", "delete", "rt3"])]
+        let images = [Item(id: "i1", label: "postgres:16", detail: "3f2a9c1e7b4d", size: 438 * MB, date: days(12), command: ["docker", "image", "rm", "postgres:16"]),
+                      Item(id: "i2", label: "node:18-bullseye", detail: "9b1e4c7a2f30", size: 1_090 * MB, date: days(220), command: ["docker", "image", "rm", "node:18-bullseye"]),
+                      Item(id: "i3", label: "orbital-api:dev", detail: "+2 tags", size: 2_310 * MB, date: days(340), command: ["docker", "image", "rm", "orbital-api:dev"])]
+        return [.unavailableSimulators: ToolActionStatus(action: .unavailableSimulators, count: 3, size: 3_270 * MB, items: sims,
+                                                         commands: [["xcrun", "simctl", "delete", "unavailable"]], note: nil),
+                .simulatorRuntimes: ToolActionStatus(action: .simulatorRuntimes, count: 3, size: 22_960 * MB, items: runtimes, commands: [], note: nil),
+                .localSnapshots: ToolActionStatus(action: .localSnapshots, count: 3, size: nil, items: [], commands: [], note: nil),
+                .dockerImages: ToolActionStatus(action: .dockerImages, count: 3, size: 3_840 * MB, items: images,
+                                                commands: [["docker", "image", "prune", "--all", "--force"]], note: nil),
+                .dockerBuildCache: ToolActionStatus(action: .dockerBuildCache, count: 214, size: 4_120 * MB, items: [],
+                                                    commands: [["docker", "builder", "prune", "--all", "--force"]], note: nil),
+                .dockerVolumes: ToolActionStatus(action: .dockerVolumes, count: 2, size: 1_310 * MB,
+                                                 items: ["orbital_pgdata", "3f9c1e7a2b"].map { Item(id: $0, label: $0, command: ["docker", "volume", "rm", $0]) },
+                                                 commands: [["docker", "volume", "rm", "orbital_pgdata", "3f9c1e7a2b"]], note: nil)]
     }
 
     /// Plausible file paths inside an entry, streamed by the demo cleanup.

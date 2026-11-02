@@ -3,6 +3,7 @@ import Foundation
 /// Cleanups that must go through the owning tool rather than deleting files (PRD FR-C3).
 enum ToolAction: String, CaseIterable, Sendable, Identifiable {
     case unavailableSimulators
+    case simulatorRuntimes
     case localSnapshots
     case dockerImages
     case dockerBuildCache
@@ -13,6 +14,7 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
     var title: String {
         switch self {
         case .unavailableSimulators: "Unavailable simulators"
+        case .simulatorRuntimes: "Simulator runtimes"
         case .localSnapshots: "Local Time Machine snapshots"
         case .dockerImages: "Unused Docker images"
         case .dockerBuildCache: "Docker build cache"
@@ -23,6 +25,7 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
     var badge: String {
         switch self {
         case .unavailableSimulators: "sim"
+        case .simulatorRuntimes: "rt"
         case .localSnapshots: "tm"
         case .dockerImages: "img"
         case .dockerBuildCache: "bk"
@@ -34,6 +37,7 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
     var noun: String {
         switch self {
         case .unavailableSimulators: "device"
+        case .simulatorRuntimes: "runtime"
         case .localSnapshots: "snapshot"
         case .dockerImages: "image"
         case .dockerBuildCache: "record"
@@ -43,9 +47,14 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
 
     var isDocker: Bool { [.dockerImages, .dockerBuildCache, .dockerVolumes].contains(self) }
 
+    /// Deleting everything at once is never what's wanted (every simulator runtime, including the one in use):
+    /// only items picked under the twisty can be deleted.
+    var requiresSelection: Bool { self == .simulatorRuntimes }
+
     var explanation: String {
         switch self {
         case .unavailableSimulators: "Simulators whose iOS runtime is no longer installed. Xcode can't boot them."
+        case .simulatorRuntimes: "iOS, watchOS, tvOS and visionOS simulator images. Pick old ones to delete; Xcode › Settings › Components downloads them again."
         case .localSnapshots: "APFS snapshots macOS keeps between Time Machine backups. macOS frees them on its own when space runs low."
         case .dockerImages: "Images no container uses, including dangling layers. `docker pull` or a rebuild brings them back."
         case .dockerBuildCache: "BuildKit layer cache. The next `docker build` is slower while it refills."
@@ -55,14 +64,38 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
 }
 
 struct ToolActionStatus: Sendable, Identifiable {
+    /// One thing the action would remove: an image, a volume, a simulator, a snapshot.
+    struct Item: Sendable, Identifiable, Hashable {
+        let id: String
+        let label: String
+        var detail: String? = nil
+        var size: Int64? = nil
+        var date: Date? = nil
+        /// Removes just this item. Nil when it can't be removed on its own.
+        var command: [String]? = nil
+    }
+
     var id: String { action.rawValue }
     let action: ToolAction
     let count: Int
     let size: Int64?
-    let items: [String]
+    let items: [Item]
     /// The exact commands that will run, shown before confirming.
     let commands: [[String]]
     let note: String?
+
+    /// Items listed under the row's twisty, each with its own checkbox.
+    var hasSelectableItems: Bool { items.contains { $0.command != nil } }
+
+    /// The same action narrowed to `ids`: only their commands run. Picking every item keeps the
+    /// original commands (a prune also catches dangling layers no list shows).
+    func selecting(_ ids: Set<String>) -> ToolActionStatus {
+        let picked = items.filter { ids.contains($0.id) && $0.command != nil }
+        if !action.requiresSelection, !commands.isEmpty, picked.count == items.count { return self }
+        let sizes = picked.compactMap(\.size)
+        return ToolActionStatus(action: action, count: picked.count, size: sizes.count == picked.count ? sizes.reduce(0, +) : nil,
+                                items: picked, commands: picked.compactMap(\.command), note: note)
+    }
 }
 
 /// Inspects and runs tool-backed cleanups through `ProcessRunner` (never with sudo).
@@ -79,14 +112,33 @@ struct ToolActionService: Sendable {
             let devices = Self.parseUnavailableSimulators(r.stdout)
             guard !devices.isEmpty else { return ToolActionStatus(action: action, count: 0, size: 0, items: [], commands: [], note: nil) }
             let root = home.appendingPathComponent("Library/Developer/CoreSimulator/Devices")
-            let size = devices.reduce(Int64(0)) { $0 + FileWalker.measure(root.appendingPathComponent($1.udid)).size }
-            return ToolActionStatus(action: action, count: devices.count, size: size,
-                                    items: devices.map { "\($0.name) (\($0.runtime))" },
-                                    commands: [["xcrun", "simctl", "delete", "unavailable"]], note: nil)
+            let items = devices.map { d in
+                let folder = root.appendingPathComponent(d.udid)
+                let m = FileWalker.measure(folder)
+                return ToolActionStatus.Item(id: d.udid, label: d.name, detail: d.runtime, size: m.size, date: m.newestModification,
+                                             command: ["xcrun", "simctl", "delete", d.udid])
+            }
+            return ToolActionStatus(action: action, count: devices.count, size: items.reduce(0) { $0 + ($1.size ?? 0) },
+                                    items: items, commands: [["xcrun", "simctl", "delete", "unavailable"]], note: nil)
+        case .simulatorRuntimes:
+            guard await runner.which("xcrun") != nil,
+                  let r = try? await runner.run(["xcrun", "simctl", "runtime", "list", "-j"], timeout: 30),
+                  r.succeeded else { return nil }
+            let runtimes = Self.parseSimulatorRuntimes(r.stdout)
+            let items = runtimes.map { rt in
+                ToolActionStatus.Item(id: rt.identifier, label: "\(rt.platform) \(rt.version)",
+                                      detail: rt.build + (rt.deletable ? "" : " · managed by macOS"),
+                                      size: rt.size, date: rt.lastUsed,
+                                      command: rt.deletable ? ["xcrun", "simctl", "runtime", "delete", rt.identifier] : nil)
+            }
+            return ToolActionStatus(action: action, count: runtimes.count, size: runtimes.reduce(0) { $0 + $1.size },
+                                    items: items, commands: [],
+                                    note: "Simulators that use a deleted runtime stop booting until it's downloaded again.")
         case .localSnapshots:
             guard let r = try? await runner.run(["tmutil", "listlocalsnapshots", "/"], timeout: 30), r.succeeded else { return nil }
             let dates = Self.parseSnapshotDates(r.stdout)
-            return ToolActionStatus(action: action, count: dates.count, size: nil, items: dates,
+            return ToolActionStatus(action: action, count: dates.count, size: nil,
+                                    items: dates.map { .init(id: $0, label: $0, command: ["tmutil", "deletelocalsnapshots", $0]) },
                                     commands: dates.map { ["tmutil", "deletelocalsnapshots", $0] },
                                     note: "macOS may require administrator rights for this. Yokoi never uses sudo; if it fails, run `sudo tmutil deletelocalsnapshots /` yourself.")
         case .dockerImages, .dockerBuildCache, .dockerVolumes:
@@ -104,8 +156,10 @@ struct ToolActionService: Sendable {
         case .dockerImages:
             guard let u = usage["Images"] else { return nil }
             let count = max(0, u.total - u.active)
-            return ToolActionStatus(action: action, count: count, size: u.reclaimable, items: [],
-                                    commands: count > 0 ? [["docker", "image", "prune", "--all", "--force"]] : [], note: nil)
+            let items = count > 0 ? await unusedDockerImages() : []
+            return ToolActionStatus(action: action, count: count, size: u.reclaimable, items: items,
+                                    commands: count > 0 ? [["docker", "image", "prune", "--all", "--force"]] : [],
+                                    note: items.isEmpty ? nil : "Sizes include layers images share, so single items can add up to more than the total.")
         case .dockerBuildCache:
             guard let u = usage["Build Cache"] else { return nil }
             let count = u.reclaimable > 0 ? max(u.total - u.active, 1) : 0
@@ -117,10 +171,33 @@ struct ToolActionService: Sendable {
             let names = ls.stdout.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
             // Named volumes are listed one by one, so exactly these and nothing created since are removed.
             return ToolActionStatus(action: action, count: names.count, size: names.isEmpty ? 0 : usage["Local Volumes"]?.reclaimable,
-                                    items: names, commands: names.isEmpty ? [] : [["docker", "volume", "rm"] + names],
+                                    items: names.map { .init(id: $0, label: $0, command: ["docker", "volume", "rm", $0]) }, commands: names.isEmpty ? [] : [["docker", "volume", "rm"] + names],
                                     note: "Volume data can't be put back. Check the list for databases you still need.")
         default:
             return nil
+        }
+    }
+
+    /// Images no container (running or stopped) was created from, one item per image.
+    private func unusedDockerImages() async -> [ToolActionStatus.Item] {
+        guard let ls = try? await runner.run(["docker", "image", "ls", "--no-trunc", "--format", "{{json .}}"], timeout: 30),
+              ls.succeeded else { return [] }
+        var used = Set<String>()
+        if let ps = try? await runner.run(["docker", "container", "ls", "--all", "--quiet", "--no-trunc"], timeout: 30), ps.succeeded {
+            let ids = ps.stdout.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.isEmpty }
+            if !ids.isEmpty,
+               let inspect = try? await runner.run(["docker", "container", "inspect", "--format", "{{.Image}}"] + ids, timeout: 30) {
+                // A failed inspect (a container removed meanwhile) means "used" is unknown: offer nothing one by one.
+                guard inspect.succeeded else { return [] }
+                used = Set(inspect.stdout.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) })
+            }
+        }
+        return Self.parseDockerImages(ls.stdout).filter { !used.contains($0.id) }.map { image in
+            // Removing every tag deletes the image; an untagged image is removed by id.
+            let refs = image.tags.isEmpty ? [image.id] : image.tags
+            return ToolActionStatus.Item(id: image.id, label: image.tags.first ?? "<none>",
+                                         detail: image.tags.count > 1 ? "+\(image.tags.count - 1) tag\(image.tags.count == 2 ? "" : "s")" : String(image.id.replacingOccurrences(of: "sha256:", with: "").prefix(12)),
+                                         size: image.size, date: image.created, command: ["docker", "image", "rm"] + refs)
         }
     }
 
@@ -152,6 +229,76 @@ struct ToolActionService: Sendable {
             }
         }
         .sorted { $0.name < $1.name }
+    }
+
+    struct SimulatorRuntime: Sendable, Equatable {
+        let identifier: String
+        let platform: String
+        let version: String
+        let build: String
+        let size: Int64
+        let lastUsed: Date?
+        let deletable: Bool
+    }
+
+    /// Parses `xcrun simctl runtime list -j`, newest version first within each platform.
+    static func parseSimulatorRuntimes(_ json: String) -> [SimulatorRuntime] {
+        guard let data = json.data(using: .utf8),
+              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: [String: Any]] else { return [] }
+        let platforms = ["iphonesimulator": "iOS", "watchsimulator": "watchOS", "appletvsimulator": "tvOS", "xrsimulator": "visionOS"]
+        let iso = ISO8601DateFormatter()
+        return root.compactMap { key, r -> SimulatorRuntime? in
+            guard let version = r["version"] as? String else { return nil }
+            let platformID = (r["platformIdentifier"] as? String ?? "").replacingOccurrences(of: "com.apple.platform.", with: "")
+            return SimulatorRuntime(identifier: r["identifier"] as? String ?? key,
+                                    platform: platforms[platformID] ?? platformID, version: version,
+                                    build: r["build"] as? String ?? "",
+                                    size: (r["sizeBytes"] as? NSNumber)?.int64Value ?? 0,
+                                    lastUsed: (r["lastUsedAt"] as? String).flatMap { iso.date(from: $0) },
+                                    deletable: r["deletable"] as? Bool ?? false)
+        }
+        .sorted { a, b in
+            a.platform != b.platform ? a.platform < b.platform
+                : a.version.compare(b.version, options: .numeric) == .orderedDescending
+        }
+    }
+
+    struct DockerImage: Sendable, Equatable {
+        let id: String
+        /// `repo:tag` names; empty for an untagged (dangling) image.
+        let tags: [String]
+        let size: Int64?
+        let created: Date?
+    }
+
+    /// Parses `docker image ls --no-trunc --format '{{json .}}'`, one item per image id, newest first.
+    static func parseDockerImages(_ output: String) -> [DockerImage] {
+        let dateFormat = DateFormatter()
+        dateFormat.locale = Locale(identifier: "en_US_POSIX")
+        dateFormat.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
+        var byID: [String: DockerImage] = [:]
+        var order: [String] = []
+        for line in output.split(whereSeparator: \.isNewline) {
+            guard let data = line.data(using: .utf8),
+                  let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let id = obj["ID"] as? String, !id.isEmpty else { continue }
+            let repo = obj["Repository"] as? String ?? "<none>", tag = obj["Tag"] as? String ?? "<none>"
+            // A repository without a tag (pulled by digest) isn't a usable name: `docker image rm foo` means
+            // `foo:latest`, a different image. Such images are removed by id instead.
+            let ref = repo == "<none>" || tag == "<none>" ? nil : "\(repo):\(tag)"
+            // "2024-05-01 10:20:30 +0200 CEST": the trailing zone name isn't parseable, the offset is enough.
+            let created = (obj["CreatedAt"] as? String).flatMap { s in
+                dateFormat.date(from: s.split(separator: " ").prefix(3).joined(separator: " "))
+            }
+            if var existing = byID[id] {
+                if let ref, !existing.tags.contains(ref) { existing = DockerImage(id: id, tags: existing.tags + [ref], size: existing.size, created: existing.created) }
+                byID[id] = existing
+            } else {
+                order.append(id)
+                byID[id] = DockerImage(id: id, tags: ref.map { [$0] } ?? [], size: parseDockerSize(obj["Size"] as? String ?? ""), created: created)
+            }
+        }
+        return order.compactMap { byID[$0] }.sorted { ($0.created ?? .distantPast) > ($1.created ?? .distantPast) }
     }
 
     struct DockerUsage: Sendable, Equatable {

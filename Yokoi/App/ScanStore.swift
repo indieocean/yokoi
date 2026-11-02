@@ -224,6 +224,8 @@ final class ScanStore {
         nodeModules.removeAll { ids.contains($0.id) }
         artifacts.removeAll { ids.contains($0.id) }
         caches.removeAll { ids.contains($0.id) }
+        // Single items cleaned from a location: drop them and keep the rest.
+        caches = caches.map { $0.removingChildren(entryIDs: ids) ?? $0 }
         bigFiles.removeAll { ids.contains($0.id) }
         screenshots.removeAll { ids.contains($0.id) }
         downloads.removeAll { ids.contains($0.id) }

@@ -324,4 +324,55 @@ struct ParserTests {
         let tm = "Snapshots for disk /:\ncom.apple.TimeMachine.2026-10-30-101010.local\ncom.apple.TimeMachine.2026-10-31-090000.local\n"
         #expect(ToolActionService.parseSnapshotDates(tm) == ["2026-10-30-101010", "2026-10-31-090000"])
     }
+
+    @Test func simulatorRuntimes() {
+        let json = #"""
+        {"A":{"identifier":"A","version":"17.5","build":"21F79","sizeBytes":7336630623,"deletable":true,"lastUsedAt":"2026-10-24T23:14:47Z","platformIdentifier":"com.apple.platform.iphonesimulator"},
+         "B":{"identifier":"B","version":"26.0","build":"23A343","sizeBytes":8014773567,"deletable":false,"platformIdentifier":"com.apple.platform.iphonesimulator"},
+         "C":{"identifier":"C","version":"11.0","build":"22R349","sizeBytes":4000,"deletable":true,"platformIdentifier":"com.apple.platform.watchsimulator"}}
+        """#
+        let rts = ToolActionService.parseSimulatorRuntimes(json)
+        #expect(rts.map(\.identifier) == ["B", "A", "C"], "grouped by platform, newest version first")
+        #expect(rts[1].platform == "iOS")
+        #expect(rts[1].size == 7_336_630_623)
+        #expect(rts[1].lastUsed != nil)
+        #expect(rts[0].deletable == false)
+        #expect(rts[2].platform == "watchOS")
+        #expect(CacheBreakdown.runtimeName("com.apple.CoreSimulator.SimRuntime.iOS-17-5") == "iOS 17.5")
+        #expect(CacheBreakdown.runtimeName("com.apple.CoreSimulator.SimRuntime.xrOS-2-0") == "visionOS 2.0")
+    }
+
+    @Test func dockerImagesGroupTagsByID() {
+        let out = """
+        {"ID":"sha256:aaa","Repository":"postgres","Tag":"16","Size":"438MB","CreatedAt":"2026-10-01 10:00:00 +0200 CEST"}
+        {"ID":"sha256:aaa","Repository":"db","Tag":"latest","Size":"438MB","CreatedAt":"2026-10-01 10:00:00 +0200 CEST"}
+        {"ID":"sha256:bbb","Repository":"<none>","Tag":"<none>","Size":"1.2GB","CreatedAt":"2024-01-01 09:00:00 +0000 UTC"}
+        {"ID":"sha256:ccc","Repository":"foo","Tag":"<none>","Size":"10MB","CreatedAt":"2023-01-01 09:00:00 +0000 UTC"}
+        """
+        let images = ToolActionService.parseDockerImages(out)
+        #expect(images.map(\.id) == ["sha256:aaa", "sha256:bbb", "sha256:ccc"], "newest first, one per image")
+        #expect(images[2].tags.isEmpty, "`foo` alone would mean foo:latest, a different image: removed by id instead")
+        #expect(images[0].tags == ["postgres:16", "db:latest"])
+        #expect(images[0].size == 438_000_000)
+        #expect(images[0].created != nil)
+        #expect(images[1].tags.isEmpty)
+    }
+
+    @Test func pickingToolItemsRunsOnlyTheirCommands() {
+        let items = ["v1", "v2", "v3"].map { ToolActionStatus.Item(id: $0, label: $0, size: 10, command: ["docker", "volume", "rm", $0]) }
+        let all = ToolActionStatus(action: .dockerVolumes, count: 3, size: 30, items: items,
+                                   commands: [["docker", "volume", "rm", "v1", "v2", "v3"]], note: nil)
+        let two = all.selecting(["v1", "v3"])
+        #expect(two.commands == [["docker", "volume", "rm", "v1"], ["docker", "volume", "rm", "v3"]])
+        #expect(two.count == 2)
+        #expect(two.size == 20)
+        #expect(all.selecting(["v1", "v2", "v3"]).commands == all.commands, "everything picked keeps the original command")
+
+        let runtimes = ToolActionStatus(action: .simulatorRuntimes, count: 2, size: 20,
+                                        items: [.init(id: "A", label: "iOS 17.5", size: 10, command: ["xcrun", "simctl", "runtime", "delete", "A"]),
+                                                .init(id: "B", label: "iOS 26.0", size: 10)],
+                                        commands: [], note: nil)
+        #expect(runtimes.selecting(["A", "B"]).commands == [["xcrun", "simctl", "runtime", "delete", "A"]],
+                "an item that can't be removed on its own is never run")
+    }
 }
