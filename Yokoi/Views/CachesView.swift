@@ -9,7 +9,7 @@ struct CachesView: View {
         let sections = vm.sections(search: app.search)
 
         VStack(spacing: 0) {
-            HeaderBar(title: "Caches",
+            HeaderBar(title: CleanCategory.caches.title,
                       subtitle: "\(CountFormat.plural(store.caches.count, "location")) · \(ByteFormat.string(store.total(.caches)))") {
                 Button("Select safe only") { vm.selectSafeOnly() }.buttonStyle(.dkSecondary)
                 RescanButton(category: .caches)
@@ -23,39 +23,35 @@ struct CachesView: View {
                                    actionTitle: "Scan caches") { store.scan([.caches]) }
                         .card()
                 } else {
+                    // The Trash sits apart, above the list: it holds deleted files, not a cache, and is emptied on its own.
+                    if let trash = vm.trash, app.search.isEmpty || trash.name.localizedCaseInsensitiveContains(app.search) {
+                        TrashCard(trash: trash) { if let r = vm.emptyTrashRequest() { app.requestCleanup(r) } }
+                    }
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(sections) { section in
+                            ForEach(sections.filter { $0.section != .trash }) { section in
                                 SectionLabel(text: section.section.rawValue)
                                     .padding(.horizontal, 20)
                                     .padding(.top, 16)
                                     .padding(.bottom, 8)
-                                ForEach(section.items) { item in
-                                    if item.permanentOnly {
-                                        CacheRow(item: item, checked: false, toggle: {}) {
-                                            Button("Empty…") { if let r = vm.emptyTrashRequest() { app.requestCleanup(r) } }
-                                                .buttonStyle(DKButtonStyle(kind: .danger, compact: true))
-                                                .disabled(item.contents.isEmpty)
+                                ForEach(section.items.filter { !$0.permanentOnly }) { item in
+                                    let open = vm.expanded.contains(item.id)
+                                    CacheRow(item: item, state: vm.state(of: item), toggle: { vm.toggle(item.id) },
+                                             expanded: item.children?.isEmpty == false ? open : nil,
+                                             toggleExpanded: { withAnimation(.easeOut(duration: 0.15)) { vm.toggleExpanded(item.id) } })
+                                    if open, let children = item.children {
+                                        ForEach(children) { child in
+                                            CacheChildRow(child: child, checked: vm.isChecked(child, in: item)) { vm.toggle(child, in: item) }
                                         }
-                                    } else {
-                                        let open = vm.expanded.contains(item.id)
-                                        CacheRow(item: item, state: vm.state(of: item), toggle: { vm.toggle(item.id) },
-                                                 expanded: item.children?.isEmpty == false ? open : nil,
-                                                 toggleExpanded: { withAnimation(.easeOut(duration: 0.15)) { vm.toggleExpanded(item.id) } })
-                                        if open, let children = item.children {
-                                            ForEach(children) { child in
-                                                CacheChildRow(child: child, checked: vm.isChecked(child, in: item)) { vm.toggle(child, in: item) }
+                                        if CacheLocation.all.first(where: { $0.id == item.id })?.breakdown.sortsByDate == true, children.count > 1 {
+                                            HStack {
+                                                Button("Select all but the newest") { vm.selectAllButNewest(item) }
+                                                    .buttonStyle(DKButtonStyle(kind: .ghost, compact: true))
+                                                Spacer()
                                             }
-                                            if CacheLocation.all.first(where: { $0.id == item.id })?.breakdown.sortsByDate == true, children.count > 1 {
-                                                HStack {
-                                                    Button("Select all but the newest") { vm.selectAllButNewest(item) }
-                                                        .buttonStyle(DKButtonStyle(kind: .ghost, compact: true))
-                                                    Spacer()
-                                                }
-                                                .padding(.leading, 70)
-                                                .padding(.vertical, 6)
-                                                .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
-                                            }
+                                            .padding(.leading, 70)
+                                            .padding(.vertical, 6)
+                                            .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
                                         }
                                     }
                                 }
@@ -174,6 +170,41 @@ extension CacheRow where Accessory == EmptyView {
 extension CacheRow {
     init(item: CacheItem, checked: Bool, toggle: @escaping () -> Void, @ViewBuilder accessory: () -> Accessory) {
         self.init(item: item, state: checked ? .on : .off, toggle: toggle, accessory: accessory)
+    }
+}
+
+/// The Trash on its own card above the cache list: deleted files rather than a cache, only ever emptied for good.
+private struct TrashCard: View {
+    let trash: CacheItem
+    let empty: () -> Void
+
+    var body: some View {
+        let count = trash.contents.count
+        HStack(spacing: 16) {
+            Image(systemName: count == 0 ? "trash" : "trash.fill")
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(Theme.danger)
+                .frame(width: 44, height: 44)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.danger.opacity(0.12)))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.danger.opacity(0.25)))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text("Trash").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                    Text(count == 0 ? "empty" : CountFormat.plural(count, "item"))
+                        .font(Theme.mono(11.5)).foregroundStyle(Theme.textTertiary)
+                }
+                Text("Files you already deleted, not a cache. Emptying the Trash can't be undone.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+            }
+            Spacer(minLength: 12)
+            SizeText(bytes: trash.size, size: 18, weight: .semibold, color: count == 0 ? Theme.textTertiary : Theme.textPrimary)
+            Button("Empty Trash…", action: empty)
+                .buttonStyle(.dkDanger)
+                .disabled(count == 0)
+        }
+        .card(padding: 16)
+        .contextMenu { Button("Reveal in Finder") { Finder.reveal([trash.url]) } }
+        .accessibilityElement(children: .contain)
     }
 }
 

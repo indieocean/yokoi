@@ -54,7 +54,7 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 |---|---|---|
 | **📦 Package managers** | **Project `node_modules`** for npm · pnpm · yarn · bun, with framework, lockfile and last-touched date. **Global packages and environments** for 17 managers (Homebrew, Cargo, pip, conda…), with outdated and unused flags | node_modules is marked **stale** after 90 days untouched (configurable), and active projects start unchecked. Every update or uninstall shows the exact command and asks first |
 | **🔨 Build artifacts** | `target/`, `.build/`, DerivedData, `build/`, `.gradle/`, `.venv`, `__pycache__`, `bin/obj`, `.next`, Unity `Library/`, Unreal `Intermediate/` + `DerivedDataCache/`… | Only matched **next to the project's marker file**, so a random `target/` folder is never touched |
-| **🗄️ Caches** | npm, Yarn, pnpm, Bun, Homebrew, Cargo, Gradle (+ wrapper distributions), CocoaPods, pip, Xcode, simulators, **Android emulators, system images and build cache**, browsers, Ollama / Hugging Face / LM Studio models, Trash | Every location is tagged **Safe**, **Re-download** or **Review**. Emulators that are running are refused |
+| **🗄️ Caches & Tooling** | npm, Yarn, pnpm, Bun, Homebrew, Cargo, Gradle (+ wrapper distributions), CocoaPods, pip, Xcode, simulators, **Android emulators, system images and build cache**, browsers, Ollama / Hugging Face / LM Studio models, Trash | Every location is tagged **Safe**, **Re-download** or **Review**. Emulators that are running are refused |
 | **🧰 Tool cleanups** | Unavailable iOS simulators, local Time Machine snapshots, **unused Docker images, Docker build cache and dangling volumes** | Done through the tool itself (`xcrun simctl`, `tmutil`, `docker`), with the exact command shown first. Volumes are listed by name, so nothing created later is swept up |
 | **🐘 Big files** | Videos, archives, disk images, VMs (`.utm`, `.vmdk`…), 3D and art files | Log-scale size slider from 100 MB to 10 GB+, with filters by type |
 | **⬇️ Downloads** | Everything in `~/Downloads`: installers, archives, media, documents and folders, with when each was added and last opened | Items untouched for 30 days (configurable) count as reclaimable. Incomplete downloads and archives you already extracted are flagged as leftovers; your own files are never preselected |
@@ -88,7 +88,7 @@ Adding a language is one entry in a rule table. See [docs/DEVELOPMENT.md](docs/D
     <td width="50%"><img src="assets/readme/screenshots/build-artifacts.png" alt="Build artifacts grouped by language"><br><sub><b>Build artifacts</b> · grouped by toolchain, matched by marker files</sub></td>
   </tr>
   <tr>
-    <td><img src="assets/readme/screenshots/caches.png" alt="Caches tagged Safe, Re-download or Review"><br><sub><b>Caches</b> · tagged Safe, Re-download or Review</sub></td>
+    <td><img src="assets/readme/screenshots/caches.png" alt="Caches & Tooling tagged Safe, Re-download or Review"><br><sub><b>Caches &amp; Tooling</b> · tagged Safe, Re-download or Review</sub></td>
     <td><img src="assets/readme/screenshots/applications.png" alt="Applications with leftovers in Library"><br><sub><b>Applications</b> · uninstall apps together with their leftovers</sub></td>
   </tr>
   <tr>

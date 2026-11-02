@@ -25,11 +25,13 @@ final class CachesViewModel: SelectionPruning {
 
     func sections(search: String) -> [Section] {
         let order = Dictionary(uniqueKeysWithValues: CacheLocation.all.enumerated().map { ($1.id, $0) })
+        // The section comes from the current list, not the scan: older scans filed the Trash under System & User.
+        let sectionOf = Dictionary(uniqueKeysWithValues: CacheLocation.all.map { ($0.id, $0.section) })
         let items = store.caches
             .filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.url.path.localizedCaseInsensitiveContains(search) }
             .sorted { (order[$0.id] ?? 0) < (order[$1.id] ?? 0) }
         return CacheLocation.Section.allCases.compactMap { s in
-            let inSection = items.filter { $0.section == s }
+            let inSection = items.filter { (sectionOf[$0.id] ?? $0.section) == s }
             return inSection.isEmpty ? nil : Section(section: s, items: inSection)
         }
     }

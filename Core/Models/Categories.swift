@@ -10,7 +10,7 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         switch self {
         case .nodeModules: "node_modules"
         case .buildArtifacts: "Build artifacts"
-        case .caches: "Caches"
+        case .caches: "Caches & Tooling"
         case .bigFiles: "Big files"
         case .downloads: "Downloads"
         case .screenshots: "Screenshots"

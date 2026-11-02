@@ -11,7 +11,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .dashboard: "Dashboard"
         case .nodeModules: "node_modules"
         case .buildArtifacts: "Build Artifacts"
-        case .caches: "Caches"
+        case .caches: "Caches & Tooling"
         case .bigFiles: "Big Files"
         case .downloads: "Downloads"
         case .screenshots: "Screenshots"

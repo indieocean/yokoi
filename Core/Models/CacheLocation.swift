@@ -12,6 +12,8 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
         /// No longer used: installers in Downloads moved to the Downloads screen. Kept so older scan caches decode.
         case downloads = "Downloads"
         case browsers = "Browsers"
+        /// Shown on its own, above the list: it holds deleted files, not a cache.
+        case trash = "Trash"
     }
 
     let id: String
@@ -71,7 +73,7 @@ extension CacheLocation {
         CacheLocation(id: "user-caches", name: "User caches", section: .systemUser, relativePath: "Library/Caches",
                       safety: .safe, badge: "◎", colorHex: 0x7D8597, restoreHint: "apps rebuild their caches automatically",
                       keepChildren: ["com.apple.*", "com.yokoi.*", "com.diskkeeper.*", "CloudKit", "FamilyCircle"], excludesNestedLocations: true),
-        CacheLocation(id: "trash", name: "Trash", section: .systemUser, relativePath: ".Trash",
+        CacheLocation(id: "trash", name: "Trash", section: .trash, relativePath: ".Trash",
                       safety: .review, badge: "🗑", colorHex: 0xF0565E, restoreHint: "emptying the Trash can't be undone",
                       permanentOnly: true, breakdown: .none),
         CacheLocation(id: "logs", name: "Logs", section: .systemUser, relativePath: "Library/Logs",

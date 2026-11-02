@@ -11,7 +11,7 @@ enum ScanCategoryOption: String, AppEnum {
     static let caseDisplayRepresentations: [ScanCategoryOption: DisplayRepresentation] = [
         .nodeModules: "node_modules",
         .buildArtifacts: "Build artifacts",
-        .caches: "Caches",
+        .caches: "Caches & Tooling",
         .bigFiles: "Big files",
         .downloads: "Downloads",
         .screenshots: "Screenshots",
@@ -27,7 +27,7 @@ enum ScreenOption: String, AppEnum {
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Screen"
     static let caseDisplayRepresentations: [ScreenOption: DisplayRepresentation] = [
         .dashboard: "Dashboard",
-        .caches: "Caches",
+        .caches: "Caches & Tooling",
         .buildArtifacts: "Build Artifacts",
         .packageManagers: "Package Managers",
         .bigFiles: "Big Files",
