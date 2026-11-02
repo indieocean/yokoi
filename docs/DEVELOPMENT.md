@@ -171,6 +171,7 @@ The secrets (in the `release` environment):
 | `NOTARY_KEY_ID` | That key's ID |
 | `NOTARY_ISSUER_ID` | The issuer ID shown above the keys list in App Store Connect |
 | `SPARKLE_PRIVATE_KEY` | The Sparkle update-signing key: `generate_keys --account yokoi -x key.txt`, then paste the file's contents |
+| `HOMEBREW_TAP_TOKEN` | A fine-grained personal access token with **Contents: read and write** on `indieocean/homebrew-tap` only. The workflow uses it to set the new version and SHA-256 in `Casks/yokoi.rb`; without it the step warns and the cask has to be bumped by hand |
 
 The certificate goes into a temporary keychain and the keys into temporary files, all deleted at the end of the run.
 `.github/workflows/test.yml` runs the tests (unsigned) on pushes to `main` and on pull requests.

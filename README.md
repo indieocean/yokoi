@@ -147,6 +147,14 @@ Every release is on the [Releases](https://github.com/indieocean/yokoi/releases)
 
 Yokoi updates itself with [Sparkle](https://sparkle-project.org). On the second launch it asks whether to check automatically; you can change that in **Settings › Updates** or check any time from **Yokoi › Check for Updates…**. Every update is signed, and Sparkle refuses one whose signature doesn't match.
 
+### Homebrew
+
+```sh
+brew install --cask indieocean/tap/yokoi
+```
+
+Homebrew installs the same signed, notarized build. Yokoi then updates itself with Sparkle as above, so `brew upgrade` leaves it alone (`brew upgrade --greedy` would include it).
+
 ### Build from source
 
 ```sh
