@@ -8,6 +8,10 @@
 </p>
 
 <p align="center">
+  <a href="https://www.producthunt.com/products/yokoi?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-yokoi" target="_blank" rel="noopener noreferrer"><img alt="Yokoi - A native macOS cleaner built for developers | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1301013&amp;theme=light&amp;t=1793585003121"></a>
+</p>
+
+<p align="center">
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-111?style=flat-square&logo=apple&logoColor=white">
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white">
   <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI-7C5CFF?style=flat-square">
