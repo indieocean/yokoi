@@ -116,7 +116,7 @@
         </article>
         <article class="card reveal" style="--c:#22D3EE">
           <div class="card-top"><span class="ico">🗄️</span><span class="badge mono">~/Library/Caches</span></div>
-          <h3>Caches</h3>
+          <h3>Caches &amp; Tooling</h3>
           <p>npm, Homebrew, Cargo, Gradle, CocoaPods, pip, Xcode, simulators, Android emulators, browsers, and Ollama / Hugging Face models.</p>
           <p class="rule">Every location is tagged <span class="tag tag-ok">Safe</span> <span class="tag tag-info">Re-download</span> or <span class="tag tag-warn">Review</span>.</p>
         </article>
@@ -188,7 +188,7 @@
       <div class="seg reveal" role="tablist" aria-label="Screens">
         <button role="tab" aria-selected="true" data-shot="npm-node-modules" data-cap="Every node_modules folder, stale ones preselected">node_modules</button>
         <button role="tab" aria-selected="false" data-shot="build-artifacts" data-cap="Build artifacts grouped by toolchain, matched by marker files">Build artifacts</button>
-        <button role="tab" aria-selected="false" data-shot="caches" data-cap="Caches tagged Safe, Re-download or Review">Caches</button>
+        <button role="tab" aria-selected="false" data-shot="caches" data-cap="Caches &amp; Tooling tagged Safe, Re-download or Review, with the Trash on its own">Caches &amp; Tooling</button>
         <button role="tab" aria-selected="false" data-shot="applications" data-cap="Uninstall apps together with their leftovers">Applications</button>
         <button role="tab" aria-selected="false" data-shot="package-managers" data-cap="Outdated and unused global packages">Packages</button>
         <button role="tab" aria-selected="false" data-shot="screenshots" data-cap="File screenshots by month, or clear them out">Screenshots</button>
@@ -214,7 +214,7 @@
           <div class="srow reveal"><span class="sdot" style="--c:#7C5CFF"></span><div><h4>Dry run</h4><p>Preview exactly what would happen, with sizes, without touching a byte.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#22D3EE"></span><div><h4>Scoped access</h4><p>Each category can only touch its own folders. Keychains, Mail, Messages, iCloud Drive, Photos, <code>/System</code> and <code>.git</code> are blocked unconditionally.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#F59E0B"></span><div><h4>Busy means no</h4><p>Projects open in Xcode, Unity, Unreal or a running <code>node</code> process are refused, checked when you confirm and again right before acting. Recently touched projects start unchecked.</p></div></div>
-          <div class="srow reveal"><span class="sdot" style="--c:#F0565E"></span><div><h4>No escalation, symlink-proof</h4><p>Never runs <code>sudo</code>. Tools run without a shell. Symlinks are removed, never followed, and paths are re-checked at their real location.</p></div></div>
+          <div class="srow reveal"><span class="sdot" style="--c:#F0565E"></span><div><h4>No escalation, symlink-proof</h4><p>Never runs <code>sudo</code>. Tools run without a shell, from a full path you see before confirming, and only from folders you or an administrator control. Symlinks are removed, never followed, and paths are re-checked at their real location.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#60A5FA"></span><div><h4>Everything is logged</h4><p>Every cleanup goes to <code>cleanup.log</code> with path, size, action and where it went.</p></div></div>
         </div>
         <figure class="safety-media reveal">
@@ -273,7 +273,8 @@
       <div class="faq">
         <details class="reveal"><summary>Is it safe to delete node_modules and build folders?</summary><p>Yes. Your package manager or toolchain rebuilds them (<code>npm install</code>, <code>cargo build</code>, reopening the project in Unity…). Yokoi shows the restore command before you confirm, and only matches build folders next to their project files.</p></details>
         <details class="reveal"><summary>Can I undo a cleanup?</summary><p>Anything moved to the Trash can be put back from <em>Recent cleanups</em> on the dashboard, until you empty the Trash. Permanent deletes can't be undone, which is why they always need an extra confirmation.</p></details>
-        <details class="reveal"><summary>Why does it want Full Disk Access?</summary><p>macOS protects some caches and folders. Without access, Yokoi can't measure them and skips them. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.</p></details>
+        <details class="reveal"><summary>Why does it want Full Disk Access?</summary><p>macOS protects some caches and folders. Without access, Yokoi can't measure them and skips them. Full Disk Access is optional: everything else works without it. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.</p><p>It's a broad grant, and the tools Yokoi runs for you (<code>brew</code>, <code>npm</code>, <code>docker</code>…) inherit it. That's why each tool is run from a full path you see before confirming, and only from a folder that you or an administrator control.</p></details>
+        <details class="reveal"><summary>Why isn't Yokoi sandboxed?</summary><p>The App Sandbox only lets an app into folders you pick in an Open panel, and it can't run other programs. A cleaner that measures <code>~/Library/Caches</code>, <code>node_modules</code> across your projects and Xcode's folders, and runs <code>brew</code>, <code>npm</code> or <code>docker</code> to clean up after them, can't work inside it. Yokoi is notarized and built with the Hardened Runtime and no exception entitlements: no unsigned code, no injected libraries, no debugger attach. Moving the deleting and the running of tools into a separate helper with fewer rights is on the roadmap.</p></details>
         <details class="reveal"><summary>Does it need my password or run anything as root?</summary><p>No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for administrators are shown as commands you can run yourself.</p></details>
         <details class="reveal"><summary>How does it update?</summary><p>Through <a href="https://sparkle-project.org">Sparkle</a>. Every update is signed, and Sparkle refuses one whose signature doesn't match. You choose whether it checks automatically.</p></details>
         <details class="reveal"><summary>What does "garbage collected" mean here?</summary><p>It's the same idea as in a runtime: find what's no longer reachable from your active work, such as stale dependencies, rebuildable output and caches nobody reads, and reclaim it without touching anything still in use.</p></details>
