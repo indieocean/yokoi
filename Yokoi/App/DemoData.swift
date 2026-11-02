@@ -103,6 +103,10 @@ enum DemoData {
                 "yarn": 1_120 * MB, "homebrew": 2_040 * MB, "cargo-registry": 1_780 * MB, "cocoapods": 884 * MB, "pip": 702 * MB,
                 "simulator-devices": 3_270 * MB, "xcode-archives": 1_060 * MB, "ollama": 7_400 * MB,
                 "chrome": 1_310 * MB, "arc": 822 * MB,
+                "playwright": 1_460 * MB, "yarn-berry": 690 * MB, "uv": 2_880 * MB, "poetry": 540 * MB,
+                "gradle-caches": 2_210 * MB, "maven": 1_340 * MB, "nuget-packages": 970 * MB,
+                "xcode-previews": 1_150 * MB, "vscode-cached-data": 410 * MB, "vscode-vsix": 1_270 * MB,
+                "cursor-cache": 520 * MB, "jetbrains-caches": 3_060 * MB, "docker-desktop-logs": 318 * MB, "orbstack-logs": 96 * MB,
             ]
             guard let size = sizes[loc.id] else { return nil }
             let u = loc.url(home: home)
@@ -313,6 +317,8 @@ enum DemoData {
                                                 commands: [["docker", "image", "prune", "--all", "--force"]], note: nil),
                 .dockerBuildCache: ToolActionStatus(action: .dockerBuildCache, count: 214, size: 4_120 * MB, items: [],
                                                     commands: [["docker", "builder", "prune", "--all", "--force"]], note: nil),
+                .goModuleCache: ToolActionStatus(action: .goModuleCache, count: 412, size: 2_190 * MB, items: [],
+                                                 commands: [["go", "clean", "-modcache"]], note: nil),
                 .dockerVolumes: ToolActionStatus(action: .dockerVolumes, count: 2, size: 1_310 * MB,
                                                  items: ["orbital_pgdata", "3f9c1e7a2b"].map { Item(id: $0, label: $0, command: ["docker", "volume", "rm", $0]) },
                                                  commands: [["docker", "volume", "rm", "orbital_pgdata", "3f9c1e7a2b"]], note: nil)]
