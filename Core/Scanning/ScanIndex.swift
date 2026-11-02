@@ -7,7 +7,8 @@ import os
 /// Without usable history (first scan, reset journal, other volume) everything is measured as before.
 final class ScanIndex: Sendable {
     struct Stored: Codable, Sendable {
-        static let currentVersion = 1
+        /// 2: sizes of cleanable folders count only what cleaning frees (hardlinks, clones).
+        static let currentVersion = 2
         var version = Stored.currentVersion
         var eventID: UInt64
         /// When everything was last measured from scratch. Older than `maxAge` starts over.
@@ -25,6 +26,8 @@ final class ScanIndex: Sendable {
         let isDirectory: Bool
         let size: Int64
         let files: Int
+        /// Measured with `FileWalker.measure(reclaimable:)`.
+        var reclaimable: Bool? = nil
     }
 
     struct Touched: Codable, Sendable {
@@ -120,19 +123,22 @@ final class ScanIndex: Sendable {
     // MARK: Cached work
 
     /// Allocated size and file count, reused when nothing under `url` changed.
-    func measure(_ url: URL, progress: ScanProgress?) -> FileWalker.Measurement {
+    func measure(_ url: URL, progress: ScanProgress?, reclaimable: Bool = false) -> FileWalker.Measurement {
         let key = Self.key(url)
-        guard let node = Self.node(key) else { return FileWalker.measure(url, progress: progress) }
-        if let old = previous?.sizes[key], old.isDirectory == node.isDirectory,
+        guard let node = Self.node(key) else { return FileWalker.measure(url, progress: progress, reclaimable: reclaimable) }
+        if let old = previous?.sizes[key], old.isDirectory == node.isDirectory, (old.reclaimable ?? false) == reclaimable,
            reusable(key, inode: old.inode, isDirectory: old.isDirectory, current: node.inode) {
             progress?.visited(files: old.files)
             fresh.withLock { $0.sizes[key] = old }
             reuseCount.withLock { $0 += 1 }
             return FileWalker.Measurement(size: old.size, files: old.files)
         }
-        let m = FileWalker.measure(url, progress: progress)
+        let m = FileWalker.measure(url, progress: progress, reclaimable: reclaimable)
         if !Task.isCancelled {
-            fresh.withLock { $0.sizes[key] = Sized(inode: node.inode, isDirectory: node.isDirectory, size: m.size, files: m.files) }
+            fresh.withLock {
+                $0.sizes[key] = Sized(inode: node.inode, isDirectory: node.isDirectory, size: m.size, files: m.files,
+                                      reclaimable: reclaimable ? true : nil)
+            }
         }
         return m
     }

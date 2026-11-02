@@ -42,7 +42,7 @@ struct BuildArtifactScanner: CategoryScanner {
                 let (key, hits) = pair
                 guard let rule = ruleByID[key.rule], !Task.isCancelled else { return nil }
                 let targets = hits.map(\.target).sorted { $0.path < $1.path }
-                let m = targets.reduce(FileWalker.Measurement()) { $0 + context.measure($1, progress: progress) }
+                let m = targets.reduce(FileWalker.Measurement()) { $0 + context.measure($1, progress: progress, reclaimable: true) }
                 guard m.files > 0 || m.size > 0 else { return nil }
                 return ArtifactItem(
                     ruleID: rule.id, ecosystem: rule.ecosystem,
@@ -160,7 +160,7 @@ struct BuildArtifactScanner: CategoryScanner {
             guard !context.isExcluded(url) else { return nil }
             let children = FileWalker.list(url).filter { $0.name != ".DS_Store" && !context.isExcluded($0.url) }.map(\.url)
             guard !children.isEmpty else { return nil }
-            let m = children.reduce(FileWalker.Measurement()) { $0 + context.measure($1, progress: progress) }
+            let m = children.reduce(FileWalker.Measurement()) { $0 + context.measure($1, progress: progress, reclaimable: true) }
             return ArtifactItem(
                 ruleID: rule.id, ecosystem: rule.ecosystem, projectURL: url, projectName: rule.title,
                 targets: children, optIn: false, note: nil, isGlobal: true,

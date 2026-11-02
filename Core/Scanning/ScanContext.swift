@@ -74,8 +74,10 @@ struct ScanContext: Sendable {
     func isExcluded(_ url: URL) -> Bool { exclusions.matches(url) }
 
     /// `FileWalker.measure`, reusing the last scan's result when nothing under `url` changed.
-    func measure(_ url: URL, progress: ScanProgress? = nil) -> FileWalker.Measurement {
-        index?.measure(url, progress: progress) ?? FileWalker.measure(url, progress: progress)
+    /// `reclaimable` counts only what removing `url` frees; see `FileWalker.measure`.
+    func measure(_ url: URL, progress: ScanProgress? = nil, reclaimable: Bool = false) -> FileWalker.Measurement {
+        index?.measure(url, progress: progress, reclaimable: reclaimable)
+            ?? FileWalker.measure(url, progress: progress, reclaimable: reclaimable)
     }
 
     /// `FileWalker.lastTouched`, reusing the last scan's result when nothing in the project changed.

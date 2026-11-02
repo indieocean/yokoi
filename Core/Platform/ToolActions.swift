@@ -8,6 +8,7 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
     case dockerImages
     case dockerBuildCache
     case dockerVolumes
+    case goModuleCache
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
         case .dockerImages: "Unused Docker images"
         case .dockerBuildCache: "Docker build cache"
         case .dockerVolumes: "Unused Docker volumes"
+        case .goModuleCache: "Go module cache"
         }
     }
 
@@ -30,6 +32,7 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
         case .dockerImages: "img"
         case .dockerBuildCache: "bk"
         case .dockerVolumes: "vol"
+        case .goModuleCache: "go"
         }
     }
 
@@ -42,6 +45,7 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
         case .dockerImages: "image"
         case .dockerBuildCache: "record"
         case .dockerVolumes: "volume"
+        case .goModuleCache: "module"
         }
     }
 
@@ -59,6 +63,7 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
         case .dockerImages: "Images no container uses, including dangling layers. `docker pull` or a rebuild brings them back."
         case .dockerBuildCache: "BuildKit layer cache. The next `docker build` is slower while it refills."
         case .dockerVolumes: "Volumes no container is attached to. They can hold database data, which is lost for good."
+        case .goModuleCache: "Go modules downloaded for your builds. The next `go build` downloads what it needs again. Go makes these files read-only, so they're removed with `go clean -modcache` rather than deleted directly."
         }
     }
 }
@@ -157,6 +162,17 @@ struct ToolActionService: Sendable {
                                     note: "macOS may require administrator rights for this. Yokoi never uses sudo; if it fails, run `sudo tmutil deletelocalsnapshots /` yourself.")
         case .dockerImages, .dockerBuildCache, .dockerVolumes:
             return await dockerStatus(action)
+        case .goModuleCache:
+            guard await runner.which("go") != nil,
+                  let r = try? await runner.run(["go", "env", "GOMODCACHE"], timeout: 30), r.succeeded else { return nil }
+            let path = r.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard path.hasPrefix("/") else { return nil }
+            let cache = URL(fileURLWithPath: path)
+            let count = Self.countGoModules(in: cache)
+            guard count > 0 else { return ToolActionStatus(action: action, count: 0, size: 0, items: [], commands: [], note: nil) }
+            return ToolActionStatus(action: action, count: count, size: FileWalker.measure(cache, reclaimable: true).size, items: [],
+                                    commands: [["go", "clean", "-modcache"]],
+                                    note: "Cached at \(PathFormat.abbreviate(cache)).")
         }
     }
 
@@ -222,6 +238,19 @@ struct ToolActionService: Sendable {
             if let r = try? await runner.run(command, timeout: 300) { results.append(r) }
         }
         return results
+    }
+
+    /// Module versions in a Go module cache: folders named `name@version`, outside `cache/` (the download cache).
+    static func countGoModules(in root: URL) -> Int {
+        guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [],
+                                                     errorHandler: { _, _ in true }) else { return 0 }
+        var count = 0
+        while let url = e.nextObject() as? URL {
+            if e.level == 1 && url.lastPathComponent == "cache" { e.skipDescendants(); continue }
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
+            if url.lastPathComponent.contains("@") { count += 1; e.skipDescendants() }
+        }
+        return count
     }
 
     struct Simulator: Sendable, Equatable {

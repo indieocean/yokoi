@@ -34,7 +34,7 @@ struct NodeModulesScanner: CategoryScanner {
     static func makeItem(project: URL, roots: [URL], skip: Set<String>, context: ScanContext, progress: ScanProgress?) -> NodeModulesItem? {
         if Task.isCancelled { return nil }
         let nm = project.appendingPathComponent("node_modules")
-        let m = context.measure(nm, progress: progress)
+        let m = context.measure(nm, progress: progress, reclaimable: true)
         let pkg = readPackageJSON(project)
         return NodeModulesItem(
             url: nm,

@@ -210,13 +210,15 @@ final class AppModel {
 
     /// Separates entries whose project or app is in use by a running process.
     nonisolated static func splitInUse(_ entries: [CleanupEntry]) async -> ([CleanupEntry], [CleanupRequest.Blocked]) {
-        guard entries.contains(where: { $0.projectRoot != nil }) else { return (entries, []) }
+        guard entries.contains(where: { $0.projectRoot != nil || !$0.usedByApps.isEmpty }) else { return (entries, []) }
         let snapshot = await Task.detached(priority: .userInitiated) { InUseSnapshot.capture() }.value
         var allowed: [CleanupEntry] = []
         var blocked: [CleanupRequest.Blocked] = []
         for entry in entries {
             if let root = entry.projectRoot, let process = snapshot.blocker(for: root) {
                 blocked.append(.init(entry: entry, process: process))
+            } else if let app = snapshot.runningApp(entry.usedByApps) {
+                blocked.append(.init(entry: entry, process: app))
             } else {
                 allowed.append(entry)
             }

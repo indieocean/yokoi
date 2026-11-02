@@ -54,7 +54,7 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 |---|---|---|
 | **📦 Package managers** | **Project `node_modules`** for npm · pnpm · yarn · bun, with framework, lockfile and last-touched date. **Global packages and environments** for 17 managers (Homebrew, Cargo, pip, conda…), with outdated and unused flags | node_modules is marked **stale** after 90 days untouched (configurable), and active projects start unchecked. Every update or uninstall shows the exact command and asks first |
 | **🔨 Build artifacts** | `target/`, `.build/`, DerivedData, `build/`, `.gradle/`, `.venv`, `__pycache__`, `bin/obj`, `.next`, Unity `Library/`, Unreal `Intermediate/` + `DerivedDataCache/`… | Only matched **next to the project's marker file**, so a random `target/` folder is never touched |
-| **🗄️ Caches & Tooling** | npm, Yarn, pnpm, Bun, Homebrew, Cargo, Gradle (+ wrapper distributions), CocoaPods, pip, Xcode, simulators, **Android emulators, system images and build cache**, browsers, Ollama / Hugging Face / LM Studio models, Trash | Every location is tagged **Safe**, **Re-download** or **Review**. Emulators that are running are refused |
+| **🗄️ Caches & Tooling** | JavaScript (npm, Yarn, pnpm, Bun, Deno, Playwright, Puppeteer, Electron), Python (pip, uv, Poetry), Homebrew, Cargo, Go modules, Gradle, Maven, NuGet, Flutter, SwiftPM, CocoaPods, Xcode and simulators, **Android emulators, system images and build cache**, VS Code, Cursor and JetBrains caches, Docker Desktop and OrbStack, browsers, Ollama / Hugging Face / LM Studio, Trash | Every location is tagged **Safe**, **Re-download** or **Review**. Sizes count only what cleaning frees, so caches shared with projects through hardlinks or clones aren't overstated. Running emulators, simulators, Gradle daemons, editors and Docker block their own caches |
 | **🧰 Tool cleanups** | Unavailable iOS simulators, local Time Machine snapshots, **unused Docker images, Docker build cache and dangling volumes** | Done through the tool itself (`xcrun simctl`, `tmutil`, `docker`), with the exact command shown first. Volumes are listed by name, so nothing created later is swept up |
 | **🐘 Big files** | Videos, archives, disk images, VMs (`.utm`, `.vmdk`…), 3D and art files | Log-scale size slider from 100 MB to 10 GB+, with filters by type |
 | **⬇️ Downloads** | Everything in `~/Downloads`: installers, archives, media, documents and folders, with when each was added and last opened | Items untouched for 30 days (configurable) count as reclaimable. Incomplete downloads and archives you already extracted are flagged as leftovers; your own files are never preselected |
@@ -67,7 +67,13 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 
 <br>
 
-**Build artifacts:** Rust · Xcode · Swift PM · Gradle / Android · Python · .NET · Unity · Unreal Engine · Go · Next.js / Nuxt / SvelteKit / Turbo / Parcel · CMake
+**Build artifacts:** Rust · Xcode · Swift PM · CocoaPods (opt-in) · Gradle / Android · Python · .NET · Unity · Unreal Engine · Go · Next.js / Nuxt / SvelteKit / Turbo / Parcel / Angular · CMake
+
+**Caches by stack:** JavaScript (npm · Yarn classic and Berry · pnpm · Bun · Deno · node-gyp · Electron · Playwright · Puppeteer) · Python (pip · uv · Poetry, keeping its virtualenvs) · JVM (Gradle caches, wrapper distributions and daemon logs · Maven) · .NET (NuGet) · Rust (registry and git dependencies) · Go (module cache, via `go clean -modcache`) · Flutter / Dart (pub cache, keeping activated tools) · SwiftPM · mise
+
+**Xcode:** DerivedData · Archives · iOS, watchOS and tvOS device support · simulators and runtimes · test simulator clones · SwiftUI Previews · XcodeBuildMCP / MobileBuildMCP DerivedData from AI agent builds
+
+**Editors and containers:** VS Code · Cursor · JetBrains IDEs · Docker Desktop · OrbStack
 
 **Android:** emulators (AVDs) · SDK system images · SDK cache · Android Gradle build cache · Gradle wrapper distributions
 
@@ -135,7 +141,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 
 ### Download
 
-**[Download Yokoi 1.3.1](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
+**[Download Yokoi 1.4.0](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
 
 Every release is on the [Releases](https://github.com/indieocean/yokoi/releases) page, with a SHA-256 checksum.
 
@@ -221,6 +227,8 @@ Anything moved to the Trash can be put back from <em>Recent cleanups</em> on the
 macOS protects some caches and folders. Without access Yokoi can't measure them and skips them. Full Disk Access is optional: everything else works without it. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.
 
 It's a broad grant, and the tools Yokoi runs for you (<code>brew</code>, <code>npm</code>, <code>docker</code>…) inherit it. That's why each tool is run from a full path you see before confirming, and only from a folder that you or an administrator control.
+
+That check keeps out other accounts on the Mac, not programs already running as you. Yokoi finds tools the way your shell does, so folders you own like <code>~/.cargo/bin</code>, <code>~/.nvm</code> or <code>~/.local/bin</code> are searched too, and that is often where the only copy lives. Malware already running under your account could put a fake <code>npm</code> there, and Yokoi would run it with Full Disk Access. The full path in the confirmation is how you'd spot it. If you don't want any tool to inherit the grant, leave Full Disk Access off: Yokoi still scans and cleans everything it can read.
 </details>
 
 <details>

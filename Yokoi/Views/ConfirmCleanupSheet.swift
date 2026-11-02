@@ -188,9 +188,9 @@ struct ConfirmCleanupSheet: View {
                     .foregroundStyle(Theme.textPrimary)
             }
             ForEach(request.blocked.prefix(4)) { b in
-                Text("\(b.entry.label) · open in \(b.process)").font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
+                Text("\(b.entry.label) · in use by \(b.process)").font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
             }
-            Text("Close the project or quit the app, then try again.").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+            Text("Close the project, quit the app or stop the tool (`./gradlew --stop` for a Gradle daemon), then try again.").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

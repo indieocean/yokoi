@@ -341,3 +341,43 @@ struct StalenessTests {
         #expect(!item.isStale(days: 90))
     }
 }
+
+@Suite("Reclaimable sizes")
+struct ReclaimableSizeTests {
+    @Test func hardlinksFromOutsideFreeNothing() throws {
+        let f = try Fixture()
+        let store = try f.file("store/pkg/index.js", bytes: 200_000)
+        try f.dir("dev/app/node_modules/pkg")
+        let linked = f.url("dev/app/node_modules/pkg/index.js")
+        #expect(link(store.path, linked.path) == 0)
+        try f.file("dev/app/node_modules/own.js", bytes: 50_000)
+
+        let nm = f.url("dev/app/node_modules")
+        let plain = FileWalker.measure(nm)
+        let real = FileWalker.measure(nm, reclaimable: true)
+        #expect(plain.files == 2 && real.files == 2)
+        #expect(plain.size >= 250_000)
+        #expect(real.size >= 50_000 && real.size < 100_000, "the linked file stays in the store")
+    }
+
+    @Test func hardlinksInsideAreCountedOnce() throws {
+        let f = try Fixture()
+        let a = try f.file("target/debug/deps/app-1234", bytes: 300_000)
+        #expect(link(a.path, f.url("target/debug/app").path) == 0)
+        let plain = FileWalker.measure(f.url("target"))
+        let real = FileWalker.measure(f.url("target"), reclaimable: true)
+        #expect(plain.size >= 600_000)
+        #expect(real.size >= 300_000 && real.size < 400_000)
+    }
+
+    @Test func clonesShareTheirBlocks() throws {
+        let f = try Fixture()
+        let original = try f.file("store/big.bin", bytes: 1_000_000)
+        try f.dir("dev/app/node_modules")
+        let clone = f.url("dev/app/node_modules/big.bin")
+        guard copyfile(original.path, clone.path, nil, copyfile_flags_t(COPYFILE_CLONE_FORCE)) == 0 else { return } // not APFS
+        let real = FileWalker.measure(f.url("dev/app/node_modules"), reclaimable: true)
+        #expect(FileWalker.measure(f.url("dev/app/node_modules")).size >= 1_000_000)
+        #expect(real.size < 100_000, "the clone's blocks are still used by the store")
+    }
+}

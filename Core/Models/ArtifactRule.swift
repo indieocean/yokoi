@@ -107,10 +107,16 @@ extension ArtifactRule {
             markers: [.file("package.json")],
             targets: [
                 Target(path: ".next"), Target(path: ".nuxt"), Target(path: ".svelte-kit"), Target(path: ".turbo"),
-                Target(path: ".parcel-cache"),
+                Target(path: ".parcel-cache"), Target(path: ".angular"),
                 Target(path: "dist", optIn: true, note: "Build output. Some projects commit or publish dist/, so it's opt-in."),
             ],
             summary: ".next · .turbo · dist", restoreHint: "rebuild the project"
+        ),
+        ArtifactRule(
+            id: "cocoapods", ecosystem: .xcode,
+            markers: [.file("Podfile")],
+            targets: [Target(path: "Pods", optIn: true, note: "Some projects commit Pods/ to git, so it's opt-in.")],
+            summary: "Pods", restoreHint: "pod install"
         ),
         ArtifactRule(
             id: "cmake", ecosystem: .cmake,

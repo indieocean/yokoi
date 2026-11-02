@@ -31,6 +31,16 @@ struct InUseSnapshot: Sendable {
         return uses.first { $0.path == r || $0.path.hasPrefix(prefix) }?.process
     }
 
+    /// The first of `apps` that is running: a process launched from inside `<name>.app`, or named `name`.
+    func runningApp(_ apps: [String]) -> String? {
+        guard !apps.isEmpty else { return nil }
+        for app in apps {
+            let bundle = "/\(app).app/"
+            if uses.contains(where: { $0.process == app || $0.path.contains(bundle) }) { return app }
+        }
+        return nil
+    }
+
     /// Captures a snapshot of the current user's processes.
     static func capture(excludingPID: pid_t = getpid()) -> InUseSnapshot {
         var uses = Set<Use>()

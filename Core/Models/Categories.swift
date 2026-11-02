@@ -6,6 +6,10 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Whether cleanup refuses an item created after the scan that found it. Not for caches: tools delete
+    /// and recreate their cache folders all the time, and whatever is there now is still a cache.
+    var checksReplacement: Bool { self != .caches }
+
     var title: String {
         switch self {
         case .nodeModules: "node_modules"

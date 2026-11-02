@@ -5,9 +5,12 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
     enum Section: String, Sendable, CaseIterable, Codable {
         case systemUser = "System & User"
         case javascript = "JavaScript"
+        case python = "Python"
         case nativeToolchains = "Native toolchains"
         case xcode = "Xcode"
         case android = "Android"
+        case editors = "Editors & IDEs"
+        case containers = "Containers"
         case aiModels = "AI models"
         /// No longer used: installers in Downloads moved to the Downloads screen. Kept so older scan caches decode.
         case downloads = "Downloads"
@@ -36,6 +39,9 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
     var permanentOnly: Bool = false
     /// How the location's contents are listed under its twisty so single items can be cleaned.
     var breakdown: Breakdown = .children
+    /// Apps (bundle names without `.app`) or process names that keep this location open. Cleanup is
+    /// refused while one of them runs: an editor or Docker writing its cache as it's removed can corrupt it.
+    var usedByApps: [String] = []
 
     /// How a location's contents become individually selectable rows.
     enum Breakdown: String, Sendable, Codable {
@@ -55,6 +61,8 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
         case systemImages
         /// One row per model (`models--org--name`).
         case huggingface
+        /// One row per workspace: `workspaces/<name>/DerivedData` only, never the workspace's other state.
+        case workspaceDerivedData
 
         /// Versioned things read best newest first, so the old ones collect at the bottom.
         var sortsByDate: Bool { [.simulators, .archives, .deviceSupport, .systemImages, .avds].contains(self) }
@@ -62,9 +70,22 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
 
     func url(home: URL) -> URL { home.appendingPathComponent(relativePath) }
 
-    /// Locations a running process may be using (emulators keep their AVD open). Cleanup is refused while
-    /// a process holds a file inside them, like an open project.
-    static let inUseGuarded: Set<String> = ["android-avd", "android-system-images"]
+    /// Every location by id.
+    static let byID: [String: CacheLocation] = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+
+    /// Locations a running process may be using: emulators keep their AVD open, a Gradle daemon keeps its
+    /// caches and distribution open between builds, `rustc` reads crate sources from the registry, and a
+    /// booted simulator runs from its device folder. Clearing them underneath it can break the build or
+    /// corrupt the cache, so cleanup is refused while a process holds a file inside them, like an open project.
+    static let inUseGuarded: Set<String> = [
+        "android-avd", "android-system-images", "gradle-caches", "gradle-wrapper", "gradle-daemon", "cargo-registry", "cargo-git",
+        "simulator-devices", "xctest-devices", "xcode-previews",
+        "xcodebuildmcp-deriveddata", "xcodebuildmcp-workspaces", "mobilebuildmcp-deriveddata", "mobilebuildmcp-workspaces",
+    ]
+
+    /// JetBrains IDEs by process name (their bundles have many names: `IntelliJ IDEA CE.app`, `PyCharm Professional Edition.app`…).
+    static let jetBrainsProcesses = ["idea", "webstorm", "pycharm", "goland", "clion", "rider", "rubymine", "phpstorm",
+                                     "datagrip", "rustrover", "dataspell", "aqua", "studio"]
 }
 
 extension CacheLocation {
@@ -77,7 +98,7 @@ extension CacheLocation {
                       safety: .review, badge: "🗑", colorHex: 0xF0565E, restoreHint: "emptying the Trash can't be undone",
                       permanentOnly: true, breakdown: .none),
         CacheLocation(id: "logs", name: "Logs", section: .systemUser, relativePath: "Library/Logs",
-                      safety: .safe, badge: "◎", colorHex: 0x7D8597, restoreHint: "logs are recreated as needed"),
+                      safety: .safe, badge: "◎", colorHex: 0x7D8597, restoreHint: "logs are recreated as needed", excludesNestedLocations: true),
         // JavaScript
         CacheLocation(id: "npm", name: "npm cache", section: .javascript, relativePath: ".npm/_cacache",
                       safety: .safe, badge: "npm", colorHex: 0xF87171, restoreHint: "npm refills it on the next install", breakdown: .none),
@@ -87,6 +108,50 @@ extension CacheLocation {
                       safety: .safe, badge: "y", colorHex: 0x60A5FA, restoreHint: "yarn refills it on the next install"),
         CacheLocation(id: "bun", name: "Bun cache", section: .javascript, relativePath: ".bun/install/cache",
                       safety: .safe, badge: "bun", colorHex: 0xE6E8EE, restoreHint: "bun refills it on the next install", breakdown: .none),
+        CacheLocation(id: "npm-logs", name: "npm logs", section: .javascript, relativePath: ".npm/_logs",
+                      safety: .safe, badge: "npm", colorHex: 0xF87171, restoreHint: "npm writes new logs as it runs", breakdown: .none),
+        CacheLocation(id: "yarn-xdg", name: "Yarn cache (~/.cache)", section: .javascript, relativePath: ".cache/yarn",
+                      safety: .safe, badge: "y", colorHex: 0x60A5FA, restoreHint: "yarn refills it on the next install"),
+        CacheLocation(id: "yarn-berry", name: "Yarn Berry global cache", section: .javascript, relativePath: ".yarn/berry/cache",
+                      safety: .redownload, badge: "y", colorHex: 0x60A5FA, restoreHint: "Yarn re-downloads packages on the next install", breakdown: .none),
+        CacheLocation(id: "pnpm-legacy", name: "pnpm store (~/.pnpm-store)", section: .javascript, relativePath: ".pnpm-store",
+                      safety: .redownload, badge: "pn", colorHex: 0xF59E0B, restoreHint: "pnpm re-downloads packages on the next install", breakdown: .none),
+        CacheLocation(id: "pnpm-xdg", name: "pnpm store (~/.local/share)", section: .javascript, relativePath: ".local/share/pnpm/store",
+                      safety: .redownload, badge: "pn", colorHex: 0xF59E0B, restoreHint: "pnpm re-downloads packages on the next install", breakdown: .none),
+        CacheLocation(id: "pnpm-metadata", name: "pnpm metadata cache", section: .javascript, relativePath: ".cache/pnpm",
+                      safety: .safe, badge: "pn", colorHex: 0xF59E0B, restoreHint: "pnpm fetches package metadata again"),
+        CacheLocation(id: "deno", name: "Deno cache", section: .javascript, relativePath: "Library/Caches/deno",
+                      safety: .redownload, badge: "dn", colorHex: 0xE6E8EE, restoreHint: "Deno re-downloads modules on the next run"),
+        CacheLocation(id: "deno-xdg", name: "Deno cache (~/.cache)", section: .javascript, relativePath: ".cache/deno",
+                      safety: .redownload, badge: "dn", colorHex: 0xE6E8EE, restoreHint: "Deno re-downloads modules on the next run"),
+        CacheLocation(id: "node-gyp", name: "node-gyp headers", section: .javascript, relativePath: "Library/Caches/node-gyp",
+                      safety: .safe, badge: "gyp", colorHex: 0x34D399, restoreHint: "node-gyp downloads Node headers again for the next native build"),
+        CacheLocation(id: "node-gyp-xdg", name: "node-gyp headers (~/.cache)", section: .javascript, relativePath: ".cache/node-gyp",
+                      safety: .safe, badge: "gyp", colorHex: 0x34D399, restoreHint: "node-gyp downloads Node headers again for the next native build"),
+        CacheLocation(id: "electron", name: "Electron downloads", section: .javascript, relativePath: "Library/Caches/electron",
+                      safety: .redownload, badge: "el", colorHex: 0x9FEAF9, restoreHint: "Electron is downloaded again on the next install"),
+        CacheLocation(id: "electron-builder", name: "electron-builder downloads", section: .javascript, relativePath: "Library/Caches/electron-builder",
+                      safety: .redownload, badge: "el", colorHex: 0x9FEAF9, restoreHint: "electron-builder downloads its tools again on the next build"),
+        CacheLocation(id: "puppeteer", name: "Puppeteer browsers", section: .javascript, relativePath: ".cache/puppeteer",
+                      safety: .redownload, badge: "pup", colorHex: 0x34D399, restoreHint: "`npx puppeteer browsers install` downloads them again"),
+        CacheLocation(id: "playwright", name: "Playwright browsers", section: .javascript, relativePath: "Library/Caches/ms-playwright",
+                      safety: .redownload, badge: "pw", colorHex: 0x34D399, restoreHint: "`npx playwright install` downloads them again"),
+        CacheLocation(id: "playwright-xdg", name: "Playwright browsers (~/.cache)", section: .javascript, relativePath: ".cache/ms-playwright",
+                      safety: .redownload, badge: "pw", colorHex: 0x34D399, restoreHint: "`npx playwright install` downloads them again"),
+        // Python
+        CacheLocation(id: "pip-xdg", name: "pip (~/.cache)", section: .python, relativePath: ".cache/pip",
+                      safety: .safe, badge: "pip", colorHex: 0xFACC15, restoreHint: "pip refills it on the next install"),
+        CacheLocation(id: "uv", name: "uv cache", section: .python, relativePath: ".cache/uv",
+                      safety: .redownload, badge: "uv", colorHex: 0xDE5FE9, restoreHint: "uv re-downloads packages on the next sync; existing environments keep working", breakdown: .none),
+        CacheLocation(id: "uv-library", name: "uv cache (Library)", section: .python, relativePath: "Library/Caches/uv",
+                      safety: .redownload, badge: "uv", colorHex: 0xDE5FE9, restoreHint: "uv re-downloads packages on the next sync; existing environments keep working", breakdown: .none),
+        // Poetry keeps its virtualenvs inside its cache folder on macOS: those are never touched.
+        CacheLocation(id: "poetry", name: "Poetry cache", section: .python, relativePath: "Library/Caches/pypoetry",
+                      safety: .redownload, badge: "po", colorHex: 0x60A5FA, restoreHint: "Poetry re-downloads packages on the next install",
+                      keepChildren: ["virtualenvs"]),
+        CacheLocation(id: "poetry-xdg", name: "Poetry cache (~/.cache)", section: .python, relativePath: ".cache/pypoetry",
+                      safety: .redownload, badge: "po", colorHex: 0x60A5FA, restoreHint: "Poetry re-downloads packages on the next install",
+                      keepChildren: ["virtualenvs"]),
         // Native toolchains
         CacheLocation(id: "homebrew", name: "Homebrew downloads", section: .nativeToolchains, relativePath: "Library/Caches/Homebrew",
                       safety: .safe, badge: "br", colorHex: 0xF59E0B, restoreHint: "brew downloads bottles again when needed"),
@@ -98,8 +163,30 @@ extension CacheLocation {
                       safety: .redownload, badge: "gr", colorHex: 0x34D399, restoreHint: "./gradlew downloads its distribution again on the next build"),
         CacheLocation(id: "cocoapods", name: "CocoaPods", section: .nativeToolchains, relativePath: "Library/Caches/CocoaPods",
                       safety: .safe, badge: "pod", colorHex: 0xF87171, restoreHint: "pod install refills it"),
-        CacheLocation(id: "pip", name: "pip", section: .nativeToolchains, relativePath: "Library/Caches/pip",
+        CacheLocation(id: "pip", name: "pip", section: .python, relativePath: "Library/Caches/pip",
                       safety: .safe, badge: "pip", colorHex: 0xFACC15, restoreHint: "pip refills it on the next install"),
+        CacheLocation(id: "cargo-git", name: "Cargo git dependencies", section: .nativeToolchains, relativePath: ".cargo/git",
+                      safety: .redownload, badge: "cg", colorHex: 0xF97316, restoreHint: "cargo clones git dependencies again on the next build"),
+        CacheLocation(id: "gradle-daemon", name: "Gradle daemon logs", section: .nativeToolchains, relativePath: ".gradle/daemon",
+                      safety: .safe, badge: "gr", colorHex: 0x34D399, restoreHint: "Gradle starts a fresh daemon and log on the next build"),
+        CacheLocation(id: "maven", name: "Maven repository", section: .nativeToolchains, relativePath: ".m2/repository",
+                      safety: .review, badge: "mvn", colorHex: 0xF87171,
+                      restoreHint: "Maven re-downloads dependencies; anything you `mvn install`ed locally is lost"),
+        CacheLocation(id: "swiftpm", name: "Swift Package Manager cache", section: .nativeToolchains, relativePath: "Library/Caches/org.swift.swiftpm",
+                      safety: .redownload, badge: "spm", colorHex: 0xF05138, restoreHint: "SwiftPM re-downloads packages on the next resolve"),
+        // Activated global tools live in bin/ and global_packages/, so they stay.
+        CacheLocation(id: "pub-cache", name: "Flutter / Dart pub cache", section: .nativeToolchains, relativePath: ".pub-cache",
+                      safety: .redownload, badge: "dt", colorHex: 0x22D3EE, restoreHint: "`flutter pub get` downloads packages again",
+                      keepChildren: ["bin", "global_packages"]),
+        CacheLocation(id: "nuget-packages", name: "NuGet packages", section: .nativeToolchains, relativePath: ".nuget/packages",
+                      safety: .review, badge: "nu", colorHex: 0xA78BFA,
+                      restoreHint: "`dotnet restore` downloads them again; packages only added from a local folder are lost"),
+        CacheLocation(id: "nuget-http", name: "NuGet HTTP cache", section: .nativeToolchains, relativePath: ".local/share/NuGet/http-cache",
+                      safety: .safe, badge: "nu", colorHex: 0xA78BFA, restoreHint: "NuGet refills it on the next restore"),
+        CacheLocation(id: "nuget-v3", name: "NuGet v3 cache", section: .nativeToolchains, relativePath: ".local/share/NuGet/v3-cache",
+                      safety: .safe, badge: "nu", colorHex: 0xA78BFA, restoreHint: "NuGet refills it on the next restore"),
+        CacheLocation(id: "mise", name: "mise cache", section: .nativeToolchains, relativePath: ".cache/mise",
+                      safety: .safe, badge: "mi", colorHex: 0xE6E8EE, restoreHint: "mise refills it as needed; installed tools are kept"),
         // Xcode
         CacheLocation(id: "xcode-cache", name: "Xcode caches", section: .xcode, relativePath: "Library/Caches/com.apple.dt.Xcode",
                       safety: .safe, badge: "xc", colorHex: 0x60A5FA, restoreHint: "Xcode rebuilds it"),
@@ -112,6 +199,22 @@ extension CacheLocation {
                       safety: .review, badge: "arc", colorHex: 0x60A5FA, restoreHint: "archives contain dSYMs and can't be recreated", breakdown: .archives),
         CacheLocation(id: "device-support", name: "Device support", section: .xcode, relativePath: "Library/Developer/Xcode/iOS DeviceSupport",
                       safety: .review, badge: "dev", colorHex: 0x60A5FA, restoreHint: "Xcode re-copies symbols when a device connects", breakdown: .deviceSupport),
+        CacheLocation(id: "watch-device-support", name: "watchOS device support", section: .xcode, relativePath: "Library/Developer/Xcode/watchOS DeviceSupport",
+                      safety: .review, badge: "dev", colorHex: 0x60A5FA, restoreHint: "Xcode re-copies symbols when a watch connects", breakdown: .deviceSupport),
+        CacheLocation(id: "tv-device-support", name: "tvOS device support", section: .xcode, relativePath: "Library/Developer/Xcode/tvOS DeviceSupport",
+                      safety: .review, badge: "dev", colorHex: 0x60A5FA, restoreHint: "Xcode re-copies symbols when an Apple TV connects", breakdown: .deviceSupport),
+        CacheLocation(id: "xctest-devices", name: "Test simulator clones", section: .xcode, relativePath: "Library/Developer/XCTestDevices",
+                      safety: .safe, badge: "sim", colorHex: 0x60A5FA, restoreHint: "Xcode clones simulators again for parallel testing", breakdown: .simulators),
+        CacheLocation(id: "xcode-previews", name: "SwiftUI Previews", section: .xcode, relativePath: "Library/Developer/Xcode/UserData/Previews",
+                      safety: .safe, badge: "pv", colorHex: 0x60A5FA, restoreHint: "Xcode rebuilds previews when you open them"),
+        CacheLocation(id: "xcodebuildmcp-deriveddata", name: "XcodeBuildMCP DerivedData", section: .xcode, relativePath: "Library/Developer/XcodeBuildMCP/DerivedData",
+                      safety: .safe, badge: "mcp", colorHex: 0x60A5FA, restoreHint: "the next agent build rebuilds it"),
+        CacheLocation(id: "xcodebuildmcp-workspaces", name: "XcodeBuildMCP workspace builds", section: .xcode, relativePath: "Library/Developer/XcodeBuildMCP/workspaces",
+                      safety: .safe, badge: "mcp", colorHex: 0x60A5FA, restoreHint: "the next agent build rebuilds it", breakdown: .workspaceDerivedData),
+        CacheLocation(id: "mobilebuildmcp-deriveddata", name: "MobileBuildMCP DerivedData", section: .xcode, relativePath: "Library/Developer/MobileBuildMCP/DerivedData",
+                      safety: .safe, badge: "mcp", colorHex: 0x60A5FA, restoreHint: "the next agent build rebuilds it"),
+        CacheLocation(id: "mobilebuildmcp-workspaces", name: "MobileBuildMCP workspace builds", section: .xcode, relativePath: "Library/Developer/MobileBuildMCP/workspaces",
+                      safety: .safe, badge: "mcp", colorHex: 0x60A5FA, restoreHint: "the next agent build rebuilds it", breakdown: .workspaceDerivedData),
         // Android
         CacheLocation(id: "android-avd", name: "Android emulators (AVDs)", section: .android, relativePath: ".android/avd",
                       safety: .review, badge: "avd", colorHex: 0x3DDC84, restoreHint: "recreate emulators in Android Studio › Device Manager (their app data is lost)", breakdown: .avds),
@@ -121,11 +224,57 @@ extension CacheLocation {
                       safety: .safe, badge: "and", colorHex: 0x3DDC84, restoreHint: "the SDK tools rebuild it"),
         CacheLocation(id: "android-build-cache", name: "Android build cache", section: .android, relativePath: ".android/build-cache",
                       safety: .safe, badge: "and", colorHex: 0x3DDC84, restoreHint: "the Android Gradle plugin rebuilds it on the next build"),
+        // Editors & IDEs: refused while the editor is open.
+        CacheLocation(id: "vscode-cache", name: "VS Code cache", section: .editors, relativePath: "Library/Application Support/Code/Cache",
+                      safety: .safe, badge: "vs", colorHex: 0x3B82F6, restoreHint: "VS Code rebuilds it", usedByApps: ["Visual Studio Code"]),
+        CacheLocation(id: "vscode-cached-data", name: "VS Code compiled code", section: .editors, relativePath: "Library/Application Support/Code/CachedData",
+                      safety: .safe, badge: "vs", colorHex: 0x3B82F6, restoreHint: "VS Code rebuilds it; the next start is a little slower", usedByApps: ["Visual Studio Code"]),
+        CacheLocation(id: "vscode-vsix", name: "VS Code extension downloads", section: .editors, relativePath: "Library/Application Support/Code/CachedExtensionVSIXs",
+                      safety: .safe, badge: "vs", colorHex: 0x3B82F6, restoreHint: "installed extensions are kept; VS Code downloads updates again", usedByApps: ["Visual Studio Code"]),
+        CacheLocation(id: "vscode-logs", name: "VS Code logs", section: .editors, relativePath: "Library/Application Support/Code/logs",
+                      safety: .safe, badge: "vs", colorHex: 0x3B82F6, restoreHint: "VS Code writes new logs", usedByApps: ["Visual Studio Code"]),
+        CacheLocation(id: "cursor-cache", name: "Cursor cache", section: .editors, relativePath: "Library/Application Support/Cursor/Cache",
+                      safety: .safe, badge: "cu", colorHex: 0xE6E8EE, restoreHint: "Cursor rebuilds it", usedByApps: ["Cursor"]),
+        CacheLocation(id: "cursor-cached-data", name: "Cursor compiled code", section: .editors, relativePath: "Library/Application Support/Cursor/CachedData",
+                      safety: .safe, badge: "cu", colorHex: 0xE6E8EE, restoreHint: "Cursor rebuilds it; the next start is a little slower", usedByApps: ["Cursor"]),
+        CacheLocation(id: "cursor-logs", name: "Cursor logs", section: .editors, relativePath: "Library/Application Support/Cursor/logs",
+                      safety: .safe, badge: "cu", colorHex: 0xE6E8EE, restoreHint: "Cursor writes new logs", usedByApps: ["Cursor"]),
+        CacheLocation(id: "jetbrains-caches", name: "JetBrains caches", section: .editors, relativePath: "Library/Caches/JetBrains",
+                      safety: .safe, badge: "jb", colorHex: 0xF472B6, restoreHint: "the IDE re-indexes projects on the next open", usedByApps: jetBrainsProcesses),
+        CacheLocation(id: "jetbrains-logs", name: "JetBrains logs", section: .editors, relativePath: "Library/Logs/JetBrains",
+                      safety: .safe, badge: "jb", colorHex: 0xF472B6, restoreHint: "the IDE writes new logs", usedByApps: jetBrainsProcesses),
+        // Containers: refused while Docker Desktop or OrbStack runs.
+        CacheLocation(id: "docker-desktop-cache", name: "Docker Desktop cache", section: .containers, relativePath: "Library/Containers/com.docker.docker/Data/cache",
+                      safety: .safe, badge: "dk", colorHex: 0x2496ED, restoreHint: "Docker Desktop rebuilds it", usedByApps: ["Docker"]),
+        CacheLocation(id: "docker-desktop-logs", name: "Docker Desktop logs", section: .containers, relativePath: "Library/Containers/com.docker.docker/Data/log",
+                      safety: .safe, badge: "dk", colorHex: 0x2496ED, restoreHint: "Docker Desktop writes new logs", usedByApps: ["Docker"]),
+        CacheLocation(id: "docker-desktop-tmp", name: "Docker Desktop temporary files", section: .containers, relativePath: "Library/Containers/com.docker.docker/Data/tmp",
+                      safety: .safe, badge: "dk", colorHex: 0x2496ED, restoreHint: "Docker Desktop recreates what it needs", usedByApps: ["Docker"]),
+        CacheLocation(id: "docker-group-caches", name: "Docker shared caches", section: .containers, relativePath: "Library/Group Containers/group.com.docker/Caches",
+                      safety: .safe, badge: "dk", colorHex: 0x2496ED, restoreHint: "Docker Desktop rebuilds it", usedByApps: ["Docker"]),
+        CacheLocation(id: "docker-cli-plugins", name: "Docker CLI plugin cache", section: .containers, relativePath: ".docker/cli-plugins/.cache",
+                      safety: .safe, badge: "dk", colorHex: 0x2496ED, restoreHint: "the Docker CLI refills it"),
+        CacheLocation(id: "docker-buildx", name: "Docker buildx cache", section: .containers, relativePath: ".docker/buildx/cache",
+                      safety: .redownload, badge: "bk", colorHex: 0x2496ED, restoreHint: "the next `docker buildx build` is slower while it refills"),
+        CacheLocation(id: "orbstack-logs", name: "OrbStack logs", section: .containers, relativePath: ".orbstack/log",
+                      safety: .safe, badge: "orb", colorHex: 0x8B5CF6, restoreHint: "OrbStack writes new logs", usedByApps: ["OrbStack"]),
+        CacheLocation(id: "orbstack-caches", name: "OrbStack cache", section: .containers, relativePath: "Library/Caches/dev.kdrag0n.MacVirt",
+                      safety: .safe, badge: "orb", colorHex: 0x8B5CF6, restoreHint: "OrbStack rebuilds it", usedByApps: ["OrbStack"]),
+        CacheLocation(id: "orbstack-app-logs", name: "OrbStack app logs", section: .containers, relativePath: "Library/Logs/OrbStack",
+                      safety: .safe, badge: "orb", colorHex: 0x8B5CF6, restoreHint: "OrbStack writes new logs", usedByApps: ["OrbStack"]),
         // AI models (opt-in: unchecked by default)
         CacheLocation(id: "ollama", name: "Ollama models", section: .aiModels, relativePath: ".ollama/models",
                       safety: .review, badge: "ol", colorHex: 0xE6E8EE, restoreHint: "`ollama pull` downloads models again", breakdown: .none),
         CacheLocation(id: "huggingface", name: "Hugging Face cache", section: .aiModels, relativePath: ".cache/huggingface/hub",
                       safety: .redownload, badge: "hf", colorHex: 0xFACC15, restoreHint: "models are downloaded again on next use", breakdown: .huggingface),
+        CacheLocation(id: "huggingface-datasets", name: "Hugging Face datasets", section: .aiModels, relativePath: ".cache/huggingface/datasets",
+                      safety: .redownload, badge: "hf", colorHex: 0xFACC15, restoreHint: "datasets are downloaded again on next use"),
+        CacheLocation(id: "huggingface-xet", name: "Hugging Face Xet cache", section: .aiModels, relativePath: ".cache/huggingface/xet",
+                      safety: .redownload, badge: "hf", colorHex: 0xFACC15, restoreHint: "files are downloaded again on next use"),
+        CacheLocation(id: "ollama-logs", name: "Ollama logs", section: .aiModels, relativePath: ".ollama/logs",
+                      safety: .safe, badge: "ol", colorHex: 0xE6E8EE, restoreHint: "Ollama writes new logs"),
+        CacheLocation(id: "lmstudio-logs", name: "LM Studio server logs", section: .aiModels, relativePath: ".lmstudio/server-logs",
+                      safety: .safe, badge: "lm", colorHex: 0xA78BFA, restoreHint: "LM Studio writes new logs"),
         CacheLocation(id: "lmstudio", name: "LM Studio models", section: .aiModels, relativePath: ".lmstudio/models",
                       safety: .review, badge: "lm", colorHex: 0xA78BFA, restoreHint: "download models again in LM Studio"),
         // Browsers

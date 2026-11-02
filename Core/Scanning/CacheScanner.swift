@@ -58,7 +58,7 @@ struct CacheScanner: CategoryScanner {
         var children: [CacheChild] = []
         for group in groups {
             if Task.isCancelled { return nil }
-            let m = group.urls.reduce(FileWalker.Measurement()) { $0 + context.measure($1, progress: progress) }
+            let m = group.urls.reduce(FileWalker.Measurement()) { $0 + context.measure($1, progress: progress, reclaimable: true) }
             children.append(CacheChild(urls: group.urls, name: group.name, detail: group.detail,
                                        size: m.size, fileCount: m.files, date: group.date ?? CacheBreakdown.lastChanged(group.urls)))
         }
@@ -121,6 +121,12 @@ enum CacheBreakdown {
                                  detail: kind == "models" ? nil : String(kind.dropLast()))
                 }
                 return plain(u)
+            }
+        case .workspaceDerivedData:
+            // `workspaces/<name>/DerivedData`: only the build products, never the workspace's lock or state.
+            return entries.compactMap { workspace in
+                let derived = workspace.appendingPathComponent("DerivedData")
+                return isDirectory(derived) ? Group(urls: [derived], name: workspace.lastPathComponent) : nil
             }
         }
     }

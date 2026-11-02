@@ -272,3 +272,39 @@ struct CleanupProgressTests {
         if let trashed = out.records.first?.items.first?.destination { try? FileManager.default.removeItem(atPath: trashed) }
     }
 }
+
+@Suite("Cleanup refuses what the scan didn't see")
+struct ReplacedSinceScanTests {
+    @Test func refusesItemCreatedAfterTheScan() async throws {
+        let f = try Fixture.standard()
+        let log = CleanupLog(url: f.url("support/cleanup.log"))
+        let svc = CleanupService(context: f.context(), log: log)
+        let scannedAt = Date(timeIntervalSinceNow: -3600)
+        var stale = CleanupEntry(id: "nm", category: .nodeModules, label: "web", displayPath: "~/dev/web/node_modules",
+                                 urls: [f.url("dev/web/node_modules")], size: 1)
+        stale.scannedAt = scannedAt
+        let outcome = await svc.perform([stale], action: .delete, dryRun: false)
+        #expect(f.exists("dev/web/node_modules"), "created after the scan: refused")
+        #expect(outcome.failures.first?.reason.contains("Replaced since the last scan") == true)
+
+        // Scanned after it was created: allowed.
+        var fresh = stale
+        fresh.scannedAt = Date(timeIntervalSinceNow: 60)
+        let ok = await svc.perform([fresh], action: .delete, dryRun: false)
+        #expect(ok.failures.isEmpty)
+        #expect(!f.exists("dev/web/node_modules"))
+    }
+
+    @Test func cachesAreNotChecked() async throws {
+        #expect(!CleanCategory.caches.checksReplacement)
+        #expect(CleanCategory.nodeModules.checksReplacement)
+        #expect(CleanCategory.applications.checksReplacement)
+    }
+
+    @Test func toolCachesAreGuardedWhileInUse() {
+        for id in ["gradle-caches", "gradle-wrapper", "cargo-registry", "simulator-devices", "android-avd"] {
+            #expect(CacheLocation.inUseGuarded.contains(id))
+            #expect(CacheLocation.all.contains { $0.id == id }, "\(id) is a real location")
+        }
+    }
+}

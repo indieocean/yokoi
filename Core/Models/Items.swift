@@ -120,6 +120,7 @@ struct CacheItem: Reclaimable, Codable, Hashable {
         entry.permanentOnly = permanentOnly
         // Only the emulator using this AVD blocks it, not any running emulator.
         if CacheLocation.inUseGuarded.contains(locationID) { entry.projectRoot = child.urls[0] }
+        entry.usedByApps = CacheLocation.byID[locationID]?.usedByApps ?? []
         return entry
     }
 

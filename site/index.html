@@ -68,7 +68,7 @@
           </a>
           <a class="btn btn-ghost btn-lg" href="https://github.com/indieocean/yokoi">View source</a>
         </div>
-        <p class="hero-meta mono reveal"><span data-version>v1.3.1</span> · signed &amp; notarized · Apple Silicon &amp; Intel</p>
+        <p class="hero-meta mono reveal"><span data-version>v1.4.0</span> · signed &amp; notarized · Apple Silicon &amp; Intel</p>
 
         <div class="term reveal" aria-label="Yokoi command example">
           <span class="t-prompt">$</span> <span class="t-cmd">yokoi</span> <span class="t-flag">scan</span>
@@ -111,20 +111,20 @@
         <article class="card reveal" style="--c:#F97316">
           <div class="card-top"><span class="ico">🔨</span><span class="badge mono">target/</span></div>
           <h3>Build artifacts</h3>
-          <p>Rust, Xcode, Swift PM, Gradle, Python, .NET, Unity, Unreal, Go, Next.js and CMake output.</p>
+          <p>Rust, Xcode, Swift PM, CocoaPods, Gradle, Python, .NET, Unity, Unreal, Go, Next.js, Angular and CMake output.</p>
           <p class="rule">Only matched next to the project's marker file, so a random <code>target/</code> is never touched.</p>
         </article>
         <article class="card reveal" style="--c:#22D3EE">
           <div class="card-top"><span class="ico">🗄️</span><span class="badge mono">~/Library/Caches</span></div>
           <h3>Caches &amp; Tooling</h3>
-          <p>npm, Homebrew, Cargo, Gradle, CocoaPods, pip, Xcode, simulators, Android emulators, browsers, and Ollama / Hugging Face models.</p>
-          <p class="rule">Every location is tagged <span class="tag tag-ok">Safe</span> <span class="tag tag-info">Re-download</span> or <span class="tag tag-warn">Review</span>.</p>
+          <p>JavaScript, Python (pip, uv, Poetry), Homebrew, Cargo, Go, Gradle, Maven, NuGet, Flutter, Xcode and simulators, Android emulators, VS Code, Cursor and JetBrains, Docker Desktop and OrbStack, browsers, and AI models.</p>
+          <p class="rule">Every location is tagged <span class="tag tag-ok">Safe</span> <span class="tag tag-info">Re-download</span> or <span class="tag tag-warn">Review</span>. Sizes count only what cleaning frees.</p>
         </article>
         <article class="card reveal" style="--c:#60A5FA">
           <div class="card-top"><span class="ico">🧰</span><span class="badge mono">docker</span></div>
           <h3>Tool cleanups</h3>
-          <p>Unavailable iOS simulators, local Time Machine snapshots, unused Docker images, build cache and dangling volumes.</p>
-          <p class="rule">Done through the tool itself (<code>xcrun simctl</code>, <code>tmutil</code>, <code>docker</code>), with the command shown first.</p>
+          <p>Unavailable iOS simulators, local Time Machine snapshots, unused Docker images, build cache and dangling volumes, and the Go module cache.</p>
+          <p class="rule">Done through the tool itself (<code>xcrun simctl</code>, <code>tmutil</code>, <code>docker</code>, <code>go</code>), with the command shown first.</p>
         </article>
         <article class="card reveal" style="--c:#F59E0B">
           <div class="card-top"><span class="ico">🐘</span><span class="badge mono">.utm · .vmdk</span></div>
@@ -174,6 +174,13 @@
         <span class="chip" style="--c:#F59E0B">Homebrew</span>
         <span class="chip" style="--c:#FACC15">conda</span>
         <span class="chip" style="--c:#F05138">npm · pnpm · Yarn · Bun</span>
+        <span class="chip" style="--c:#DE5FE9">uv · Poetry</span>
+        <span class="chip" style="--c:#F87171">Maven</span>
+        <span class="chip" style="--c:#A78BFA">NuGet</span>
+        <span class="chip" style="--c:#22D3EE">Flutter</span>
+        <span class="chip" style="--c:#3B82F6">VS Code · Cursor</span>
+        <span class="chip" style="--c:#F472B6">JetBrains</span>
+        <span class="chip" style="--c:#8B5CF6">OrbStack</span>
       </div>
     </section>
 
@@ -273,7 +280,7 @@
       <div class="faq">
         <details class="reveal"><summary>Is it safe to delete node_modules and build folders?</summary><p>Yes. Your package manager or toolchain rebuilds them (<code>npm install</code>, <code>cargo build</code>, reopening the project in Unity…). Yokoi shows the restore command before you confirm, and only matches build folders next to their project files.</p></details>
         <details class="reveal"><summary>Can I undo a cleanup?</summary><p>Anything moved to the Trash can be put back from <em>Recent cleanups</em> on the dashboard, until you empty the Trash. Permanent deletes can't be undone, which is why they always need an extra confirmation.</p></details>
-        <details class="reveal"><summary>Why does it want Full Disk Access?</summary><p>macOS protects some caches and folders. Without access, Yokoi can't measure them and skips them. Full Disk Access is optional: everything else works without it. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.</p><p>It's a broad grant, and the tools Yokoi runs for you (<code>brew</code>, <code>npm</code>, <code>docker</code>…) inherit it. That's why each tool is run from a full path you see before confirming, and only from a folder that you or an administrator control.</p></details>
+        <details class="reveal"><summary>Why does it want Full Disk Access?</summary><p>macOS protects some caches and folders. Without access, Yokoi can't measure them and skips them. Full Disk Access is optional: everything else works without it. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.</p><p>It's a broad grant, and the tools Yokoi runs for you (<code>brew</code>, <code>npm</code>, <code>docker</code>…) inherit it. That's why each tool is run from a full path you see before confirming, and only from a folder that you or an administrator control.</p><p>That check keeps out other accounts on the Mac, not programs already running as you. Yokoi finds tools the way your shell does, so folders you own like <code>~/.cargo/bin</code> or <code>~/.nvm</code> are searched too. Malware already running under your account could put a fake <code>npm</code> there, and Yokoi would run it with Full Disk Access. The full path in the confirmation is how you'd spot it. If you don't want any tool to inherit the grant, leave Full Disk Access off: Yokoi still scans and cleans everything it can read.</p></details>
         <details class="reveal"><summary>Why isn't Yokoi sandboxed?</summary><p>The App Sandbox only lets an app into folders you pick in an Open panel, and it can't run other programs. A cleaner that measures <code>~/Library/Caches</code>, <code>node_modules</code> across your projects and Xcode's folders, and runs <code>brew</code>, <code>npm</code> or <code>docker</code> to clean up after them, can't work inside it. Yokoi is notarized and built with the Hardened Runtime and no exception entitlements: no unsigned code, no injected libraries, no debugger attach. Moving the deleting and the running of tools into a separate helper with fewer rights is on the roadmap.</p></details>
         <details class="reveal"><summary>Does it need my password or run anything as root?</summary><p>No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for administrators are shown as commands you can run yourself.</p></details>
         <details class="reveal"><summary>How does it update?</summary><p>Through <a href="https://sparkle-project.org">Sparkle</a>. Every update is signed, and Sparkle refuses one whose signature doesn't match. You choose whether it checks automatically.</p></details>
@@ -288,7 +295,7 @@
         <h2>Get your gigabytes back</h2>
         <p>Free and open source. macOS 14 Sonoma or later.</p>
         <div class="hero-cta">
-          <a class="btn btn-primary btn-lg" href="https://github.com/indieocean/yokoi/releases/latest" data-download>Download Yokoi <span class="mono" data-version>v1.3.1</span></a>
+          <a class="btn btn-primary btn-lg" href="https://github.com/indieocean/yokoi/releases/latest" data-download>Download Yokoi <span class="mono" data-version>v1.4.0</span></a>
           <a class="btn btn-ghost btn-lg" href="https://github.com/indieocean/yokoi#build-from-source">Build from source</a>
         </div>
       </div>

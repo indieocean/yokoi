@@ -21,6 +21,8 @@ private struct ScanCache: Codable {
     var applications: [AppItem]?
     var downloads: [DownloadItem]?
     var summary: ScanSummary?
+    /// When each category's results were scanned, by `CleanCategory.rawValue`.
+    var scannedAt: [String: Date]?
 }
 
 /// The single source of truth for scan results and cleanup history (PRD §10 "ScanStore").
@@ -39,6 +41,8 @@ final class ScanStore {
     var scanningCategories: Set<CleanCategory> = []
     var progress = ScanProgress.Snapshot()
     var lastScan: ScanSummary?
+    /// When the scan behind each category's current results started. Cleanup refuses items replaced since.
+    private var scannedAt: [CleanCategory: Date] = [:]
     var records: [CleanupRecord] = []
     var disk = DiskInfo.current()
 
@@ -140,6 +144,7 @@ final class ScanStore {
         let context = settings.context()
         let progress = ScanProgress()
         let start = Date()
+        for c in categories { scannedAt[c] = start }
         let previous = reclaimableTotal
         isScanning = true
         scanningCategories = categories.subtracting([.packages, .externalDrives])
@@ -211,6 +216,11 @@ final class ScanStore {
 
     func perform(_ entries: [CleanupEntry], action: CleanupAction, progress: CleanupProgress? = nil) async -> CleanupOutcome {
         let service = CleanupService(context: settings.context(), log: log)
+        let entries = entries.map { entry in
+            var e = entry
+            e.scannedAt = e.scannedAt ?? scannedAt[e.category]
+            return e
+        }
         let outcome = await service.perform(entries, action: action, dryRun: settings.data.dryRun, progress: progress)
         if !outcome.dryRun { remove(ids: outcome.completedIDs) }
         await reloadLog()
@@ -272,11 +282,15 @@ final class ScanStore {
         applications = cache.applications ?? []
         downloads = (cache.downloads ?? []).filter { FileManager.default.fileExists(atPath: $0.url.path) }
         lastScan = cache.summary
+        for (raw, date) in cache.scannedAt ?? [:] {
+            if let c = CleanCategory(rawValue: raw) { scannedAt[c] = date }
+        }
     }
 
     private func saveCache() {
         let cache = ScanCache(nodeModules: nodeModules, artifacts: artifacts, caches: caches,
-                              bigFiles: bigFiles, screenshots: screenshots, applications: applications, downloads: downloads, summary: lastScan)
+                              bigFiles: bigFiles, screenshots: screenshots, applications: applications, downloads: downloads, summary: lastScan,
+                              scannedAt: Dictionary(uniqueKeysWithValues: scannedAt.map { ($0.key.rawValue, $0.value) }))
         let url = Self.cacheURL
         Task.detached(priority: .utility) {
             guard let data = try? JSONEncoder().encode(cache) else { return }

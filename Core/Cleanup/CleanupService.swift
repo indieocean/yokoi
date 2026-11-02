@@ -36,6 +36,11 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
     /// Why the item must never be cleaned (an Apple app, Yokoi itself). `CleanupService` refuses it,
     /// whatever screen or automation built the entry.
     var refusal: String? = nil
+    /// When the scan that found this item started. A path created after it holds something the scan never
+    /// saw (a reinstalled `node_modules`, an app updated in place), so cleanup refuses it until a rescan.
+    var scannedAt: Date? = nil
+    /// Apps or processes whose running blocks this cleanup (`CacheLocation.usedByApps`).
+    var usedByApps: [String] = []
 
     init<R: Reclaimable>(_ item: R, displayPath: String? = nil, date: Date? = nil) {
         id = item.id
@@ -59,6 +64,7 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
             permanentOnly = i.permanentOnly
             // A running emulator keeps its AVD's files open: block like an open project.
             if CacheLocation.inUseGuarded.contains(i.locationID) { projectRoot = i.url }
+            usedByApps = CacheLocation.byID[i.locationID]?.usedByApps ?? []
         default: break
         }
     }
@@ -347,6 +353,11 @@ actor CleanupService {
                     failedHere += 1
                     continue
                 }
+                if let scannedAt = entry.scannedAt, entry.category.checksReplacement, Self.created(url, after: scannedAt) {
+                    failures.append(.init(path: url.path, reason: "Replaced since the last scan. Rescan, then clean it"))
+                    failedHere += 1
+                    continue
+                }
                 if dryRun {
                     progress?.touched(url.path)
                     moved.append(.init(original: url.path, destination: nil))
@@ -454,6 +465,15 @@ actor CleanupService {
         try? await log.append(restored)
         return CleanupOutcome(batchID: batchID, action: .trash, dryRun: false, records: restored, failures: failures,
                               completedIDs: Set(restored.map(\.path)), bytes: bytes)
+    }
+
+    /// Whether the item at `url` itself (not a symlink's target) was created after `date`. False when the
+    /// volume doesn't record creation dates.
+    static func created(_ url: URL, after date: Date) -> Bool {
+        var st = stat()
+        guard lstat(url.path, &st) == 0, st.st_birthtimespec.tv_sec > 0 else { return false }
+        let born = Date(timeIntervalSince1970: TimeInterval(st.st_birthtimespec.tv_sec) + TimeInterval(st.st_birthtimespec.tv_nsec) / 1e9)
+        return born > date
     }
 
     /// `base/YYYY/MM` when organizing by date (PRD FR-S3).
