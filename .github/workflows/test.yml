@@ -4,9 +4,9 @@ name: Test
 on:
   push:
     branches: [main]
-    paths-ignore: ["**.md", "docs/**", "assets/**"]
+    paths-ignore: ["**.md", "docs/**", "assets/**", "site/**"]
   pull_request:
-    paths-ignore: ["**.md", "docs/**", "assets/**"]
+    paths-ignore: ["**.md", "docs/**", "assets/**", "site/**"]
   workflow_dispatch:
 
 jobs:

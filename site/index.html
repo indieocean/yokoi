@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yokoi · Your Mac, garbage collected</title>
+  <meta name="description" content="A native macOS cleaner built for developers. Yokoi finds the gigabytes your toolchains leave behind (node_modules, DerivedData, caches, build artifacts) and removes them safely. Free, open source, 100% local.">
+  <meta name="theme-color" content="#0E1016">
+  <meta name="color-scheme" content="dark">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Yokoi · Your Mac, garbage collected">
+  <meta property="og:description" content="A native macOS cleaner built for developers. Trash-first, undo-able, 100% local.">
+  <meta property="og:image" content="https://indieocean.github.io/yokoi/img/og.png">
+  <meta property="og:url" content="https://indieocean.github.io/yokoi/">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="apple-touch-icon" href="img/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <canvas class="bg-particles" aria-hidden="true"></canvas>
+
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top">
+        <img src="img/icon.png" alt="" width="28" height="28">
+        <span>Yokoi</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="#cleans">What it cleans</a>
+        <a href="#tour">Tour</a>
+        <a href="#safety">Safety</a>
+        <a href="#cli">CLI</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="btn btn-ghost btn-sm hide-sm" href="https://github.com/indieocean/yokoi">
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+        <a class="btn btn-primary btn-sm" href="https://github.com/indieocean/yokoi/releases/latest" data-download>Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div class="pills reveal">
+          <span class="pill pill-violet">macOS 14+</span>
+          <span class="pill pill-cyan">Native SwiftUI</span>
+          <span class="pill pill-green">Free &amp; open source</span>
+        </div>
+        <h1 class="reveal">Your Mac,<br><span class="grad">garbage collected</span></h1>
+        <p class="lede reveal">A native macOS cleaner built for developers. Yokoi finds the gigabytes your toolchains leave behind and removes them safely: Trash-first, logged and undo-able.</p>
+        <div class="hero-cta reveal">
+          <a class="btn btn-primary btn-lg" href="https://github.com/indieocean/yokoi/releases/latest" data-download>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M16.37 12.6c-.02-2.3 1.88-3.4 1.97-3.46-1.07-1.57-2.74-1.78-3.33-1.8-1.42-.14-2.77.83-3.49.83-.72 0-1.83-.81-3.01-.79-1.55.02-2.98.9-3.78 2.29-1.61 2.8-.41 6.94 1.16 9.21.77 1.11 1.68 2.36 2.88 2.31 1.16-.05 1.59-.75 2.99-.75 1.4 0 1.79.75 3.01.72 1.24-.02 2.03-1.13 2.79-2.25.88-1.29 1.24-2.54 1.26-2.6-.03-.01-2.42-.93-2.45-3.71zM14.08 5.85c.64-.77 1.07-1.85.95-2.92-.92.04-2.03.61-2.69 1.38-.59.68-1.11 1.78-.97 2.83 1.02.08 2.07-.52 2.71-1.29z"/></svg>
+            Download for macOS
+          </a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/indieocean/yokoi">View source</a>
+        </div>
+        <p class="hero-meta mono reveal"><span data-version>v1.2.4</span> · signed &amp; notarized · Apple Silicon &amp; Intel</p>
+
+        <div class="term reveal" aria-label="Yokoi command example">
+          <span class="t-prompt">$</span> <span class="t-cmd">yokoi</span> <span class="t-flag">scan</span>
+          <span class="t-sep"></span>
+          <span class="t-dim" data-typer>node_modules · DerivedData · caches · brew · cargo</span><span class="t-caret"></span>
+        </div>
+      </div>
+
+      <div class="wrap">
+        <figure class="shot shot-hero reveal">
+          <div class="shot-glow" aria-hidden="true"></div>
+          <img src="img/dashboard.webp" width="1600" height="1025" alt="Yokoi dashboard: 203 GB reclaimable, broken down by category, with recent cleanups and top offenders" fetchpriority="high">
+        </figure>
+      </div>
+    </section>
+
+    <!-- KPI strip -->
+    <section class="kpis wrap">
+      <div class="kpi reveal"><div class="kpi-label">Data sent home</div><div class="kpi-val mono">0 bytes</div><div class="kpi-sub ok">No account, no analytics</div></div>
+      <div class="kpi reveal"><div class="kpi-label">Times it runs sudo</div><div class="kpi-val mono">never</div><div class="kpi-sub">No root, no shell</div></div>
+      <div class="kpi reveal"><div class="kpi-label">Package managers</div><div class="kpi-val mono">17</div><div class="kpi-sub">brew · cargo · pip · npm…</div></div>
+      <div class="kpi reveal"><div class="kpi-label">Default action</div><div class="kpi-val mono">Trash</div><div class="kpi-sub accent">Put Back any time</div></div>
+    </section>
+
+    <!-- What it cleans -->
+    <section id="cleans" class="section wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">What it cleans</p>
+        <h2>Knows where developer clutter lives</h2>
+        <p class="sub">Generic cleaners don't understand <code>target/</code> or <code>DerivedData</code>. <code>rm -rf</code> does, but it doesn't forgive mistakes. Yokoi shows you what it found and why, then cleans it with a safety net.</p>
+      </div>
+
+      <div class="cards">
+        <article class="card reveal" style="--c:#F05138">
+          <div class="card-top"><span class="ico">📦</span><span class="badge mono">node_modules</span></div>
+          <h3>Package managers</h3>
+          <p>Every project <code>node_modules</code> for npm, pnpm, Yarn and Bun, plus global packages for 17 managers with outdated and unused flags.</p>
+          <p class="rule">Stale after 90 days untouched. Every update or uninstall shows the exact command first.</p>
+        </article>
+        <article class="card reveal" style="--c:#F97316">
+          <div class="card-top"><span class="ico">🔨</span><span class="badge mono">target/</span></div>
+          <h3>Build artifacts</h3>
+          <p>Rust, Xcode, Swift PM, Gradle, Python, .NET, Unity, Unreal, Go, Next.js and CMake output.</p>
+          <p class="rule">Only matched next to the project's marker file, so a random <code>target/</code> is never touched.</p>
+        </article>
+        <article class="card reveal" style="--c:#22D3EE">
+          <div class="card-top"><span class="ico">🗄️</span><span class="badge mono">~/Library/Caches</span></div>
+          <h3>Caches</h3>
+          <p>npm, Homebrew, Cargo, Gradle, CocoaPods, pip, Xcode, simulators, Android emulators, browsers, and Ollama / Hugging Face models.</p>
+          <p class="rule">Every location is tagged <span class="tag tag-ok">Safe</span> <span class="tag tag-info">Re-download</span> or <span class="tag tag-warn">Review</span>.</p>
+        </article>
+        <article class="card reveal" style="--c:#60A5FA">
+          <div class="card-top"><span class="ico">🧰</span><span class="badge mono">docker</span></div>
+          <h3>Tool cleanups</h3>
+          <p>Unavailable iOS simulators, local Time Machine snapshots, unused Docker images, build cache and dangling volumes.</p>
+          <p class="rule">Done through the tool itself (<code>xcrun simctl</code>, <code>tmutil</code>, <code>docker</code>), with the command shown first.</p>
+        </article>
+        <article class="card reveal" style="--c:#F59E0B">
+          <div class="card-top"><span class="ico">🐘</span><span class="badge mono">.utm · .vmdk</span></div>
+          <h3>Big files</h3>
+          <p>Videos, archives, disk images, VMs, 3D and art files, found with a log-scale slider from 100&nbsp;MB to 10&nbsp;GB+.</p>
+          <p class="rule">Filter by type, then reveal in Finder or clean.</p>
+        </article>
+        <article class="card reveal" style="--c:#34D399">
+          <div class="card-top"><span class="ico">⬇️</span><span class="badge mono">~/Downloads</span></div>
+          <h3>Downloads</h3>
+          <p>Installers, archives, media and folders, with when each was added and last opened.</p>
+          <p class="rule">Leftover installers and already-extracted archives are flagged. Your own files are never preselected.</p>
+        </article>
+        <article class="card reveal" style="--c:#F472B6">
+          <div class="card-top"><span class="ico">📸</span><span class="badge mono">YYYY/MM</span></div>
+          <h3>Screenshots</h3>
+          <p>Screenshots and screen recordings in your screenshot folder.</p>
+          <p class="rule">File them by month or trash them, by hand or with a daily rule.</p>
+        </article>
+        <article class="card reveal" style="--c:#A78BFA">
+          <div class="card-top"><span class="ico">🧩</span><span class="badge mono">.app</span></div>
+          <h3>Applications</h3>
+          <p>Installed apps with size, last opened, and their leftovers in <code>~/Library</code>.</p>
+          <p class="rule">Uninstalls the app and its support files. Apple apps and running apps are locked.</p>
+        </article>
+        <article class="card reveal" style="--c:#C084FC">
+          <div class="card-top"><span class="ico">💽</span><span class="badge mono">._ files</span></div>
+          <h3>External drives</h3>
+          <p>The drive's own Trash, <code>.DS_Store</code> files and <code>._</code> AppleDouble files on exFAT, FAT and NTFS.</p>
+          <p class="rule">Time Machine disks are locked.</p>
+        </article>
+      </div>
+
+      <div class="chips reveal" aria-label="Supported toolchains">
+        <span class="chip" style="--c:#F97316">Rust</span>
+        <span class="chip" style="--c:#60A5FA">Xcode</span>
+        <span class="chip" style="--c:#F87171">Swift</span>
+        <span class="chip" style="--c:#34D399">Gradle</span>
+        <span class="chip" style="--c:#FACC15">Python</span>
+        <span class="chip" style="--c:#C084FC">.NET</span>
+        <span class="chip" style="--c:#A78BFA">Unity</span>
+        <span class="chip" style="--c:#E6E8EE">Unreal</span>
+        <span class="chip" style="--c:#22D3EE">Go</span>
+        <span class="chip" style="--c:#E6E8EE">Next.js</span>
+        <span class="chip" style="--c:#34D399">Android</span>
+        <span class="chip" style="--c:#60A5FA">Docker</span>
+        <span class="chip" style="--c:#F59E0B">Homebrew</span>
+        <span class="chip" style="--c:#FACC15">conda</span>
+        <span class="chip" style="--c:#F05138">npm · pnpm · Yarn · Bun</span>
+      </div>
+    </section>
+
+    <!-- Tour -->
+    <section id="tour" class="section wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">A quick tour</p>
+        <h2>Feels right at home next to Xcode</h2>
+        <p class="sub">Dark-first, translucent sidebar, monospace for every path and size. Everything you'd expect from a native Mac app.</p>
+      </div>
+
+      <div class="seg reveal" role="tablist" aria-label="Screens">
+        <button role="tab" aria-selected="true" data-shot="npm-node-modules" data-cap="Every node_modules folder, stale ones preselected">node_modules</button>
+        <button role="tab" aria-selected="false" data-shot="build-artifacts" data-cap="Build artifacts grouped by toolchain, matched by marker files">Build artifacts</button>
+        <button role="tab" aria-selected="false" data-shot="caches" data-cap="Caches tagged Safe, Re-download or Review">Caches</button>
+        <button role="tab" aria-selected="false" data-shot="applications" data-cap="Uninstall apps together with their leftovers">Applications</button>
+        <button role="tab" aria-selected="false" data-shot="package-managers" data-cap="Outdated and unused global packages">Packages</button>
+        <button role="tab" aria-selected="false" data-shot="screenshots" data-cap="File screenshots by month, or clear them out">Screenshots</button>
+        <button role="tab" aria-selected="false" data-shot="external-drives" data-cap="Drive Trash, .DS_Store and ._ files">Drives</button>
+      </div>
+
+      <figure class="shot shot-tour reveal">
+        <img id="tour-img" src="img/npm-node-modules.webp" width="1600" height="1025" alt="Every node_modules folder, stale ones preselected" loading="lazy">
+        <figcaption id="tour-cap" class="mono">Every node_modules folder, stale ones preselected</figcaption>
+      </figure>
+    </section>
+
+    <!-- Safety -->
+    <section id="safety" class="section wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow">Safe by design</p>
+        <h2>It deletes things for a living,<br>so it's built to be paranoid</h2>
+      </div>
+
+      <div class="safety">
+        <div class="safety-list">
+          <div class="srow reveal"><span class="sdot" style="--c:#34D399"></span><div><h4>Trash first, with Put Back</h4><p>Everything goes to the Trash by default and can be put back from the dashboard. Permanent delete is an explicit, red, every-time choice.</p></div></div>
+          <div class="srow reveal"><span class="sdot" style="--c:#7C5CFF"></span><div><h4>Dry run</h4><p>Preview exactly what would happen, with sizes, without touching a byte.</p></div></div>
+          <div class="srow reveal"><span class="sdot" style="--c:#22D3EE"></span><div><h4>Scoped access</h4><p>Each category can only touch its own folders. Keychains, Mail, Messages, iCloud Drive, Photos, <code>/System</code> and <code>.git</code> are blocked unconditionally.</p></div></div>
+          <div class="srow reveal"><span class="sdot" style="--c:#F59E0B"></span><div><h4>Busy means no</h4><p>Projects open in Xcode, Unity, Unreal or a running <code>node</code> process are refused, checked when you confirm and again right before acting. Recently touched projects start unchecked.</p></div></div>
+          <div class="srow reveal"><span class="sdot" style="--c:#F0565E"></span><div><h4>No escalation, symlink-proof</h4><p>Never runs <code>sudo</code>. Tools run without a shell. Symlinks are removed, never followed, and paths are re-checked at their real location.</p></div></div>
+          <div class="srow reveal"><span class="sdot" style="--c:#60A5FA"></span><div><h4>Everything is logged</h4><p>Every cleanup goes to <code>cleanup.log</code> with path, size, action and where it went.</p></div></div>
+        </div>
+        <figure class="safety-media reveal">
+          <video src="img/cleaning.mp4" poster="img/cleaning.webp" autoplay muted loop playsinline aria-label="Cleanup in progress: an SSD whose flash cells erase as files are removed, with a live counter of space freed"></video>
+          <figcaption>An animated SSD erases its flash cells as files go, with a live counter of space freed, so it never looks frozen.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- CLI + everyday -->
+    <section id="cli" class="section wrap">
+      <div class="split">
+        <div class="reveal">
+          <p class="eyebrow">Everyday use</p>
+          <h2>Keyboard-first, scriptable, read-only from the terminal</h2>
+          <ul class="ticks">
+            <li><kbd>⌘⇧R</kbd> scan · <kbd>⌘K</kbd> search · <kbd>⌘⌫</kbd> clean the selection</li>
+            <li><b>Smart Select</b> picks stale node_modules, artifacts of inactive projects and Safe caches</li>
+            <li>Menu bar helper with free and reclaimable space</li>
+            <li>Scheduled scans that notify you when reclaimable space passes a threshold</li>
+            <li>Shortcuts and Siri actions that report, and never delete</li>
+          </ul>
+        </div>
+        <div class="window reveal">
+          <div class="window-bar"><i></i><i></i><i></i><span class="mono">zsh</span></div>
+          <pre class="mono"><span class="c"># the app binary doubles as a read-only CLI</span>
+<span class="p">$</span> yokoi scan
+<span class="p">$</span> yokoi scan <span class="f">--json</span> | jq .reclaimableBytes
+<span class="o">218103808000</span>
+<span class="p">$</span> yokoi scan <span class="f">--category</span> caches,build-artifacts <span class="f">--top</span> 10
+
+<span class="c"># cleaning always goes through the app's confirmation sheet</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Privacy -->
+    <section class="section wrap">
+      <div class="privacy reveal">
+        <div class="lock" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z"/></svg>
+        </div>
+        <div>
+          <h2>100% local. No account, no analytics, no telemetry.</h2>
+          <p>Yokoi only uses the network when you click <b>Check for Updates</b> on the Packages screen, and for a small signed update feed from GitHub. That request carries Yokoi's version and nothing else.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="section wrap narrow">
+      <div class="section-head reveal">
+        <p class="eyebrow">FAQ</p>
+        <h2>Questions, answered</h2>
+      </div>
+      <div class="faq">
+        <details class="reveal"><summary>Is it safe to delete node_modules and build folders?</summary><p>Yes. Your package manager or toolchain rebuilds them (<code>npm install</code>, <code>cargo build</code>, reopening the project in Unity…). Yokoi shows the restore command before you confirm, and only matches build folders next to their project files.</p></details>
+        <details class="reveal"><summary>Can I undo a cleanup?</summary><p>Anything moved to the Trash can be put back from <em>Recent cleanups</em> on the dashboard, until you empty the Trash. Permanent deletes can't be undone, which is why they always need an extra confirmation.</p></details>
+        <details class="reveal"><summary>Why does it want Full Disk Access?</summary><p>macOS protects some caches and folders. Without access, Yokoi can't measure them and skips them. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.</p></details>
+        <details class="reveal"><summary>Does it need my password or run anything as root?</summary><p>No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for administrators are shown as commands you can run yourself.</p></details>
+        <details class="reveal"><summary>How does it update?</summary><p>Through <a href="https://sparkle-project.org">Sparkle</a>. Every update is signed, and Sparkle refuses one whose signature doesn't match. You choose whether it checks automatically.</p></details>
+        <details class="reveal"><summary>What does "garbage collected" mean here?</summary><p>It's the same idea as in a runtime: find what's no longer reachable from your active work, such as stale dependencies, rebuildable output and caches nobody reads, and reclaim it without touching anything still in use.</p></details>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="section wrap">
+      <div class="cta reveal">
+        <img src="img/icon.png" alt="" width="96" height="96">
+        <h2>Get your gigabytes back</h2>
+        <p>Free and open source. macOS 14 Sonoma or later.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-lg" href="https://github.com/indieocean/yokoi/releases/latest" data-download>Download Yokoi <span class="mono" data-version>v1.2.4</span></a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/indieocean/yokoi#build-from-source">Build from source</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="brand"><img src="img/icon.png" alt="" width="22" height="22"><span>Yokoi</span></div>
+      <p class="mono foot-joke">Made for developers who've typed <code>du -sh * | sort -h</code> one too many times.</p>
+      <nav class="foot-links" aria-label="Footer">
+        <a href="https://github.com/indieocean/yokoi">GitHub</a>
+        <a href="https://github.com/indieocean/yokoi/releases">Releases</a>
+        <a href="https://github.com/indieocean/yokoi/blob/main/docs/DEVELOPMENT.md">Contributing</a>
+        <a href="https://buymeacoffee.com/theranchsteamlab">Buy me a coffee</a>
+      </nav>
+      <p class="copy">© 2026 <a href="https://theranchsteamlab.com/">The Ranch STEAM Lab</a> · <a href="https://github.com/indieocean/yokoi/blob/main/LICENSE">GPL-3.0</a></p>
+    </div>
+  </footer>
+</body>
+</html>
