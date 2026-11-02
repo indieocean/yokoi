@@ -17,8 +17,13 @@ final class PackagesStore {
         let kind: PackageManagerKind
         let action: Action
         let packages: [InstalledPackage]
+        /// The manager's absolute path, so the sheet shows exactly what runs. Nil leaves the bare name (demo mode).
+        var executable: String? = nil
         var commands: [[String]] {
-            packages.compactMap { action == .update ? kind.updateCommand($0.commandTarget) : kind.uninstallCommand($0.commandTarget) }
+            packages.compactMap { p -> [String]? in
+                guard let c = action == .update ? kind.updateCommand(p.commandTarget) : kind.uninstallCommand(p.commandTarget) else { return nil }
+                return executable.map { [$0] + c.dropFirst() } ?? c
+            }
         }
     }
 
@@ -193,7 +198,19 @@ final class PackagesStore {
     func request(_ action: Action, _ pkgs: [InstalledPackage]) {
         let allowed = pkgs.filter { can(action, $0) }
         guard !allowed.isEmpty else { return }
-        pending = PendingAction(kind: selected, action: action, packages: allowed)
+        let kind = selected
+        let pendingAction = PendingAction(kind: kind, action: action, packages: allowed)
+        if store.isDemo { pending = pendingAction; return }
+        Task {
+            // Resolve the tool first: the sheet shows its full path, and that same path is what runs.
+            guard let tool = pendingAction.commands.first?.first, let exe = await runner.which(tool) else {
+                errors[kind] = "\(kind.title) isn't installed, or only in a folder another account can write to."
+                return
+            }
+            var resolved = pendingAction
+            resolved.executable = exe
+            pending = resolved
+        }
     }
 
     /// Runs the confirmed commands one at a time, keeping each one's output.

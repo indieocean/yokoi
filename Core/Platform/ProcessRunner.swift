@@ -2,9 +2,12 @@ import Foundation
 
 /// Runs command-line tools (PRD §10 "ProcessRunner").
 ///
-/// - Executables are launched directly via `/usr/bin/env`, never through a shell, and every argument is
-///   passed separately, so package names can't inject commands.
-/// - `PATH` comes from the user's login shell (Homebrew, nvm, asdf shims), resolved once.
+/// - Each tool is looked up once to an absolute path and launched directly, never through `/usr/bin/env`
+///   or a shell, and every argument is passed separately, so package names can't inject commands.
+/// - `PATH` comes from the user's login shell (Homebrew, nvm, asdf shims), resolved once, and only if that
+///   shell is listed in `/etc/shells`. Folders another account could write to are dropped from it, and a
+///   tool is only run from a file another account couldn't have replaced (`isTrusted`): whatever Yokoi
+///   starts inherits its Full Disk Access.
 /// - Only the package-manager and developer tools Yokoi knows (`knownTools`) can be launched. Privilege
 ///   escalation, shells, interpreters and launchers that run another program (`env`, `xargs`…) are refused.
 /// - Every run has a timeout (SIGTERM, then SIGKILL) and keeps its output so the UI can show it. A child
@@ -54,6 +57,8 @@ actor ProcessRunner {
     static let drainTimeout: TimeInterval = 2
 
     private var resolvedPath: String?
+    /// Tool name → absolute path, looked up once.
+    private var resolvedTools: [String: String] = [:]
     private let pathOverride: String?
     private let allowedTools: Set<String>?
 
@@ -89,7 +94,7 @@ actor ProcessRunner {
             + Self.nvmNodeBins(home: home)
             + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
         var path = fallback.joined(separator: ":")
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let shell = Self.loginShell(ProcessInfo.processInfo.environment["SHELL"])
         // Interactive *and* login, so tools set up in ~/.zshrc (nvm, pyenv, conda init) are found too.
         // stdin is closed and there's a timeout, and markers cut out any greeting the rc files print.
         let script = "printf '__DKPATH__%s__DKEND__' \"$PATH\""
@@ -102,8 +107,46 @@ actor ProcessRunner {
             for p in fallback where !parts.contains(p) { parts.append(p) }
             path = parts.joined(separator: ":")
         }
+        path = Self.trustedPath(path)
         resolvedPath = path
         return path
+    }
+
+    /// `$SHELL` when `/etc/shells` lists it, else zsh: an arbitrary program named in the environment is never started.
+    static func loginShell(_ candidate: String?, shells: String? = try? String(contentsOfFile: "/etc/shells", encoding: .utf8)) -> String {
+        let listed = Set((shells ?? "").split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.hasPrefix("/") })
+        if let candidate, listed.contains(candidate), isTrusted(candidate) { return candidate }
+        return "/bin/zsh"
+    }
+
+    /// `path` without the folders that are relative, missing, duplicated or writable by another account.
+    static func trustedPath(_ path: String) -> String {
+        var seen = Set<String>()
+        return path.split(separator: ":").map(String.init)
+            .filter { $0.hasPrefix("/") && seen.insert($0).inserted && isTrusted($0, directory: true) }
+            .joined(separator: ":")
+    }
+
+    /// Group ids whose members can already use sudo: a folder they can write to gives nothing away.
+    /// (Homebrew makes `/opt/homebrew` writable by `admin` on many Macs.)
+    static let privilegedGroups: Set<gid_t> = [0, 80] // wheel, admin
+
+    /// Whether only the user, root or an admin could have put this file or folder there: owned by the user
+    /// or root, never world-writable, and group-writable only for wheel/admin. For a file, its real location
+    /// (Homebrew links into the Cellar) and that location's folder must pass too.
+    static func isTrusted(_ path: String, directory: Bool = false, uid: uid_t = getuid()) -> Bool {
+        func ok(_ p: String, dir: Bool) -> Bool {
+            var st = stat()
+            guard stat(p, &st) == 0 else { return false }
+            let isDir = (st.st_mode & S_IFMT) == S_IFDIR
+            guard isDir == dir, st.st_uid == uid || st.st_uid == 0, st.st_mode & S_IWOTH == 0 else { return false }
+            return st.st_mode & S_IWGRP == 0 || privilegedGroups.contains(st.st_gid)
+        }
+        if directory { return ok(path, dir: true) }
+        let real = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        return ok(path, dir: false) && ok(real, dir: false) && ok((real as NSString).deletingLastPathComponent, dir: true)
     }
 
     /// `~/.nvm/versions/node/<newest>/bin`, so global npm packages are found even if nvm isn't loaded.
@@ -116,14 +159,32 @@ actor ProcessRunner {
         return newest.map { ["\(root)/\($0)/bin"] } ?? []
     }
 
-    /// Finds an executable on the search path, or nil when the tool isn't installed.
+    /// Finds an executable on the search path, or nil when the tool isn't installed (or only in a place
+    /// another account could have written to). An absolute path is checked the same way.
     func which(_ tool: String) async -> String? {
-        let path = await searchPath()
-        for dir in path.split(separator: ":") {
-            let candidate = "\(dir)/\(tool)"
-            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        if let known = resolvedTools[tool] { return known }
+        var found: String?
+        if tool.hasPrefix("/") {
+            found = FileManager.default.isExecutableFile(atPath: tool) && Self.isTrusted(tool) ? tool : nil
+        } else if !tool.contains("/") {
+            for dir in await searchPath().split(separator: ":") {
+                let candidate = "\(dir)/\(tool)"
+                if FileManager.default.isExecutableFile(atPath: candidate) {
+                    // The first match is the one a shell would run: if it's untrusted, don't fall through to another.
+                    found = Self.isTrusted(candidate) ? candidate : nil
+                    break
+                }
+            }
         }
-        return nil
+        if let found { resolvedTools[tool] = found }
+        return found
+    }
+
+    /// `command` with its tool replaced by the absolute path that will run, for showing before confirming.
+    /// Nil when the tool isn't installed in a trusted place.
+    func resolved(_ command: [String]) async -> [String]? {
+        guard let tool = command.first, let exe = await which(tool) else { return nil }
+        return [exe] + command.dropFirst()
     }
 
     func run(_ command: [String], timeout: TimeInterval = 120, environment extra: [String: String] = [:]) async throws -> Result {
@@ -135,7 +196,11 @@ actor ProcessRunner {
         env["NO_COLOR"] = "1"
         env["NPM_CONFIG_UPDATE_NOTIFIER"] = "false"
         for (k, v) in extra { env[k] = v }
-        return try await Self.launch(executable: "/usr/bin/env", arguments: command, environment: env, timeout: timeout, display: command)
+        guard let exe = await which(command[0]) else {
+            throw RunnerError.launchFailed("\((command[0] as NSString).lastPathComponent) isn't installed, or only in a folder another account can write to")
+        }
+        let arguments = Array(command.dropFirst())
+        return try await Self.launch(executable: exe, arguments: arguments, environment: env, timeout: timeout, display: [exe] + arguments)
     }
 
     private static func launch(executable: String, arguments: [String], environment: [String: String],

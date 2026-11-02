@@ -103,7 +103,21 @@ struct ToolActionService: Sendable {
     let runner: ProcessRunner
     let home: URL
 
+    /// What `action` would remove, with every command already pointing at the absolute path that will run,
+    /// so the confirmation shows exactly that. Commands whose tool can't be found in a trusted place are dropped.
     func status(_ action: ToolAction) async -> ToolActionStatus? {
+        guard let s = await rawStatus(action) else { return nil }
+        var commands: [[String]] = []
+        for c in s.commands { if let r = await runner.resolved(c) { commands.append(r) } }
+        var items: [ToolActionStatus.Item] = []
+        for var item in s.items {
+            if let c = item.command { item.command = await runner.resolved(c) }
+            items.append(item)
+        }
+        return ToolActionStatus(action: s.action, count: s.count, size: s.size, items: items, commands: commands, note: s.note)
+    }
+
+    private func rawStatus(_ action: ToolAction) async -> ToolActionStatus? {
         switch action {
         case .unavailableSimulators:
             guard await runner.which("xcrun") != nil,

@@ -8,7 +8,66 @@ struct PlatformTests {
         let r = try await runner.run(["echo", "a;b", "$HOME"])
         #expect(r.succeeded)
         #expect(r.stdout == "a;b $HOME\n", "arguments are passed literally, never shell-expanded")
-        #expect(r.commandLine == "echo 'a;b' '$HOME'")
+        #expect(r.commandLine == "/bin/echo 'a;b' '$HOME'", "the log shows the absolute path that ran")
+    }
+
+    // MARK: Trusted tool paths
+
+    func chmod(_ url: URL, _ mode: Int) throws {
+        try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
+    }
+
+    @Test func runsAToolFromItsAbsolutePathOnly() async throws {
+        let f = try Fixture()
+        try script(f, "bin/tool", "echo real")
+        let runner = ProcessRunner(path: f.url("bin").path + ":/usr/bin:/bin", allowedTools: nil)
+        let exe = try #require(await runner.which("tool"))
+        #expect(exe == f.url("bin/tool").path)
+        #expect(await runner.resolved(["tool", "-v"]) == [exe, "-v"])
+        let r = try await runner.run(["tool"])
+        #expect(r.stdout == "real\n")
+        #expect(r.command.first == exe)
+        #expect(await runner.which("../bin/tool") == nil, "relative paths are never looked up")
+    }
+
+    @Test func skipsFoldersAndFilesOtherAccountsCanWrite() async throws {
+        let f = try Fixture()
+        try script(f, "open/tool", "echo planted")
+        try chmod(f.url("open"), 0o777)
+        try script(f, "safe/tool", "echo safe")
+        #expect(!ProcessRunner.isTrusted(f.url("open").path, directory: true))
+        #expect(ProcessRunner.trustedPath(f.url("open").path + ":" + f.url("safe").path + ":relative") == f.url("safe").path)
+
+        let runner = ProcessRunner(path: ProcessRunner.trustedPath(f.url("open").path + ":" + f.url("safe").path), allowedTools: nil)
+        #expect(try await runner.run(["tool"]).stdout == "safe\n", "the world-writable folder is dropped from PATH")
+
+        // A world-writable file in a good folder is refused, and the search doesn't fall through to a later copy.
+        try script(f, "first/tool2", "echo writable")
+        try chmod(f.url("first/tool2"), 0o777)
+        try script(f, "later/tool2", "echo later")
+        let shadowed = ProcessRunner(path: f.url("first").path + ":" + f.url("later").path, allowedTools: nil)
+        #expect(await shadowed.which("tool2") == nil)
+        await #expect(throws: ProcessRunner.RunnerError.self) { try await shadowed.run(["tool2"]) }
+    }
+
+    @Test func followsSymlinksToCheckTheRealFile() throws {
+        let f = try Fixture()
+        try script(f, "cellar/tool", "echo hi")
+        try chmod(f.url("cellar"), 0o777)
+        try f.dir("bin")
+        try FileManager.default.createSymbolicLink(atPath: f.url("bin/tool").path, withDestinationPath: f.url("cellar/tool").path)
+        #expect(!ProcessRunner.isTrusted(f.url("bin/tool").path), "the link is fine, but its target sits in a world-writable folder")
+        #expect(ProcessRunner.isTrusted("/bin/ls"))
+        #expect(ProcessRunner.isTrusted("/usr/bin", directory: true))
+        #expect(!ProcessRunner.isTrusted("/tmp", directory: true), "/tmp is world-writable")
+    }
+
+    @Test func onlyTrustsShellsListedInEtcShells() {
+        let shells = "# comment\n/bin/zsh\n/bin/bash\n"
+        #expect(ProcessRunner.loginShell("/bin/bash", shells: shells) == "/bin/bash")
+        #expect(ProcessRunner.loginShell("/tmp/evil", shells: shells) == "/bin/zsh")
+        #expect(ProcessRunner.loginShell(nil, shells: shells) == "/bin/zsh")
+        #expect(ProcessRunner.loginShell("# comment", shells: shells) == "/bin/zsh")
     }
 
     @Test func refusesPrivilegeEscalation() async {
