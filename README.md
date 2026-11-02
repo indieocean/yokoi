@@ -115,6 +115,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 - **Busy means no.** Projects open in Xcode, Unity, Unreal or a running `node` process, running apps, and Android emulators that are booted are refused. Yokoi checks twice: when you confirm and again right before acting.
 - **Recent means careful.** Projects you touched in the last 14 days start unchecked and need an extra confirmation.
 - **No escalation.** Yokoi never runs `sudo`. Command-line tools are run without a shell, and arguments are passed literally, so package names can't inject commands.
+- **Trusted tools only.** Each tool (`brew`, `npm`, `docker`…) is looked up once and run from its full path, which the confirmation shows. Folders and files another account could write to are skipped, so a look-alike `npm` dropped somewhere on your `PATH` isn't picked up.
 - **Symlink-proof.** Symlinks are removed, never followed. Paths are checked both as written and with symlinks resolved, and checked again at their real location right before anything is trashed, deleted or moved.
 - **Look, don't touch.** The `yokoi` command and the Shortcuts actions only scan and report. Cleaning always goes through the app's confirmation sheet.
 - **Everything is logged.** Every cleanup is written to `~/Library/Application Support/Yokoi/cleanup.log` with path, size, action and where it went.
@@ -217,7 +218,15 @@ Anything moved to the Trash can be put back from <em>Recent cleanups</em> on the
 <details>
 <summary><strong>Why does it want Full Disk Access?</strong></summary>
 <br>
-macOS protects some caches and folders. Without access Yokoi can't measure them and skips them. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.
+macOS protects some caches and folders. Without access Yokoi can't measure them and skips them. Full Disk Access is optional: everything else works without it. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.
+
+It's a broad grant, and the tools Yokoi runs for you (<code>brew</code>, <code>npm</code>, <code>docker</code>…) inherit it. That's why each tool is run from a full path you see before confirming, and only from a folder that you or an administrator control.
+</details>
+
+<details>
+<summary><strong>Why isn't Yokoi sandboxed?</strong></summary>
+<br>
+The App Sandbox only lets an app into folders you pick in an Open panel, and it can't run other programs. A cleaner that measures <code>~/Library/Caches</code>, <code>node_modules</code> across your projects and Xcode's folders, and that runs <code>brew</code>, <code>npm</code> or <code>docker</code> to clean up after them, can't work inside it. Yokoi is notarized and built with the Hardened Runtime and no exception entitlements: no unsigned code, no injected libraries, no debugger attach. In place of the sandbox, its limits are the ones listed under <a href="#safe-by-design">Safe by design</a>. Moving the deleting and the running of tools into a separate helper with fewer rights is on the roadmap.
 </details>
 
 <details>
@@ -242,6 +251,7 @@ It's the same idea as in a runtime: find what's no longer reachable from your ac
 - [x] Incremental rescans (FSEvents)
 - [x] `yokoi` command-line companion (`yokoi scan --json`)
 - [x] Shortcuts and App Intents
+- [ ] A separate helper with fewer rights for deleting files and running tools
 
 <br>
 
