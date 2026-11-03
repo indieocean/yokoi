@@ -101,6 +101,27 @@ Extra safety added with these:
 
 None of these can delete. Cleaning always goes through the confirmation sheet.
 
+## Duplicates
+
+`DuplicateScanner` compares files of 1 MB or more in the big-file locations: by size, then a hash of each file's
+first and last 64 KB, then SHA-256 of the whole file. It reads every real duplicate in full, so it only runs when asked
+for. `CleanCategory.routine` leaves it out of full and background scans, and `ScanReport.scannable` leaves it out of the
+CLI and Shortcuts. Its bytes aren't in the reclaimable total, because they're the same files as Big files and Downloads.
+
+- Each copy is its own item (`DuplicateFile`), so no cleanup entry can stand for a whole group.
+- `CleanupService` runs each entry's `KeepCheck` right before removing it. The copy is hashed again and must still match,
+  and so must another copy that isn't in the same cleanup. A copy kept for several others is read once per cleanup. This
+  holds whatever the UI sends, and it means a cleanup reads what it removes, which takes a while for big files.
+- Hardlinks count as one file. Files with their data in the cloud (`SF_DATALESS`) are skipped, because reading one
+  downloads it. Groups of clones that would free nothing aren't reported. Cloud-only and unreadable files are listed
+  under "not checked" (`ScanProgress.skipped`).
+- "Choose Folder…" scans one folder (`ScanContext.duplicateFolder`). It must be in a big-file location, since those are
+  what cleanup may reach. Groups that are all inside git work trees are shown for a chosen folder, and "Select Extras"
+  still leaves repository copies to be ticked by hand.
+- Copies inside a git work tree are tagged, kept first, and never picked by "Select Extras". A group with every
+  copy inside work trees isn't shown unless a folder was chosen: on a real home folder that's nearly all of them, and it's build output and
+  vendored code.
+
 ## Incremental rescans
 
 Rescans reuse the last scan's measurements for anything FSEvents says hasn't changed. On a real home folder this

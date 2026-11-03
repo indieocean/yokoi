@@ -15,6 +15,62 @@ enum CleanupAction: Sendable, Hashable {
     }
 }
 
+/// A file as a scan saw it.
+struct FileSnapshot: Sendable, Hashable {
+    let url: URL
+    let size: Int64
+    let modified: Date
+
+    init(_ file: DuplicateFile) {
+        url = file.url
+        size = file.fileSize
+        modified = file.modified
+    }
+
+    static func modified(_ st: stat) -> Date {
+        Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec) + TimeInterval(st.st_mtimespec.tv_nsec) / 1e9)
+    }
+
+    /// The file is still there, still a regular file with its data on this Mac, with the same length and
+    /// modification date.
+    var isUnchanged: Bool {
+        var st = stat()
+        guard lstat(url.path, &st) == 0, st.st_mode & S_IFMT == S_IFREG,
+              st.st_flags & DuplicateScanner.datalessFlag == 0 else { return false }
+        return Int64(st.st_size) == size && abs(Self.modified(st).timeIntervalSince(modified)) < 1
+    }
+}
+
+/// What must hold for a duplicate to be removed: it still has the contents that were compared, and another
+/// copy with those contents outlives it. Checked right before the removal, because everything else about a
+/// duplicate is only as fresh as the scan that found it. Both files are read again: an edit can leave the
+/// length and date as they were.
+struct KeepCheck: Sendable, Hashable {
+    let digest: String
+    let target: FileSnapshot
+    let keep: [FileSnapshot]
+
+    /// Why this removal can't go ahead, if it can't.
+    /// - Parameters:
+    ///   - removing: every path in the cleanup. A copy in it isn't one that survives.
+    ///   - verified: paths already read in this cleanup, so a copy kept for several others is read once.
+    func refusal(removing: Set<String>, verified: inout Set<String>) -> String? {
+        guard matches(target, &verified) else { return "Changed since the last scan, or can't be read. Rescan, then clean it" }
+        for copy in keep where !removing.contains(copy.url.path) {
+            if matches(copy, &verified) { return nil }
+        }
+        return "Refused: no unchanged copy would be left. Rescan, then clean it"
+    }
+
+    private func matches(_ file: FileSnapshot, _ verified: inout Set<String>) -> Bool {
+        guard file.isUnchanged else { return false }
+        if verified.contains(file.url.path) { return true }
+        guard DuplicateScanner.digest(file.url) == digest else { return false }
+        verified.insert(file.url.path)
+        return true
+    }
+}
+
 /// One thing to clean, flattened from any `Reclaimable`.
 struct CleanupEntry: Sendable, Identifiable, Hashable {
     let id: String
@@ -41,6 +97,8 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
     var scannedAt: Date? = nil
     /// Apps or processes whose running blocks this cleanup (`CacheLocation.usedByApps`).
     var usedByApps: [String] = []
+    /// For a duplicate: refused unless this passes.
+    var keepCheck: KeepCheck? = nil
 
     init<R: Reclaimable>(_ item: R, displayPath: String? = nil, date: Date? = nil) {
         id = item.id
@@ -57,6 +115,7 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
         switch item {
         case let i as NodeModulesItem: projectRoot = i.projectURL
         case let i as ArtifactItem: projectRoot = i.isGlobal ? nil : i.projectURL
+        case let i as DuplicateFile: projectRoot = i.repository
         case let i as AppItem:
             projectRoot = i.url
             refusal = i.protectedReason
@@ -313,6 +372,8 @@ actor CleanupService {
         var failures: [CleanupOutcome.Failure] = []
         var completed = Set<String>()
         var bytes: Int64 = 0
+        let removing = Set(entries.flatMap(\.urls).map(\.path))
+        var verified = Set<String>()
         progress?.begin(entries: entries.count, files: entries.reduce(0) { $0 + max($1.fileCount, $1.urls.count) },
                         bytes: entries.reduce(0) { $0 + $1.size })
 
@@ -329,6 +390,11 @@ actor CleanupService {
             let pathGuard = guards[entry.category] ?? PathGuard(allowedRoots: [], exclusions: GlobMatcher(patterns: []))
             if let why = entry.refusal {
                 failures.append(.init(path: entry.displayPath, reason: "Refused: \(why)"))
+                failedHere = 1
+                continue
+            }
+            if let why = entry.keepCheck?.refusal(removing: removing, verified: &verified) {
+                failures.append(.init(path: entry.displayPath, reason: why))
                 failedHere = 1
                 continue
             }

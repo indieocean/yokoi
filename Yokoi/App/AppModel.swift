@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum Screen: String, CaseIterable, Identifiable, Hashable {
-    case dashboard, nodeModules, buildArtifacts, caches, bigFiles, downloads, screenshots, applications, externalDrives, packageManagers, settings
+    case dashboard, nodeModules, buildArtifacts, caches, bigFiles, duplicates, downloads, screenshots, applications, externalDrives, packageManagers, settings
 
     var id: String { rawValue }
 
@@ -13,6 +13,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .buildArtifacts: "Build Artifacts"
         case .caches: "Caches & Tooling"
         case .bigFiles: "Big Files"
+        case .duplicates: "Duplicates"
         case .downloads: "Downloads"
         case .screenshots: "Screenshots"
         case .applications: "Applications"
@@ -29,6 +30,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .buildArtifacts: "hammer"
         case .caches: "archivebox"
         case .bigFiles: "externaldrive.badge.exclamationmark"
+        case .duplicates: "doc.on.doc"
         case .downloads: "arrow.down.circle"
         case .screenshots: "camera.viewfinder"
         case .applications: "app.dashed"
@@ -44,6 +46,7 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
         case .buildArtifacts: .buildArtifacts
         case .caches: .caches
         case .bigFiles: .bigFiles
+        case .duplicates: .duplicates
         case .downloads: .downloads
         case .screenshots: .screenshots
         case .applications: .applications
@@ -126,6 +129,7 @@ final class AppModel {
     let artifactsVM: ArtifactsViewModel
     let cachesVM: CachesViewModel
     let bigFilesVM: BigFilesViewModel
+    let duplicatesVM: DuplicatesViewModel
     let screenshotsVM: ScreenshotsViewModel
     let downloadsVM: DownloadsViewModel
     let applicationsVM: ApplicationsViewModel
@@ -147,6 +151,7 @@ final class AppModel {
         artifactsVM = ArtifactsViewModel(store: store)
         cachesVM = CachesViewModel(store: store)
         bigFilesVM = BigFilesViewModel(store: store)
+        duplicatesVM = DuplicatesViewModel(store: store)
         screenshotsVM = ScreenshotsViewModel(store: store)
         downloadsVM = DownloadsViewModel(store: store)
         applicationsVM = ApplicationsViewModel(store: store)
@@ -258,7 +263,7 @@ final class AppModel {
         activity.outcome = outcome
         lastOutcome = outcome
 
-        for vm in [nodeModulesVM as any SelectionPruning, artifactsVM, cachesVM, bigFilesVM, downloadsVM, screenshotsVM, applicationsVM] {
+        for vm in [nodeModulesVM as any SelectionPruning, artifactsVM, cachesVM, bigFilesVM, duplicatesVM, downloadsVM, screenshotsVM, applicationsVM] {
             vm.prune(outcome.completedIDs)
         }
     }

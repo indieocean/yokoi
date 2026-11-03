@@ -61,6 +61,7 @@ struct RootView: View {
         case .buildArtifacts: BuildArtifactsView()
         case .caches: CachesView()
         case .bigFiles: BigFilesView()
+        case .duplicates: DuplicatesView()
         case .downloads: DownloadsView()
         case .screenshots: ScreenshotsView()
         case .applications: ApplicationsView()

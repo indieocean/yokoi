@@ -27,6 +27,10 @@ struct ScanContext: Sendable {
     var externalVolumes: [URL] = []
     /// Smallest file the big-file scanner reports. The UI threshold filters further.
     var bigFileFloor: Int64 = 100_000_000
+    /// Smallest file compared by the duplicate scanner. Below this, copies aren't worth reading the disk for.
+    var duplicateFloor: Int64 = 1_000_000
+    /// The one folder to look for duplicates in, instead of all the big-file locations.
+    var duplicateFolder: URL? = nil
     /// How many folders are sized at once.
     var concurrency: Int = 8
     /// The previous scan's measurements, for incremental rescans. `nil` measures everything.
@@ -46,7 +50,7 @@ struct ScanContext: Sendable {
             return roots.map { $0.url(home: home) } + GlobalArtifactRule.all.map { home.appendingPathComponent($0.relativePath) }
         case .caches:
             return CacheLocation.all.map { $0.url(home: home) }
-        case .bigFiles:
+        case .bigFiles, .duplicates:
             return bigFileRoots
         case .downloads:
             return [downloadsURL]
@@ -59,6 +63,17 @@ struct ScanContext: Sendable {
         case .packages:
             return []
         }
+    }
+
+    /// Why `folder` can't be searched for duplicates, or nil when it can. It has to be in a big-file location,
+    /// because those are what cleanup may reach: anything found outside one couldn't be removed.
+    func duplicateFolderRefusal(_ folder: URL) -> String? {
+        let path = PathFormat.canonical(folder.standardizedFileURL.path)
+        let inside = bigFileRoots.contains { root in
+            let root = PathFormat.canonical(root.standardizedFileURL.path)
+            return path == root || path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+        }
+        return inside ? nil : "It isn't in your big-file locations. Add it in Settings first."
     }
 
     var downloadsURL: URL { downloadsFolder ?? home.appendingPathComponent("Downloads") }
@@ -97,8 +112,16 @@ final class ScanProgress: Sendable {
     }
 
     private let state = OSAllocatedUnfairLock(initialState: Snapshot())
+    private let skips = OSAllocatedUnfairLock(initialState: [SkippedFile]())
 
     init() {}
+
+    /// Files the scan had to leave out. Kept apart from `snapshot`, which the UI polls.
+    var skippedFiles: [SkippedFile] { skips.withLock { $0 } }
+
+    func skipped(_ file: SkippedFile) {
+        skips.withLock { $0.append(file) }
+    }
 
     var snapshot: Snapshot { state.withLock { $0 } }
 

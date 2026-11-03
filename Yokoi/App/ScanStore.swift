@@ -20,6 +20,9 @@ private struct ScanCache: Codable {
     var screenshots: [ScreenshotItem]
     var applications: [AppItem]?
     var downloads: [DownloadItem]?
+    var duplicates: [DuplicateFile]?
+    var duplicateFolder: URL?
+    var duplicateSkips: [SkippedFile]?
     var summary: ScanSummary?
     /// When each category's results were scanned, by `CleanCategory.rawValue`.
     var scannedAt: [String: Date]?
@@ -33,6 +36,11 @@ final class ScanStore {
     var artifacts: [ArtifactItem] = []
     var caches: [CacheItem] = []
     var bigFiles: [BigFileItem] = []
+    var duplicates: [DuplicateFile] = []
+    /// The folder the duplicates came from, when one was chosen. Nil means all the big-file locations.
+    private(set) var duplicateFolder: URL?
+    /// Files the last duplicate scan couldn't compare.
+    var duplicateSkips: [SkippedFile] = []
     var screenshots: [ScreenshotItem] = []
     var downloads: [DownloadItem] = []
     var applications: [AppItem] = []
@@ -78,6 +86,8 @@ final class ScanStore {
         artifacts = DemoData.artifacts
         caches = DemoData.caches
         bigFiles = DemoData.bigFiles
+        duplicates = DemoData.duplicates
+        duplicateSkips = DemoData.duplicateSkips
         screenshots = DemoData.screenshots()
         downloads = DemoData.downloads
         applications = DemoData.applications
@@ -100,11 +110,30 @@ final class ScanStore {
         case .bigFiles: bigFiles.filter { $0.size >= settings.data.bigFileThreshold }.reduce(0) { $0 + $1.size }
         case .downloads: downloads.filter { $0.isOld(days: settings.data.downloadsAgeDays) }.reduce(0) { $0 + $1.size }
         case .screenshots: screenshots.reduce(0) { $0 + $1.size }
+        case .duplicates: 0  // the same files as Big files and Downloads: shown on its own screen, not in the total
         case .externalDrives: 0  // a different disk: shown on its own screen, not in the Mac's total
         case .applications: applications.filter { $0.protectedReason == nil && $0.isUnused(days: 180) }.reduce(0) { $0 + $1.size }
         case .packages: packagesReclaimable
         }
     }
+
+    /// What keeping one copy of everything on the Duplicates screen would free.
+    var duplicatesReclaimable: Int64 { duplicateGroups.reduce(0) { $0 + $1.reclaimable } }
+
+    /// Repositories' own copies only show when the user chose a folder to look through.
+    var duplicateGroups: [DuplicateGroup] {
+        DuplicateGroup.groups(duplicates, includingRepositories: duplicateFolder != nil)
+    }
+
+    /// Looks for duplicates in `folder`, or in all the big-file locations.
+    func findDuplicates(in folder: URL?) {
+        guard !isScanning else { return }
+        duplicateFolder = folder
+        scan([.duplicates])
+    }
+
+    /// When the scan behind this category's results started, or nil if it has never been scanned.
+    func lastScanned(_ category: CleanCategory) -> Date? { scannedAt[category] }
 
     /// Size of global packages unused for over a year (set by the Package Managers screen).
     var packagesReclaimable: Int64 = 0
@@ -138,10 +167,12 @@ final class ScanStore {
 
     // MARK: Scanning
 
-    func scan(_ categories: Set<CleanCategory> = Set(CleanCategory.allCases)) {
+    func scan(_ categories: Set<CleanCategory> = CleanCategory.routine) {
         if isDemo { populateDemo(); return }
         guard !isScanning else { return }
-        let context = settings.context()
+        var scanContext = settings.context()
+        scanContext.duplicateFolder = duplicateFolder
+        let context = scanContext
         let progress = ScanProgress()
         let start = Date()
         for c in categories { scannedAt[c] = start }
@@ -155,6 +186,10 @@ final class ScanStore {
         if categories.contains(.buildArtifacts) { artifacts = [] }
         if categories.contains(.caches) { caches = [] }
         if categories.contains(.bigFiles) { bigFiles = [] }
+        if categories.contains(.duplicates) {
+            duplicates = []
+            duplicateSkips = []
+        }
         if categories.contains(.screenshots) { screenshots = [] }
         if categories.contains(.downloads) { downloads = [] }
         if categories.contains(.applications) { applications = [] }
@@ -179,6 +214,7 @@ final class ScanStore {
                 case .artifact(let i): artifacts.append(i)
                 case .cache(let i): caches.append(i)
                 case .bigFile(let i): bigFiles.append(i)
+                case .duplicate(let i): duplicates.append(i)
                 case .screenshot(let i): screenshots.append(i)
                 case .download(let i): downloads.append(i)
                 case .application(let i): applications.append(i)
@@ -188,6 +224,11 @@ final class ScanStore {
             poller.cancel()
             self.progress = progress.snapshot
             let cancelled = Task.isCancelled
+            if categories.contains(.duplicates) {
+                duplicateSkips = progress.skippedFiles
+                // A stopped search found nothing yet, which isn't the same as finding no duplicates.
+                if cancelled { scannedAt[.duplicates] = nil }
+            }
             let partial = cancelled || !categories.isSuperset(of: ScanReport.scannable)
             Task.detached(priority: .utility) { index.save(to: indexURL, carryOver: partial) }
             isScanning = false
@@ -207,7 +248,7 @@ final class ScanStore {
     }
 
     /// Starts a scan (if none is running) and waits for it to finish. Used by scheduled scans.
-    func scanAndWait(_ categories: Set<CleanCategory> = Set(CleanCategory.allCases)) async {
+    func scanAndWait(_ categories: Set<CleanCategory> = CleanCategory.routine) async {
         if !isScanning { scan(categories) }
         await scanTask?.value
     }
@@ -237,6 +278,7 @@ final class ScanStore {
         // Single items cleaned from a location: drop them and keep the rest.
         caches = caches.map { $0.removingChildren(entryIDs: ids) ?? $0 }
         bigFiles.removeAll { ids.contains($0.id) }
+        duplicates.removeAll { ids.contains($0.id) }
         screenshots.removeAll { ids.contains($0.id) }
         downloads.removeAll { ids.contains($0.id) }
         applications.removeAll { ids.contains($0.id) }
@@ -278,6 +320,9 @@ final class ScanStore {
         artifacts = cache.artifacts
         caches = cache.caches
         bigFiles = cache.bigFiles
+        duplicates = (cache.duplicates ?? []).filter { FileManager.default.fileExists(atPath: $0.url.path) }
+        duplicateFolder = cache.duplicateFolder
+        duplicateSkips = cache.duplicateSkips ?? []
         screenshots = cache.screenshots.filter { FileManager.default.fileExists(atPath: $0.url.path) }
         applications = cache.applications ?? []
         downloads = (cache.downloads ?? []).filter { FileManager.default.fileExists(atPath: $0.url.path) }
@@ -289,7 +334,8 @@ final class ScanStore {
 
     private func saveCache() {
         let cache = ScanCache(nodeModules: nodeModules, artifacts: artifacts, caches: caches,
-                              bigFiles: bigFiles, screenshots: screenshots, applications: applications, downloads: downloads, summary: lastScan,
+                              bigFiles: bigFiles, screenshots: screenshots, applications: applications, downloads: downloads, duplicates: duplicates,
+                              duplicateFolder: duplicateFolder, duplicateSkips: duplicateSkips, summary: lastScan,
                               scannedAt: Dictionary(uniqueKeysWithValues: scannedAt.map { ($0.key.rawValue, $0.value) }))
         let url = Self.cacheURL
         Task.detached(priority: .utility) {

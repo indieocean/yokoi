@@ -124,6 +124,7 @@ enum ScanEvent: Sendable {
     case artifact(ArtifactItem)
     case cache(CacheItem)
     case bigFile(BigFileItem)
+    case duplicate(DuplicateFile)
     case screenshot(ScreenshotItem)
     case download(DownloadItem)
     case application(AppItem)
@@ -135,7 +136,7 @@ actor ScanEngine {
     private(set) var isRunning = false
     private(set) var lastDuration: TimeInterval = 0
 
-    func run(_ context: ScanContext, progress: ScanProgress, categories: Set<CleanCategory> = Set(CleanCategory.allCases)) -> AsyncStream<ScanEvent> {
+    func run(_ context: ScanContext, progress: ScanProgress, categories: Set<CleanCategory> = CleanCategory.routine) -> AsyncStream<ScanEvent> {
         isRunning = true
         let start = Date()
         let (stream, continuation) = AsyncStream<ScanEvent>.makeStream()
@@ -152,6 +153,9 @@ actor ScanEngine {
                 }
                 if categories.contains(.bigFiles) {
                     group.addTask { await Self.forward(BigFileScanner(), context, progress, continuation, ScanEvent.bigFile) }
+                }
+                if categories.contains(.duplicates) {
+                    group.addTask { await Self.forward(DuplicateScanner(), context, progress, continuation, ScanEvent.duplicate) }
                 }
                 if categories.contains(.downloads) {
                     group.addTask { await Self.forward(DownloadsScanner(), context, progress, continuation, ScanEvent.download) }

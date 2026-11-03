@@ -86,6 +86,7 @@ extension CleanCategory {
         case .buildArtifacts: "hammer"
         case .caches: "archivebox"
         case .bigFiles: "externaldrive.badge.exclamationmark"
+        case .duplicates: "doc.on.doc"
         case .downloads: "arrow.down.circle"
         case .screenshots: "camera.viewfinder"
         case .applications: "app.dashed"

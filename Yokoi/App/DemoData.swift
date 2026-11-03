@@ -147,6 +147,27 @@ enum DemoData {
         ]
     }
 
+    static var duplicates: [DuplicateFile] {
+        func f(_ path: String, _ digest: String, _ size: Int64, _ age: Double, frees: Int64? = nil, repository: String? = nil) -> DuplicateFile {
+            DuplicateFile(url: url(path), digest: digest, fileSize: size, size: frees ?? size, modified: days(age),
+                          repository: repository.map(url))
+        }
+        return [
+            f("Movies/Exports/orbital_trailer_4k_master.mov", "trailer", 14_200 * MB, 240),
+            f("Desktop/old/orbital_trailer_4k_master copy.mov", "trailer", 14_200 * MB, 240),
+            f("Downloads/ubuntu-24.04-desktop-arm64.iso", "ubuntu", 5_710 * MB, 286),
+            f("VMs/isos/ubuntu-24.04-desktop-arm64.iso", "ubuntu", 5_710 * MB, 120, frees: 0),
+            f("VMs/isos/old/ubuntu-24.04.iso", "ubuntu", 5_710 * MB, 120, frees: 0),
+            f("games/Orbital/Raw/city_block_hipoly.fbx", "fbx", 1_420 * MB, 31, repository: "games/Orbital"),
+            f("work/art/refs/city_block_hipoly.fbx", "fbx", 1_420 * MB, 90),
+        ]
+    }
+
+    static var duplicateSkips: [SkippedFile] {
+        [SkippedFile(url: url("Documents/Archive/2023_taxes.pdf"), reason: .cloudOnly),
+         SkippedFile(url: url("work/backups/locked_export.tar"), reason: .unreadable)]
+    }
+
     static var downloads: [DownloadItem] {
         func d(_ name: String, _ kind: DownloadKind, _ size: Int64, added: Double, opened: Double? = nil,
                files: Int = 1, extracted: Bool = false) -> DownloadItem {

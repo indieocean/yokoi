@@ -31,7 +31,7 @@ struct IncrementalScanTests {
             case .screenshot(let i): out.append("shot \(i.url.path) \(i.size)")
             case .download(let i): out.append("dl \(i.url.path) \(i.size)")
             case .application(let i): out.append("app \(i.url.path) \(i.appSize)")
-            case .finished: break
+            case .duplicate, .finished: break
             }
         }
         return out.sorted()

@@ -2,9 +2,13 @@ import Foundation
 
 /// Top-level reclaimable categories shown on the dashboard and sidebar.
 enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
-    case nodeModules, buildArtifacts, caches, bigFiles, downloads, screenshots, applications, externalDrives, packages
+    case nodeModules, buildArtifacts, caches, bigFiles, duplicates, downloads, screenshots, applications, externalDrives, packages
 
     var id: String { rawValue }
+
+    /// What a full scan covers. Duplicates are left out: finding them reads whole files, so that scan only
+    /// runs when asked for.
+    static var routine: Set<CleanCategory> { Set(allCases).subtracting([.duplicates]) }
 
     /// Whether cleanup refuses an item created after the scan that found it. Not for caches: tools delete
     /// and recreate their cache folders all the time, and whatever is there now is still a cache.
@@ -16,6 +20,7 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .buildArtifacts: "Build artifacts"
         case .caches: "Caches & Tooling"
         case .bigFiles: "Big files"
+        case .duplicates: "Duplicates"
         case .downloads: "Downloads"
         case .screenshots: "Screenshots"
         case .applications: "Applications"
@@ -31,6 +36,7 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .buildArtifacts: "BA"
         case .caches: "CA"
         case .bigFiles: "BF"
+        case .duplicates: "DU"
         case .downloads: "DL"
         case .screenshots: "SS"
         case .applications: "AP"
@@ -45,6 +51,7 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .buildArtifacts: 0x7C5CFF
         case .caches: 0x22D3EE
         case .bigFiles: 0xF59E0B
+        case .duplicates: 0x2DD4BF
         case .downloads: 0xA3E635
         case .screenshots: 0xF472B6
         case .applications: 0xA78BFA

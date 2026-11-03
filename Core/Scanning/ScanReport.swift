@@ -56,7 +56,7 @@ struct ScanReport: Codable, Sendable {
             case .screenshot(let i): screenshots.append(i)
             case .download(let i): downloads.append(i)
             case .application(let i): apps.append(i)
-            case .finished: break
+            case .duplicate, .finished: break
             }
         }
 

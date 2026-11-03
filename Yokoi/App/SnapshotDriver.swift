@@ -101,6 +101,9 @@ enum SnapshotDriver {
         }
         await shot("caches-items")
 
+        app.screen = .duplicates
+        await shot("duplicates")
+
         app.screen = .downloads
         app.downloadsVM.selectLeftovers()
         await shot("downloads")

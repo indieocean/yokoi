@@ -55,7 +55,7 @@ struct DashboardView: View {
                     }
                     .foregroundStyle(delta >= 0 ? Theme.success : Theme.textSecondary)
                 } else {
-                    Text("across \(CleanCategory.allCases.count - 1) categories").foregroundStyle(Theme.textSecondary)
+                    Text("across \(CleanCategory.allCases.count - 2) categories").foregroundStyle(Theme.textSecondary)
                 }
             }
             KPITile(label: "Projects scanned", value: store.projectCount.formatted()) {
@@ -211,6 +211,7 @@ struct CategoryRingCard: View {
         case .buildArtifacts: .buildArtifacts
         case .caches: .caches
         case .bigFiles: .bigFiles
+        case .duplicates: .duplicates
         case .downloads: .downloads
         case .screenshots: .screenshots
         case .applications: .applications

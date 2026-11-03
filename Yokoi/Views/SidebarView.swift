@@ -14,6 +14,7 @@ struct SidebarView: View {
                 row(.buildArtifacts)
                 row(.caches)
                 row(.bigFiles)
+                row(.duplicates)
                 row(.downloads)
                 row(.screenshots)
                 row(.applications)
@@ -79,6 +80,9 @@ struct SidebarView: View {
         let store = app.store
         if let category = screen.category, store.scanningCategories.contains(category) { return nil }
         switch screen {
+        case .duplicates:
+            let total = store.duplicatesReclaimable
+            return total > 0 ? ByteFormat.compact(total) : nil
         case .screenshots:
             return store.screenshots.isEmpty ? nil : "\(store.screenshots.count)"
         case .applications:

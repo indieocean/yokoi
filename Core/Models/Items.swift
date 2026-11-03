@@ -203,6 +203,119 @@ struct BigFileItem: Reclaimable, Codable, Hashable {
     }
 }
 
+/// One copy of a file that exists more than once. Each copy is its own item, so a cleanup can only ever name
+/// the copies picked: nothing here stands for a whole group.
+struct DuplicateFile: Reclaimable, Codable, Hashable {
+    var id: String { url.path }
+    let url: URL
+    /// SHA-256 of the contents. Copies with the same digest are one group.
+    let digest: String
+    /// Length of the file.
+    let fileSize: Int64
+    /// What removing this copy frees: nothing for an APFS clone or a file hardlinked elsewhere.
+    let size: Int64
+    let modified: Date
+    /// The git work tree this copy is in. A project may need its copy, so it's never picked automatically.
+    let repository: URL?
+
+    var category: CleanCategory { .duplicates }
+    var title: String { url.lastPathComponent }
+    var urls: [URL] { [url] }
+    var fileCount: Int { 1 }
+    var restoreHint: String { "restore from the Trash if you change your mind" }
+    var safety: SafetyLevel { .review }
+    var name: String { url.lastPathComponent }
+    var location: String { PathFormat.abbreviate(url.deletingLastPathComponent()) }
+}
+
+/// A file the duplicate scan couldn't compare, so it may have copies that aren't listed.
+struct SkippedFile: Codable, Hashable, Sendable, Identifiable {
+    enum Reason: String, Codable, Sendable {
+        case cloudOnly, unreadable
+
+        var label: String {
+            switch self {
+            case .cloudOnly: "In the cloud only"
+            case .unreadable: "Couldn't be read"
+            }
+        }
+    }
+
+    var id: String { url.path }
+    let url: URL
+    let reason: Reason
+}
+
+/// Copies of one file, with the one best worth keeping first.
+struct DuplicateGroup: Identifiable, Hashable, Sendable {
+    var id: String { digest }
+    let digest: String
+    let files: [DuplicateFile]
+
+    init(digest: String, files: [DuplicateFile]) {
+        self.digest = digest
+        self.files = files.sorted { Self.keepOrder($0) < Self.keepOrder($1) }
+    }
+
+    /// Lower is better to keep: anything in a repository, then anything outside Downloads, then the shortest
+    /// path ("clip.mov" over "clip copy.mov").
+    private static func keepOrder(_ f: DuplicateFile) -> KeepOrder {
+        KeepOrder(outsideRepository: f.repository == nil ? 1 : 0, inDownloads: f.url.path.contains("/Downloads/") ? 1 : 0,
+                  length: f.url.path.count, path: f.url.path)
+    }
+
+    private struct KeepOrder: Comparable {
+        let outsideRepository: Int, inDownloads: Int, length: Int, path: String
+        static func < (a: KeepOrder, b: KeepOrder) -> Bool {
+            (a.outsideRepository, a.inDownloads, a.length, a.path) < (b.outsideRepository, b.inDownloads, b.length, b.path)
+        }
+    }
+
+    /// Groups copies by contents, biggest saving first. A copy left on its own is no longer a duplicate, and
+    /// copies that are all in repositories aren't shown: that's build output and vendored code, which the
+    /// projects need or rebuild. A match with a file elsewhere still shows, since that file is the one to remove.
+    /// - Parameter includingRepositories: show them anyway, for a folder the user chose to look through.
+    static func groups(_ files: [DuplicateFile], includingRepositories: Bool = false) -> [DuplicateGroup] {
+        Dictionary(grouping: files, by: \.digest)
+            .filter { $0.value.count > 1 && (includingRepositories || $0.value.contains { $0.repository == nil }) }
+            .map { DuplicateGroup(digest: $0.key, files: $0.value) }
+            .sorted { ($0.reclaimable, $1.digest) > ($1.reclaimable, $0.digest) }
+    }
+
+    var name: String { files[0].name }
+    var fileSize: Int64 { files[0].fileSize }
+    var badge: String {
+        let ext = files[0].url.pathExtension.uppercased()
+        return ext.isEmpty ? "FILE" : String(ext.prefix(4))
+    }
+
+    /// What's freed by keeping the copy that frees least. Clones of each other free nothing between them, so
+    /// the result can come out low, never high.
+    var reclaimable: Int64 {
+        files.reduce(0) { $0 + $1.size } - (files.map(\.size).min() ?? 0)
+    }
+
+    /// The copies "select extras" picks: all but the best one, and never one inside a repository.
+    var extras: [DuplicateFile] { files.dropFirst().filter { $0.repository == nil } }
+
+    /// The copies in `ids` that may go. If that's every copy, the best one stays.
+    func removable(from ids: Set<String>) -> [DuplicateFile] {
+        let picked = files.filter { ids.contains($0.id) }
+        return picked.count == files.count ? Array(picked.dropFirst()) : picked
+    }
+
+    /// Cleanups of the copies in `ids`, each refused by `CleanupService` unless a copy left out survives it.
+    func entries(removing ids: Set<String>) -> [CleanupEntry] {
+        let removing = removable(from: ids)
+        let kept = files.filter { !removing.contains($0) }.map(FileSnapshot.init)
+        return removing.map { file in
+            var entry = CleanupEntry(file)
+            entry.keepCheck = KeepCheck(digest: digest, target: FileSnapshot(file), keep: kept)
+            return entry
+        }
+    }
+}
+
 struct ScreenshotItem: Reclaimable, Codable, Hashable {
     var id: String { url.path }
     let url: URL
