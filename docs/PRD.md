@@ -26,7 +26,6 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 
 **Non-goals (v1)**
 - General consumer "Mac cleaner" features (mail attachments, language packs, malware, RAM boosting).
-- Duplicate-file detection (could come later).
 - Managing project dependencies beyond deleting folders (no `npm install` orchestration).
 - Windows/Linux versions or cloud sync.
 - Uninstalling apps.
@@ -142,6 +141,17 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 - Radio choice: **Move to Trash** (default) / **Delete permanently** (red, "cannot be undone").
 - "Don't ask again" only applies to Safe-level items and never to permanent deletion.
 
+### 5.9 Duplicates
+- FR-D1 Find files of 1 MB or more with identical contents (SHA-256), in the big-file locations or in one chosen folder, skipping what Big files skips (FR-F5). The folder must be in a big-file location, since those bound what cleanup may reach.
+- FR-D2 Runs only when asked for. It reads files in full, so full and background scans, the CLI and Shortcuts leave it out. Its bytes aren't in the reclaimable total, because they overlap Big files and Downloads.
+- FR-D3 Group copies by contents, biggest saving first. Each copy shows its path, modified date and what removing it frees. Row actions are Reveal in Finder and Quick Look.
+- FR-D4 Hardlinks count as one file. Groups of APFS clones that would free nothing aren't listed.
+- FR-D5 Groups with every copy inside git work trees aren't listed, unless a folder was chosen. Copies in a repository are tagged and kept first.
+- FR-D6 Nothing is preselected. "Select Extras" picks all but the best copy in each group and never picks a copy in a repository. The best copy is one in a repository, then one outside Downloads, then the shortest path.
+- FR-D7 One copy always stays. The last unpicked copy can't be picked, and cleanup refuses a removal unless the copy still matches its hash and another copy outside that cleanup does too, read again right before acting.
+- FR-D8 Move to Trash, with permanent delete only from the confirmation sheet. No Move to…: a moved copy frees nothing.
+- FR-D9 Cloud-only files are never read, since that would download them. They're listed as not checked, along with unreadable files.
+
 ## 6. Deletion safety model
 | Guardrail | Requirement |
 |---|---|
@@ -219,7 +229,7 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 |---|---|
 | **MVP (v1.0)** | Dashboard, node_modules, Build Artifacts (Rust, Xcode, Swift PM, Gradle, Python, Unity, Unreal), Caches (Safe + Re-download levels), Big Files, Screenshots (manual move/delete), confirmation sheet, Trash default + dry run + exclusions + active-project protection + log, Settings (locations, exclusions, safety), direct distribution, macOS 14+ |
 | **v1.1** | Package managers (npm -g, pnpm -g, Homebrew formulae/casks, Cargo, pip, gem) with update/uninstall confirmation, screenshot auto rule, scheduling + menu bar helper + notifications, Go/.NET/CMake detectors, Xcode simulators/archives (Review level), undo from log, light mode |
-| **Later (v1.2+)** | FSEvents incremental index, duplicate finder, Docker images/volumes, Android SDK/emulators, conda/poetry/uv, per-project "archive & restore" (lockfile kept, deps removed), CLI companion (`yokoi scan --json`), App Store Lite edition, Shortcuts/AppIntents |
+| **Later (v1.2+)** | FSEvents incremental index, duplicate finder (built, see §5.9), Docker images/volumes, Android SDK/emulators, conda/poetry/uv, per-project "archive & restore" (lockfile kept, deps removed), CLI companion (`yokoi scan --json`), App Store Lite edition, Shortcuts/AppIntents |
 
 ## 13. Risks & open questions
 **Risks**

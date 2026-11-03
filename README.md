@@ -57,6 +57,7 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 | **🗄️ Caches & Tooling** | JavaScript (npm, Yarn, pnpm, Bun, Deno, Playwright, Puppeteer, Electron), Python (pip, uv, Poetry), Homebrew, Cargo, Go modules, Gradle, Maven, NuGet, Flutter, SwiftPM, CocoaPods, Xcode and simulators, **Android emulators, system images and build cache**, VS Code, Cursor and JetBrains caches, Docker Desktop and OrbStack, browsers, Ollama / Hugging Face / LM Studio, Trash | Every location is tagged **Safe**, **Re-download** or **Review**. Sizes count only what cleaning frees, so caches shared with projects through hardlinks or clones aren't overstated. Running emulators, simulators, Gradle daemons, editors and Docker block their own caches |
 | **🧰 Tool cleanups** | Unavailable iOS simulators, local Time Machine snapshots, **unused Docker images, Docker build cache and dangling volumes** | Done through the tool itself (`xcrun simctl`, `tmutil`, `docker`), with the exact command shown first. Volumes are listed by name, so nothing created later is swept up |
 | **🐘 Big files** | Videos, archives, disk images, VMs (`.utm`, `.vmdk`…), 3D and art files | Log-scale size slider from 100 MB to 10 GB+, with filters by type |
+| **👯 Duplicates** | Files of 1 MB or more with identical contents, across your big-file locations or in one folder you choose | Compared by SHA-256, only when you ask, because it reads the files. One copy always stays. Copies that are all inside git repos aren't listed unless you choose that folder, and sizes count what removing a copy really frees |
 | **⬇️ Downloads** | Everything in `~/Downloads`: installers, archives, media, documents and folders, with when each was added and last opened | Items untouched for 30 days (configurable) count as reclaimable. Incomplete downloads and archives you already extracted are flagged as leftovers; your own files are never preselected |
 | **📸 Screenshots** | Screenshots and screen recordings in your screenshot folder | File them into `YYYY/MM` folders or trash them, by hand or with a daily rule |
 | **🧩 Applications** | Installed apps with size, last opened, and their leftovers in `~/Library` | Uninstalls the app *and* its support files. Apple apps and running apps are locked |
@@ -102,6 +103,10 @@ Adding a language is one entry in a rule table. See [docs/DEVELOPMENT.md](docs/D
     <td><img src="assets/readme/screenshots/external-drives.png" alt="External drive junk: Trash, .DS_Store and AppleDouble files"><br><sub><b>External drives</b> · drive Trash, .DS_Store and ._ files</sub></td>
   </tr>
   <tr>
+    <td><img src="assets/readme/screenshots/duplicates.png" alt="Groups of identical files with the space each copy would free"><br><sub><b>Duplicates</b> · identical files, grouped, with one copy always kept</sub></td>
+    <td><img src="assets/readme/screenshots/downloads.png" alt="Downloads with when each item was added and last opened"><br><sub><b>Downloads</b> · what's in there, and when you last opened it</sub></td>
+  </tr>
+  <tr>
     <td><img src="assets/readme/screenshots/screenshots.png" alt="Desktop screenshots grid with move-to-folder action"><br><sub><b>Screenshots</b> · file them by month, or clear them out</sub></td>
     <td><img src="assets/readme/screenshots/cleaned.png" alt="Cleanup finished"><br><sub><b>Done</b> · what was freed, and Put Back if you change your mind</sub></td>
   </tr>
@@ -120,6 +125,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 - **Hands off your life.** Keychains, Mail, Messages, iCloud Drive, cloud storage, Photos libraries, `/System` and `.git` are blocked unconditionally, even if you add them by accident.
 - **Busy means no.** Projects open in Xcode, Unity, Unreal or a running `node` process, running apps, and Android emulators that are booted are refused. Yokoi checks twice: when you confirm and again right before acting.
 - **Recent means careful.** Projects you touched in the last 14 days start unchecked and need an extra confirmation.
+- **One copy stays.** The duplicate finder won't let you pick every copy of a file. Right before removing a copy, Yokoi reads it and a copy being kept again, and refuses if they no longer match.
 - **No escalation.** Yokoi never runs `sudo`. Command-line tools are run without a shell, and arguments are passed literally, so package names can't inject commands.
 - **Trusted tools only.** Each tool (`brew`, `npm`, `docker`…) is looked up once and run from its full path, which the confirmation shows. Folders and files another account could write to are skipped, so a look-alike `npm` dropped somewhere on your `PATH` isn't picked up.
 - **Symlink-proof.** Symlinks are removed, never followed. Paths are checked both as written and with symlinks resolved, and checked again at their real location right before anything is trashed, deleted or moved.
@@ -182,6 +188,7 @@ Yokoi works without it too. It just skips what it can't read.
 - **Scan** from the dashboard or with `⌘⇧R`. Results appear as they're found.
 - **Clean ·** on the dashboard runs *Smart Select*: stale node_modules, artifacts of inactive projects and Safe caches.
 - Search any list with `⌘K`, rescan the current screen with `⌘R`, and clean the selection with `⌘⌫`.
+- **Find duplicates** from the Duplicates screen, across your big-file locations or in one folder. It's separate from the regular scan and isn't part of the reclaimable total, so nothing is counted twice.
 - Optional **menu bar helper** shows free and reclaimable space, with one-click access.
 - Optional **scheduled scans** (daily, weekly or monthly) run at low priority, with a notification when reclaimable space passes a threshold.
 - **Shortcuts and Siri:** *Scan for Reclaimable Space* (returns bytes), *Get Free Disk Space* and *Open Yokoi* on any screen. None of them deletes anything.
@@ -267,6 +274,7 @@ It's the same idea as in a runtime: find what's no longer reachable from your ac
 - [x] Incremental rescans (FSEvents)
 - [x] `yokoi` command-line companion (`yokoi scan --json`)
 - [x] Shortcuts and App Intents
+- [x] Duplicate finder
 - [ ] A separate helper with fewer rights for deleting files and running tools
 
 <br>

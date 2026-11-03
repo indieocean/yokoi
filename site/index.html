@@ -81,7 +81,7 @@
       <div class="wrap">
         <figure class="shot shot-hero reveal">
           <div class="shot-glow" aria-hidden="true"></div>
-          <img src="img/dashboard.webp" width="1600" height="1025" alt="Yokoi dashboard: 203 GB reclaimable, broken down by category, with recent cleanups and top offenders" fetchpriority="high">
+          <img src="img/dashboard.webp" width="1600" height="1025" alt="Yokoi dashboard: 218 GB reclaimable, broken down by category, with recent cleanups and top offenders" fetchpriority="high">
         </figure>
       </div>
     </section>
@@ -132,6 +132,12 @@
           <h3>Big files</h3>
           <p>Videos, archives, disk images, VMs, 3D and art files, found with a log-scale slider from 100&nbsp;MB to 10&nbsp;GB+.</p>
           <p class="rule">Filter by type, then reveal in Finder or clean.</p>
+        </article>
+        <article class="card reveal" style="--c:#2DD4BF">
+          <div class="card-top"><span class="ico">👯</span><span class="badge mono">SHA-256</span></div>
+          <h3>Duplicates</h3>
+          <p>Files with identical contents across your big-file locations, or in one folder you choose.</p>
+          <p class="rule">One copy always stays. Copies that are all inside git repos aren't listed unless you choose that folder.</p>
         </article>
         <article class="card reveal" style="--c:#34D399">
           <div class="card-top"><span class="ico">⬇️</span><span class="badge mono">~/Downloads</span></div>
@@ -197,6 +203,7 @@
         <button role="tab" aria-selected="true" data-shot="npm-node-modules" data-cap="Every node_modules folder, stale ones preselected">node_modules</button>
         <button role="tab" aria-selected="false" data-shot="build-artifacts" data-cap="Build artifacts grouped by toolchain, matched by marker files">Build artifacts</button>
         <button role="tab" aria-selected="false" data-shot="caches" data-cap="Caches &amp; Tooling tagged Safe, Re-download or Review, with the Trash on its own">Caches &amp; Tooling</button>
+        <button role="tab" aria-selected="false" data-shot="duplicates" data-cap="Identical files, grouped, with one copy always kept">Duplicates</button>
         <button role="tab" aria-selected="false" data-shot="applications" data-cap="Uninstall apps together with their leftovers">Applications</button>
         <button role="tab" aria-selected="false" data-shot="package-managers" data-cap="Outdated and unused global packages">Packages</button>
         <button role="tab" aria-selected="false" data-shot="screenshots" data-cap="File screenshots by month, or clear them out">Screenshots</button>
@@ -222,6 +229,7 @@
           <div class="srow reveal"><span class="sdot" style="--c:#7C5CFF"></span><div><h4>Dry run</h4><p>Preview exactly what would happen, with sizes, without touching a byte.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#22D3EE"></span><div><h4>Scoped access</h4><p>Each category can only touch its own folders. Keychains, Mail, Messages, iCloud Drive, Photos, <code>/System</code> and <code>.git</code> are blocked unconditionally.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#F59E0B"></span><div><h4>Busy means no</h4><p>Projects open in Xcode, Unity, Unreal or a running <code>node</code> process are refused, checked when you confirm and again right before acting. Recently touched projects start unchecked.</p></div></div>
+          <div class="srow reveal"><span class="sdot" style="--c:#2DD4BF"></span><div><h4>One copy stays</h4><p>The duplicate finder won't let you pick every copy of a file. Right before removing a copy, Yokoi reads it and a copy being kept again, and refuses if they no longer match.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#F0565E"></span><div><h4>No escalation, symlink-proof</h4><p>Never runs <code>sudo</code>. Tools run without a shell, from a full path you see before confirming, and only from folders you or an administrator control. Symlinks are removed, never followed, and paths are re-checked at their real location.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#60A5FA"></span><div><h4>Everything is logged</h4><p>Every cleanup goes to <code>cleanup.log</code> with path, size, action and where it went.</p></div></div>
         </div>
