@@ -155,7 +155,7 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 ## 6. Deletion safety model
 | Guardrail | Requirement |
 |---|---|
-| Trash by default | All removals use `FileManager.trashItem`. Permanent delete needs an explicit choice each time. |
+| Trash by default | All removals use `FileManager.trashItem` unless permanent delete is chosen: in the confirmation sheet each time, with `--permanent` on the command line, or with the opt-in auto-clean setting. |
 | Dry run | Every clean can run as a preview that lists paths and sizes without changing anything. Settings toggle "Always dry run first". |
 | Exclusions | User paths and globs (for example `**/.git`, `~/Dropbox`) are never scanned or touched. |
 | Active-project protection | Projects touched within N days (default 30) are unselected and flagged. Deleting one needs an extra confirmation. Projects with a running process (open in Xcode/Unity/Unreal, `node` cwd) are blocked. |

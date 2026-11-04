@@ -7,7 +7,7 @@ struct DashboardView: View {
     var body: some View {
         let store = app.store
         VStack(spacing: 0) {
-            HeaderBar(title: "Dashboard") {
+            HeaderBar(title: "Dashboard", showsSearch: false) {
                 if store.isScanning {
                     Button { store.cancelScan() } label: {
                         Label("Stop", systemImage: "stop.fill")
