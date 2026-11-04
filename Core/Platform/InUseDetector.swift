@@ -16,6 +16,34 @@ struct InUseSnapshot: Sendable {
 
     static let empty = InUseSnapshot(uses: [])
 
+    /// An entry held back, and what's using it.
+    struct Blocked: Sendable {
+        let entry: CleanupEntry
+        let process: String
+    }
+
+    /// Separates entries whose project or app is in use by a running process.
+    func split(_ entries: [CleanupEntry]) -> (allowed: [CleanupEntry], blocked: [Blocked]) {
+        var allowed: [CleanupEntry] = []
+        var blocked: [Blocked] = []
+        for entry in entries {
+            if let root = entry.projectRoot, let process = blocker(for: root) {
+                blocked.append(Blocked(entry: entry, process: process))
+            } else if let app = runningApp(entry.usedByApps) {
+                blocked.append(Blocked(entry: entry, process: app))
+            } else {
+                allowed.append(entry)
+            }
+        }
+        return (allowed, blocked)
+    }
+
+    /// `split` against what's running now. Every way of starting a cleanup goes through this.
+    static func split(_ entries: [CleanupEntry]) async -> (allowed: [CleanupEntry], blocked: [Blocked]) {
+        guard entries.contains(where: { $0.projectRoot != nil || !$0.usedByApps.isEmpty }) else { return (entries, []) }
+        return await Task.detached(priority: .userInitiated) { capture() }.value.split(entries)
+    }
+
     /// Process names whose open files are also inspected (they rarely `cd` into the project).
     static let devTools: Set<String> = [
         "Xcode", "Unity", "UnrealEditor", "UE4Editor", "node", "bun", "deno", "java", "cargo", "rustc",

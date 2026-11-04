@@ -338,8 +338,23 @@ private struct ScheduleCard: View {
                         .init(value: .daily, title: "Daily"), .init(value: .weekly, title: "Weekly"), .init(value: .monthly, title: "Monthly"),
                     ], compact: true)
                 }
-                SettingRow(title: "Auto-clean safe caches", subtitle: "npm, pip, Homebrew, browser caches") {
+                SettingRow(title: "Auto-clean", subtitle: "After each automatic scan, with no confirmation. Anything in use is left alone") {
                     Toggle("", isOn: $settings.data.autoCleanSafeCaches).toggleStyle(.dk).fixedSize()
+                        .disabled(!settings.data.autoScan)
+                }
+                if settings.data.autoScan && settings.data.autoCleanSafeCaches {
+                    SettingRow(title: "Auto-clean takes", subtitle: settings.data.autoCleanScope == .safeCaches
+                               ? "npm, pip, Homebrew, browser caches"
+                               : "Safe caches, stale node_modules and build artifacts of inactive projects") {
+                        SegmentedTabs(selection: $settings.data.autoCleanScope, items: [
+                            .init(value: .safeCaches, title: "Safe caches"), .init(value: .smartSelect, title: "Smart Select"),
+                        ], compact: true)
+                    }
+                    SettingRow(title: "Delete permanently", subtitle: settings.data.autoCleanPermanent
+                               ? "Can't be undone, and Put Back won't work for these"
+                               : "Off: goes to the Trash, so the space comes back when you empty it") {
+                        Toggle("", isOn: $settings.data.autoCleanPermanent).toggleStyle(.dk).fixedSize()
+                    }
                 }
                 SettingRow(title: "Notify when reclaimable exceeds", subtitle: "Checked after each scheduled scan") {
                     Menu {
@@ -385,7 +400,7 @@ private struct AutomationCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             CardTitle(title: "Command line & Shortcuts",
-                      subtitle: "yokoi scan --json reports what a scan finds. It never deletes anything.")
+                      subtitle: "yokoi scan reports what a scan finds. yokoi clean previews, and cleans with --yes.")
             Text(installCommand)
                 .font(Theme.mono(11))
                 .foregroundStyle(Theme.textSecondary)

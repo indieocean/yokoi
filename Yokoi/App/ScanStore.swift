@@ -154,15 +154,13 @@ final class ScanStore {
 
     /// "Smart Select": stale node_modules, artifacts of inactive projects (not opt-in) and Safe caches.
     func smartSelection() -> [CleanupEntry] {
-        let d = settings.data
-        var entries: [CleanupEntry] = []
-        entries += nodeModules.filter { $0.isStale(days: d.staleDays) }.map { CleanupEntry($0) }
-        entries += artifacts
-            .filter { !$0.optIn }
-            .map { CleanupEntry($0, displayPath: $0.displayPath) }
-            .filter { !$0.isRecentlyActive(days: d.protectRecentDays) }
-        entries += caches.filter { $0.safety == .safe && $0.size > 0 }.map { CleanupEntry($0, displayPath: PathFormat.abbreviate($0.url)) }
-        return entries
+        CleanSelection.smart(nodeModules: nodeModules, artifacts: artifacts, caches: caches, settings: settings.data)
+    }
+
+    /// What scheduled auto-clean takes from the current results.
+    func autoCleanSelection() -> [CleanupEntry] {
+        CleanSelection.unattended(settings.data.autoCleanScope, nodeModules: nodeModules, artifacts: artifacts,
+                                  caches: caches, settings: settings.data)
     }
 
     // MARK: Scanning

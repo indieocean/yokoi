@@ -9,6 +9,9 @@ on:
     paths-ignore: ["**.md", "docs/**", "assets/**", "site/**", "video/**"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: macos-26

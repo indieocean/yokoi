@@ -23,6 +23,8 @@ final class ApplicationsViewModel: SelectionPruning {
     var sortOrder: [KeyPathComparator<Row>] = [KeyPathComparator(\Row.size, order: .reverse)]
     var checked: Set<String> = []
     var expanded: String?
+    /// Paths of the uncertain leftovers picked to go with their app.
+    var chosenLeftovers: Set<String> = []
     private(set) var runningBundleIDs: Set<String> = []
 
     let store: ScanStore
@@ -74,12 +76,23 @@ final class ApplicationsViewModel: SelectionPruning {
         if ids.isSubset(of: checked) { checked.subtract(ids) } else { checked.formUnion(ids) }
     }
 
-    var selectedItems: [AppItem] { store.applications.filter { checked.contains($0.id) } }
+    func toggleLeftover(_ leftover: AppLeftover) {
+        let path = leftover.url.path
+        if chosenLeftovers.contains(path) { chosenLeftovers.remove(path) } else { chosenLeftovers.insert(path) }
+    }
+
+    var selectedItems: [AppItem] {
+        store.applications.filter { checked.contains($0.id) }.map { item in
+            var copy = item
+            copy.chosenUncertain = chosenLeftovers
+            return copy
+        }
+    }
     var selectedSize: Int64 { selectedItems.reduce(0) { $0 + $1.size } }
 
     func cleanupRequest() -> CleanupRequest {
         let items = selectedItems.sorted { $0.size > $1.size }
-        let leftovers = items.reduce(0) { $0 + $1.leftovers.count }
+        let leftovers = items.reduce(0) { $0 + $1.removableLeftovers.count }
         return CleanupRequest(
             title: "Uninstall \(CountFormat.plural(items.count, "app"))?",
             restoreHint: "Moves each app and its \(CountFormat.plural(leftovers, "support file")) in ~/Library to the Trash. Put Back restores everything.",

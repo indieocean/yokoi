@@ -58,6 +58,7 @@ struct PathGuard: Sendable {
         "Library/CloudStorage", "Library/Calendars", "Library/Safari", "Library/Accounts",
         "Library/Photos", "Library/Containers/com.apple.mail", "Library/Group Containers/group.com.apple.notes",
         "Library/Application Support/AddressBook", "Library/Application Support/MobileSync",
+        ".ssh", ".gnupg", ".aws",
     ]
     /// Apple's own app data under `~/Library`, as globs relative to home. Apple apps can't be
     /// uninstalled from Yokoi, so nothing should ever reach their containers, preferences or storage.

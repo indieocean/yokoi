@@ -278,8 +278,14 @@ actor ProcessRunner {
                       timedOut: !timedOut.data.isEmpty)
     }
 
+    /// `arg` in single quotes whatever it holds, for a command that deletes: nothing in it is left to the shell.
+    nonisolated static func alwaysQuoted(_ arg: String) -> String {
+        "'" + arg.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
     nonisolated static func quote(_ arg: String) -> String {
-        let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./=:@,+%^"))
+        // Not `^`: with zsh's EXTENDED_GLOB it's a wildcard, so `a^b` would match other files.
+        let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_./=:@,+%"))
         if !arg.isEmpty, arg.unicodeScalars.allSatisfy({ safe.contains($0) }) { return arg }
         return "'" + arg.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }

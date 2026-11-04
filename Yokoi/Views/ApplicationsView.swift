@@ -151,6 +151,7 @@ private struct AppIconView: View {
 }
 
 private struct LeftoversButton: View {
+    @Environment(AppModel.self) private var app
     let item: AppItem
     @State private var showing = false
 
@@ -162,8 +163,9 @@ private struct LeftoversButton: View {
                 showing.toggle()
             } label: {
                 HStack(spacing: 4) {
-                    Text("\(item.leftovers.count)").font(Theme.mono(11.5, .semibold))
+                    Text("\(item.removableLeftovers.count)").font(Theme.mono(11.5, .semibold))
                     Text("· \(ByteFormat.string(item.leftoverSize))").font(Theme.mono(11.5))
+                    if uncertain.count > 0 { Text("+\(uncertain.count)?").font(Theme.mono(11.5)) }
                     Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
                 }
                 .foregroundStyle(Theme.textSecondary)
@@ -171,19 +173,36 @@ private struct LeftoversButton: View {
             .buttonStyle(.plain)
             .popover(isPresented: $showing, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Removed with the app").font(.system(size: 12.5, weight: .semibold))
-                    ForEach(item.leftovers, id: \.url) { l in
-                        HStack(spacing: 10) {
-                            Text(l.kind).font(.system(size: 11)).foregroundStyle(Theme.textSecondary).frame(width: 130, alignment: .leading)
-                            Text(PathFormat.abbreviate(l.url)).font(Theme.mono(11)).lineLimit(1).truncationMode(.middle)
-                            Spacer(minLength: 10)
-                            SizeText(bytes: l.size, size: 11)
+                    if item.leftovers.count > uncertain.count {
+                        Text("Removed with the app").font(.system(size: 12.5, weight: .semibold))
+                        ForEach(item.leftovers.filter { !$0.isUncertain }, id: \.url) { row($0) }
+                    }
+                    if !uncertain.isEmpty {
+                        Text("May belong to another app").font(.system(size: 12.5, weight: .semibold)).padding(.top, 4)
+                        Text("These only match on a name or id any app can claim. They stay unless you tick them.")
+                            .font(.system(size: 11.5)).foregroundStyle(Theme.textSecondary)
+                        ForEach(uncertain, id: \.url) { l in
+                            HStack(spacing: 10) {
+                                CheckBox(isOn: app.applicationsVM.chosenLeftovers.contains(l.url.path)) { app.applicationsVM.toggleLeftover(l) }
+                                row(l)
+                            }
                         }
                     }
                 }
                 .padding(16)
                 .frame(width: 560)
             }
+        }
+    }
+
+    private var uncertain: [AppLeftover] { item.leftovers.filter(\.isUncertain) }
+
+    private func row(_ l: AppLeftover) -> some View {
+        HStack(spacing: 10) {
+            Text(l.kind).font(.system(size: 11)).foregroundStyle(Theme.textSecondary).frame(width: 130, alignment: .leading)
+            Text(PathFormat.abbreviate(l.url)).font(Theme.mono(11)).lineLimit(1).truncationMode(.middle)
+            Spacer(minLength: 10)
+            SizeText(bytes: l.size, size: 11)
         }
     }
 }

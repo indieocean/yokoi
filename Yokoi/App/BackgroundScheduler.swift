@@ -88,22 +88,24 @@ final class BackgroundScheduler {
         await store.scanAndWait()
         lastAutoRun = Date()
         let d = settings.data
-        if d.autoCleanSafeCaches {
-            // Opt-in: Safe caches only, always to the Trash, logged like any other cleanup.
-            let entries = store.caches.filter { $0.safety == .safe && $0.size > 0 && !$0.permanentOnly }
-                .map { CleanupEntry($0, displayPath: PathFormat.abbreviate($0.url) + "/*") }
-            if !entries.isEmpty {
-                let outcome = await store.perform(entries, action: .trash)
-                if !outcome.dryRun && outcome.bytes > 0 {
-                    await notify("Cleared Safe caches", "Moved \(ByteFormat.string(outcome.bytes)) of caches to the Trash.")
-                }
-            }
-        }
+        if d.autoCleanSafeCaches { await runAutoClean(permanent: d.autoCleanPermanent) }
         let threshold = Int64(d.notifyThresholdGB) * 1_000_000_000
         if threshold > 0, store.reclaimableTotal >= threshold {
             await notify("\(ByteFormat.string(store.reclaimableTotal)) can be reclaimed",
                          "Open Yokoi to review node_modules, build artifacts and caches.")
         }
+    }
+
+    /// Opt-in, and logged like any other cleanup. Nobody confirms this one, so what's in use is held back here
+    /// rather than on a sheet, and held-back items simply wait for the next run.
+    private func runAutoClean(permanent: Bool) async {
+        let (entries, blocked) = await InUseSnapshot.split(store.autoCleanSelection())
+        guard !entries.isEmpty else { return }
+        let outcome = await store.perform(entries, action: permanent ? .delete : .trash)
+        guard !outcome.dryRun, outcome.bytes > 0 else { return }
+        let size = ByteFormat.string(outcome.bytes)
+        let skipped = blocked.isEmpty ? "" : " \(CountFormat.plural(blocked.count, "item")) in use left alone."
+        await notify("Auto-clean finished", (permanent ? "Permanently deleted \(size)." : "Moved \(size) to the Trash.") + skipped)
     }
 
     /// Daily: move (or trash) screenshots older than N days, as chosen in the Screenshots action panel.

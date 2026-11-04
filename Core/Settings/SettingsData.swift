@@ -8,6 +8,11 @@ enum ScreenshotAutoAction: String, Codable, Sendable, CaseIterable {
     case move, delete
 }
 
+/// What scheduled auto-clean takes.
+enum AutoCleanScope: String, Codable, Sendable, CaseIterable {
+    case safeCaches, smartSelect
+}
+
 enum ScanFrequency: String, Codable, Sendable, CaseIterable {
     case daily, weekly, monthly
 }
@@ -53,10 +58,14 @@ struct SettingsData: Codable, Sendable, Equatable {
     /// Downloads untouched (not added or opened) for this many days count as reclaimable.
     var downloadsAgeDays: Int = 30
 
-    // v1.1 — stored so the Settings UI is ready, not acted on yet.
+    // Schedule
     var autoScan: Bool = false
     var scanFrequency: ScanFrequency = .weekly
+    /// Clean after each scheduled scan. The name predates `autoCleanScope`.
     var autoCleanSafeCaches: Bool = false
+    var autoCleanScope: AutoCleanScope = .safeCaches
+    /// Delete instead of using the Trash. The Trash only gives the space back once it's emptied.
+    var autoCleanPermanent: Bool = false
     var notifyThresholdGB: Int = 50
     var showInMenuBar: Bool = false
     var launchAtLogin: Bool = false
@@ -98,8 +107,11 @@ struct SettingsData: Codable, Sendable, Equatable {
             ?? ScreenshotScanner.systemScreenshotFolder(home: home)
         return ScanContext(
             home: home,
-            roots: scanRoots,
-            bigFileRoots: bigFileRoots.map { PathFormat.expand($0, home: home) },
+            // Checked here as well as when a folder is added: saved settings are only a file, and these roots are
+            // what cleanup may reach.
+            roots: scanRoots.filter { ScanRootPolicy.refusal(for: $0.url(home: home), home: home) == nil },
+            bigFileRoots: bigFileRoots.map { PathFormat.expand($0, home: home) }
+                .filter { ScanRootPolicy.refusal(for: $0, home: home) == nil },
             exclusions: GlobMatcher(patterns: exclusions, home: home),
             screenshotFolder: screenshotFolder,
             applicationFolders: [URL(fileURLWithPath: "/Applications"), home.appendingPathComponent("Applications")]

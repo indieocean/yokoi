@@ -36,33 +36,48 @@ struct ScanReport: Codable, Sendable {
     /// Categories a headless scan can cover (packages and external drives need the app).
     static let scannable: [CleanCategory] = [.nodeModules, .buildArtifacts, .caches, .bigFiles, .downloads, .screenshots, .applications]
 
+    /// What a headless scan found, before it's summarized.
+    struct Results: Sendable {
+        var nodeModules: [NodeModulesItem] = [], artifacts: [ArtifactItem] = [], caches: [CacheItem] = []
+        var bigFiles: [BigFileItem] = [], downloads: [DownloadItem] = [], screenshots: [ScreenshotItem] = [], apps: [AppItem] = []
+    }
+
+    /// Scans `categories` with the user's settings. Never deletes, moves or runs tools.
+    /// With `index`, unchanged folders reuse the last scan's measurements (see `ScanIndex`).
+    static func results(settings: SettingsData, categories: Set<CleanCategory>, home: URL,
+                        progress: ScanProgress = ScanProgress(), index indexURL: URL? = nil) async -> Results {
+        var context = settings.makeContext(home: home)
+        let wanted = categories.intersection(scannable)
+        if let indexURL { context.index = await ScanIndex.prepare(stored: indexURL, context: context) }
+        var found = Results()
+        for await event in await ScanEngine().run(context, progress: progress, categories: wanted) {
+            switch event {
+            case .nodeModules(let i): found.nodeModules.append(i)
+            case .artifact(let i): found.artifacts.append(i)
+            case .cache(let i): found.caches.append(i)
+            case .bigFile(let i): found.bigFiles.append(i)
+            case .screenshot(let i): found.screenshots.append(i)
+            case .download(let i): found.downloads.append(i)
+            case .application(let i): found.apps.append(i)
+            case .duplicate, .finished: break
+            }
+        }
+        if let indexURL, let index = context.index {
+            index.save(to: indexURL, carryOver: wanted != Set(scannable))
+        }
+        return found
+    }
+
     /// Runs a scan of `categories` with the user's settings. Never deletes, moves or runs tools.
     /// With `index`, unchanged folders reuse the last scan's measurements (see `ScanIndex`).
     static func run(settings: SettingsData, categories: Set<CleanCategory> = Set(scannable),
                     home: URL = FileManager.default.homeDirectoryForCurrentUser,
                     progress: ScanProgress = ScanProgress(), index indexURL: URL? = nil) async -> ScanReport {
         let start = Date()
-        var context = settings.makeContext(home: home)
         let wanted = categories.intersection(scannable)
-        if let indexURL { context.index = await ScanIndex.prepare(stored: indexURL, context: context) }
-        var nodeModules: [NodeModulesItem] = [], artifacts: [ArtifactItem] = [], caches: [CacheItem] = []
-        var bigFiles: [BigFileItem] = [], downloads: [DownloadItem] = [], screenshots: [ScreenshotItem] = [], apps: [AppItem] = []
-        for await event in await ScanEngine().run(context, progress: progress, categories: wanted) {
-            switch event {
-            case .nodeModules(let i): nodeModules.append(i)
-            case .artifact(let i): artifacts.append(i)
-            case .cache(let i): caches.append(i)
-            case .bigFile(let i): bigFiles.append(i)
-            case .screenshot(let i): screenshots.append(i)
-            case .download(let i): downloads.append(i)
-            case .application(let i): apps.append(i)
-            case .duplicate, .finished: break
-            }
-        }
-
-        if let indexURL, let index = context.index {
-            index.save(to: indexURL, carryOver: wanted != Set(scannable))
-        }
+        let found = await results(settings: settings, categories: categories, home: home, progress: progress, index: indexURL)
+        let (nodeModules, artifacts, caches) = (found.nodeModules, found.artifacts, found.caches)
+        let (bigFiles, downloads, screenshots, apps) = (found.bigFiles, found.downloads, found.screenshots, found.apps)
 
         func item(_ r: some Reclaimable, path: URL, note: String? = nil) -> Item {
             Item(title: r.title, path: path.path, sizeBytes: r.size, safety: r.safety, lastTouched: r.projectLastTouched, note: note)

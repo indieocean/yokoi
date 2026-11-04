@@ -97,7 +97,7 @@ struct RoadmapTests {
         #expect(parsed == .scan(.init(json: true, categories: [.caches, .nodeModules, .bigFiles], top: 3)))
         #expect(throws: CommandLineTool.UsageError.self) { try CommandLineTool.parse(["yokoi", "scan", "--category", "packages"]) }
         #expect(throws: CommandLineTool.UsageError.self) { try CommandLineTool.parse(["yokoi", "scan", "--top"]) }
-        #expect(throws: CommandLineTool.UsageError.self) { try CommandLineTool.parse(["yokoi", "clean"]) }
+        #expect(throws: CommandLineTool.UsageError.self) { try CommandLineTool.parse(["yokoi", "frobnicate"]) }
     }
 
     @Test func categoryCLINamesRoundTrip() {

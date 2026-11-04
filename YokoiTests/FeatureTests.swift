@@ -44,6 +44,8 @@ struct FeatureTests {
         ])
         #expect(figma.protectedReason == nil)
         #expect(figma.urls.first == figma.url)
+        #expect(!figma.urls.contains(f.url("Library/Application Support/Figma")), "only matched by name: a suggestion")
+        #expect(figma.urls.contains(f.url("Library/Caches/com.figma.Desktop")))
 
         #expect(items.first { $0.name == "Safari" }?.protectedReason == "Apple app")
         #expect(items.first { $0.name == "Tool" }?.isAppStore == true)

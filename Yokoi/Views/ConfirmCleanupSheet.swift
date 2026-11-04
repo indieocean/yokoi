@@ -304,6 +304,8 @@ struct OutcomeSheet: View {
             .frame(height: 260)
             .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.25)))
 
+            if let command = outcome.adminCommand { AdminCommandCard(command: command) }
+
             HStack {
                 Button("Reveal Log") { Finder.reveal([CleanupLog.defaultURL]) }.buttonStyle(.dkSecondary)
                 Spacer()
@@ -378,6 +380,39 @@ struct OnboardingSheet: View {
                 .frame(width: 22, height: 22)
                 .background(Circle().fill(Theme.accent.opacity(0.15)))
             Text(text).font(.system(size: 13)).foregroundStyle(Theme.textPrimary)
+        }
+    }
+}
+
+/// What only an administrator can remove. Yokoi never uses sudo, so this is the user's to read and run.
+private struct AdminCommandCard: View {
+    let command: String
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Needs administrator rights").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+            Text("Yokoi never uses sudo. Check the paths, then run this in Terminal yourself. It deletes permanently, so these can't be put back.")
+                .font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 10) {
+                // All of it, scrolling if it's long: what's copied has to be what can be read.
+                ScrollView {
+                    Text(command)
+                        .font(Theme.mono(11)).foregroundStyle(Theme.textSecondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 96)
+                Button(copied ? "Copied" : "Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(command, forType: .string)
+                    copied = true
+                }
+                .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(.black.opacity(0.25)))
         }
     }
 }

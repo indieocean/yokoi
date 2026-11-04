@@ -114,7 +114,9 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
         self.date = date
         switch item {
         case let i as NodeModulesItem: projectRoot = i.projectURL
-        case let i as ArtifactItem: projectRoot = i.isGlobal ? nil : i.projectURL
+        case let i as ArtifactItem:
+            projectRoot = i.isGlobal ? nil : i.projectURL
+            if i.isGlobal { usedByApps = GlobalArtifactRule.usedByApps(i.ecosystem) }
         case let i as DuplicateFile: projectRoot = i.repository
         case let i as AppItem:
             projectRoot = i.url
@@ -154,6 +156,8 @@ struct CleanupOutcome: Sendable {
     struct Failure: Sendable, Hashable {
         let path: String
         let reason: String
+        /// Removing it takes administrator rights, which Yokoi never uses. See `adminCommand`.
+        var needsAdmin = false
     }
 
     let batchID: String
@@ -166,6 +170,15 @@ struct CleanupOutcome: Sendable {
     let bytes: Int64
 
     var itemCount: Int { completedIDs.count }
+
+    /// A command for the user to read and run themselves, for what only an administrator can remove. Yokoi shows
+    /// it and never runs it. Every path here passed `PathGuard`: what's refused never becomes a command, and
+    /// neither does a path that can't be shown faithfully, since the user has to be able to read what it deletes.
+    var adminCommand: String? {
+        let paths = failures.filter(\.needsAdmin).map(\.path).filter(PathFormat.isPrintable)
+        guard !paths.isEmpty else { return nil }
+        return "sudo rm -rf -- " + paths.map(ProcessRunner.alwaysQuoted).joined(separator: " ")
+    }
 }
 
 /// The file operations behind a cleanup. Abstracted so tests can observe or fake them.
@@ -457,7 +470,9 @@ actor CleanupService {
                         moved.append(.init(original: url.path, destination: target.path))
                     }
                 } catch {
-                    failures.append(.init(path: url.path, reason: error.localizedDescription))
+                    var needsAdmin = Self.needsAdministrator(error, at: url)
+                    if case .move = action { needsAdmin = false }  // `rm` isn't what was asked for
+                    failures.append(.init(path: url.path, reason: error.localizedDescription, needsAdmin: needsAdmin))
                     failedHere += 1
                 }
             }
@@ -481,6 +496,25 @@ actor CleanupService {
         }
         return CleanupOutcome(batchID: batchID, action: action, dryRun: dryRun, records: records,
                               failures: failures, completedIDs: completed, bytes: bytes)
+    }
+
+    /// Whether administrator rights would get past `error`. `EACCES` is a plain permissions problem. `EPERM` usually
+    /// isn't: it's how macOS privacy protection refuses, and `sudo` gets no further, so it only counts when another
+    /// account owns the item or its folder. Immutable and SIP-restricted items can't be removed even as root.
+    static func needsAdministrator(_ error: Error, at url: URL) -> Bool {
+        var st = stat()
+        guard lstat(url.path, &st) == 0,
+              st.st_flags & UInt32(UF_IMMUTABLE | SF_IMMUTABLE | SF_RESTRICTED) == 0 else { return false }
+        let e = error as NSError
+        let underlying = e.userInfo[NSUnderlyingErrorKey] as? NSError
+        let posix = e.domain == NSPOSIXErrorDomain ? e.code : underlying?.domain == NSPOSIXErrorDomain ? underlying?.code : nil
+        if posix == Int(EACCES) { return true }
+        guard posix == Int(EPERM) || (e.domain == NSCocoaErrorDomain && e.code == NSFileWriteNoPermissionError) else { return false }
+        func ownedByAnother(_ path: String) -> Bool {
+            var s = stat()
+            return lstat(path, &s) == 0 && s.st_uid != getuid()
+        }
+        return ownedByAnother(url.path) || ownedByAnother(url.deletingLastPathComponent().path)
     }
 
     /// Puts a Trash batch back where it came from (undo). Items whose original path is taken, or that

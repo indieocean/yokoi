@@ -225,7 +225,7 @@
 
       <div class="safety">
         <div class="safety-list">
-          <div class="srow reveal"><span class="sdot" style="--c:#34D399"></span><div><h4>Trash first, with Put Back</h4><p>Everything goes to the Trash by default and can be put back from the dashboard. Permanent delete is an explicit, red, every-time choice.</p></div></div>
+          <div class="srow reveal"><span class="sdot" style="--c:#34D399"></span><div><h4>Trash first, with Put Back</h4><p>Everything goes to the Trash by default and can be put back from the dashboard. Permanent delete is always an explicit choice, and never the default.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#7C5CFF"></span><div><h4>Dry run</h4><p>Preview exactly what would happen, with sizes, without touching a byte.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#22D3EE"></span><div><h4>Scoped access</h4><p>Each category can only touch its own folders. Keychains, Mail, Messages, iCloud Drive, Photos, <code>/System</code> and <code>.git</code> are blocked unconditionally.</p></div></div>
           <div class="srow reveal"><span class="sdot" style="--c:#F59E0B"></span><div><h4>Busy means no</h4><p>Projects open in Xcode, Unity, Unreal or a running <code>node</code> process are refused, checked when you confirm and again right before acting. Recently touched projects start unchecked.</p></div></div>
@@ -245,24 +245,27 @@
       <div class="split">
         <div class="reveal">
           <p class="eyebrow">Everyday use</p>
-          <h2>Keyboard-first, scriptable, read-only from the terminal</h2>
+          <h2>Keyboard-first, and scriptable from the terminal</h2>
           <ul class="ticks">
             <li><kbd>⌘⇧R</kbd> scan · <kbd>⌘K</kbd> search · <kbd>⌘⌫</kbd> clean the selection</li>
             <li><b>Smart Select</b> picks stale node_modules, artifacts of inactive projects and Safe caches</li>
             <li>Menu bar helper with free and reclaimable space</li>
             <li>Scheduled scans that notify you when reclaimable space passes a threshold</li>
+            <li>Optional auto-clean after each scheduled scan</li>
             <li>Shortcuts and Siri actions that report, and never delete</li>
           </ul>
         </div>
         <div class="window reveal">
           <div class="window-bar"><i></i><i></i><i></i><span class="mono">zsh</span></div>
-          <pre class="mono"><span class="c"># the app binary doubles as a read-only CLI</span>
+          <pre class="mono"><span class="c"># the app binary doubles as a CLI</span>
 <span class="p">$</span> yokoi scan
 <span class="p">$</span> yokoi scan <span class="f">--json</span> | jq .reclaimableBytes
 <span class="o">218103808000</span>
 <span class="p">$</span> yokoi scan <span class="f">--category</span> caches,build-artifacts <span class="f">--top</span> 10
 
-<span class="c"># cleaning always goes through the app's confirmation sheet</span></pre>
+<span class="c"># shows what it would do until you add --yes</span>
+<span class="p">$</span> yokoi clean
+<span class="p">$</span> yokoi clean <span class="f">--yes</span> <span class="f">--permanent</span></pre>
         </div>
       </div>
     </section>
@@ -290,8 +293,8 @@
         <details class="reveal"><summary>Is it safe to delete node_modules and build folders?</summary><p>Yes. Your package manager or toolchain rebuilds them (<code>npm install</code>, <code>cargo build</code>, reopening the project in Unity…). Yokoi shows the restore command before you confirm, and only matches build folders next to their project files.</p></details>
         <details class="reveal"><summary>Can I undo a cleanup?</summary><p>Anything moved to the Trash can be put back from <em>Recent cleanups</em> on the dashboard, until you empty the Trash. Permanent deletes can't be undone, which is why they always need an extra confirmation.</p></details>
         <details class="reveal"><summary>Why does it want Full Disk Access?</summary><p>macOS protects some caches and folders. Without access, Yokoi can't measure them and skips them. Full Disk Access is optional: everything else works without it. Even with access, Yokoi never touches Keychains, Mail, Messages, iCloud Drive or Photos.</p><p>It's a broad grant, and the tools Yokoi runs for you (<code>brew</code>, <code>npm</code>, <code>docker</code>…) inherit it. That's why each tool is run from a full path you see before confirming, and only from a folder that you or an administrator control.</p><p>That check keeps out other accounts on the Mac, not programs already running as you. Yokoi finds tools the way your shell does, so folders you own like <code>~/.cargo/bin</code> or <code>~/.nvm</code> are searched too. Malware already running under your account could put a fake <code>npm</code> there, and Yokoi would run it with Full Disk Access. The full path in the confirmation is how you'd spot it. If you don't want any tool to inherit the grant, leave Full Disk Access off: Yokoi still scans and cleans everything it can read.</p></details>
-        <details class="reveal"><summary>Why isn't Yokoi sandboxed?</summary><p>The App Sandbox only lets an app into folders you pick in an Open panel, and it can't run other programs. A cleaner that measures <code>~/Library/Caches</code>, <code>node_modules</code> across your projects and Xcode's folders, and runs <code>brew</code>, <code>npm</code> or <code>docker</code> to clean up after them, can't work inside it. Yokoi is notarized and built with the Hardened Runtime and no exception entitlements: no unsigned code, no injected libraries, no debugger attach. Moving the deleting and the running of tools into a separate helper with fewer rights is on the roadmap.</p></details>
-        <details class="reveal"><summary>Does it need my password or run anything as root?</summary><p>No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for administrators are shown as commands you can run yourself.</p></details>
+        <details class="reveal"><summary>Why isn't Yokoi sandboxed?</summary><p>The App Sandbox only lets an app into folders you pick in an Open panel, and it can't run other programs. A cleaner that measures <code>~/Library/Caches</code>, <code>node_modules</code> across your projects and Xcode's folders, and runs <code>brew</code>, <code>npm</code> or <code>docker</code> to clean up after them, can't work inside it. Yokoi is notarized and built with the Hardened Runtime and no exception entitlements: no unsigned code, no injected libraries, no debugger attach.</p></details>
+        <details class="reveal"><summary>Does it need my password or run anything as root?</summary><p>No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for administrators, like removing root-owned files, are shown as commands you can run yourself.</p></details>
         <details class="reveal"><summary>How does it update?</summary><p>Through <a href="https://sparkle-project.org">Sparkle</a>. Every update is signed, and Sparkle refuses one whose signature doesn't match. You choose whether it checks automatically.</p></details>
         <details class="reveal"><summary>What does "garbage collected" mean here?</summary><p>It's the same idea as in a runtime: find what's no longer reachable from your active work, such as stale dependencies, rebuildable output and caches nobody reads, and reclaim it without touching anything still in use.</p></details>
       </div>

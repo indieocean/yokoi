@@ -172,6 +172,8 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 - Schedule: automatic scan on/off, Daily/Weekly/Monthly, low priority via `NSBackgroundActivityScheduler`. Optional auto-clean of **Safe** caches only. Notify when reclaimable exceeds X GB (default 50).
 - Screenshot auto rule (mirrors §5.6).
 
+**Auto-clean** (opt-in, needs automatic scans): runs after each scheduled scan with no confirmation. Takes Safe caches, or everything Smart Select takes. Uses the Trash unless "Delete permanently" is on. Never empties the Trash, holds back anything in use, and is logged like any other cleanup. `yokoi clean` follows the same rules: it previews until given `--yes`, and `--permanent` deletes for good.
+
 ## 8. Menu bar helper
 - `MenuBarExtra` showing free space and reclaimable space, last scan, **Scan now**, **Clean safe items** (opens a confirmation), and Open Yokoi.
 - Runs scheduled scans and the screenshot rule while the main window is closed. Launch at login via `SMAppService.mainApp`.

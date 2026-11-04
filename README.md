@@ -60,7 +60,7 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 | **👯 Duplicates** | Files of 1 MB or more with identical contents, across your big-file locations or in one folder you choose | Compared by SHA-256, only when you ask, because it reads the files. One copy always stays. Copies that are all inside git repos aren't listed unless you choose that folder, and sizes count what removing a copy really frees |
 | **⬇️ Downloads** | Everything in `~/Downloads`: installers, archives, media, documents and folders, with when each was added and last opened | Items untouched for 30 days (configurable) count as reclaimable. Incomplete downloads and archives you already extracted are flagged as leftovers; your own files are never preselected |
 | **📸 Screenshots** | Screenshots and screen recordings in your screenshot folder | File them into `YYYY/MM` folders or trash them, by hand or with a daily rule |
-| **🧩 Applications** | Installed apps with size, last opened, and their leftovers in `~/Library` | Uninstalls the app *and* its support files. Apple apps and running apps are locked |
+| **🧩 Applications** | Installed apps with size, last opened, and their leftovers in `~/Library` | Uninstalls the app *and* its support files. Files that only match by name stay unless you tick them, since any app can claim a name. Apple apps and running apps are locked |
 | **💽 External drives** | The drive's own Trash, `.DS_Store` files, `._` AppleDouble files on exFAT/FAT/NTFS | Can also include a drive in project and big-file scans. Time Machine disks are locked |
 
 <details>
@@ -118,7 +118,7 @@ Adding a language is one entry in a rule table. See [docs/DEVELOPMENT.md](docs/D
 
 Yokoi deletes things for a living, so it's built to be paranoid.
 
-- **Trash first.** Everything goes to the Trash by default. Permanent delete is an explicit, red, every-time choice.
+- **Trash first.** Everything goes to the Trash by default. Permanent delete is always an explicit choice: a red option in the confirmation sheet, `--permanent` on the command line, or a setting you turn on for auto-clean.
 - **Undo.** Every Trash cleanup can be **Put Back** from the dashboard, as long as the items are still in the Trash. Nothing is ever overwritten on the way back.
 - **Dry run.** Preview exactly what would happen, with sizes, without touching a byte.
 - **Scoped access.** Each category can only touch its own folders. node_modules cleanup can't reach your Downloads, and caches cleanup can't reach your projects.
@@ -129,7 +129,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 - **No escalation.** Yokoi never runs `sudo`. Command-line tools are run without a shell, and arguments are passed literally, so package names can't inject commands.
 - **Trusted tools only.** Each tool (`brew`, `npm`, `docker`…) is looked up once and run from its full path, which the confirmation shows. Folders and files another account could write to are skipped, so a look-alike `npm` dropped somewhere on your `PATH` isn't picked up.
 - **Symlink-proof.** Symlinks are removed, never followed. Paths are checked both as written and with symlinks resolved, and checked again at their real location right before anything is trashed, deleted or moved.
-- **Look, don't touch.** The `yokoi` command and the Shortcuts actions only scan and report. Cleaning always goes through the app's confirmation sheet.
+- **Nothing cleans by surprise.** `yokoi clean` only shows what it would do until you add `--yes`, and auto-clean is off until you turn it on. Both take only what Smart Select takes, never empty the Trash, and leave alone anything a running process is using. Shortcuts actions only scan and report.
 - **Everything is logged.** Every cleanup is written to `~/Library/Application Support/Yokoi/cleanup.log` with path, size, action and where it went.
 
 <p align="center">
@@ -191,11 +191,12 @@ Yokoi works without it too. It just skips what it can't read.
 - **Find duplicates** from the Duplicates screen, across your big-file locations or in one folder. It's separate from the regular scan and isn't part of the reclaimable total, so nothing is counted twice.
 - Optional **menu bar helper** shows free and reclaimable space, with one-click access.
 - Optional **scheduled scans** (daily, weekly or monthly) run at low priority, with a notification when reclaimable space passes a threshold.
+- Optional **auto-clean** runs after each scheduled scan with no confirmation. Choose Safe caches or everything Smart Select takes, and the Trash or permanent delete.
 - **Shortcuts and Siri:** *Scan for Reclaimable Space* (returns bytes), *Get Free Disk Space* and *Open Yokoi* on any screen. None of them deletes anything.
 
 ### Command line
 
-The app binary doubles as a read-only `yokoi` command. Link it once (Settings → Command line & Shortcuts has a copy button):
+The app binary doubles as a `yokoi` command. Link it once (Settings → Command line & Shortcuts has a copy button):
 
 ```sh
 sudo ln -sf /Applications/Yokoi.app/Contents/MacOS/Yokoi /usr/local/bin/yokoi
@@ -205,9 +206,14 @@ sudo ln -sf /Applications/Yokoi.app/Contents/MacOS/Yokoi /usr/local/bin/yokoi
 yokoi scan                                  # summary + 5 largest items per category
 yokoi scan --json | jq .reclaimableBytes    # full report for scripts and CI
 yokoi scan --category caches,build-artifacts --top 10
+
+yokoi clean                                 # show what would be cleaned; changes nothing
+yokoi clean --yes                           # move it to the Trash
+yokoi clean --yes --permanent               # delete it for good
+yokoi clean --yes --category caches --json  # for scripts and CI
 ```
 
-It uses the roots, exclusions and thresholds from Settings, and never deletes anything: cleaning stays in the app.
+`clean` takes what Smart Select takes: stale node_modules, build artifacts of inactive projects and Safe caches. Big files, downloads, screenshots and apps are your own files, so those stay in the app. Anything a running process is using is left alone, including a project your shell is in. Both commands use the roots, exclusions and thresholds from Settings. Neither runs as root, or when macOS starts it (`open`, a LaunchAgent) rather than a shell or a script.
 
 <br>
 
@@ -249,13 +255,13 @@ That check keeps out other accounts on the Mac, not programs already running as 
 <details>
 <summary><strong>Why isn't Yokoi sandboxed?</strong></summary>
 <br>
-The App Sandbox only lets an app into folders you pick in an Open panel, and it can't run other programs. A cleaner that measures <code>~/Library/Caches</code>, <code>node_modules</code> across your projects and Xcode's folders, and that runs <code>brew</code>, <code>npm</code> or <code>docker</code> to clean up after them, can't work inside it. Yokoi is notarized and built with the Hardened Runtime and no exception entitlements: no unsigned code, no injected libraries, no debugger attach. In place of the sandbox, its limits are the ones listed under <a href="#safe-by-design">Safe by design</a>. Moving the deleting and the running of tools into a separate helper with fewer rights is on the roadmap.
+The App Sandbox only lets an app into folders you pick in an Open panel, and it can't run other programs. A cleaner that measures <code>~/Library/Caches</code>, <code>node_modules</code> across your projects and Xcode's folders, and that runs <code>brew</code>, <code>npm</code> or <code>docker</code> to clean up after them, can't work inside it. Yokoi is notarized and built with the Hardened Runtime and no exception entitlements: no unsigned code, no injected libraries, no debugger attach. In place of the sandbox, its limits are the ones listed under <a href="#safe-by-design">Safe by design</a>.
 </details>
 
 <details>
 <summary><strong>Does it need my password or run anything as root?</strong></summary>
 <br>
-No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for administrators, like changing MacPorts or deleting some Time Machine snapshots, are shown as commands you can run yourself.
+No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for administrators, like changing MacPorts, deleting some Time Machine snapshots or removing root-owned files, are shown as commands you can run yourself.
 </details>
 
 <details>
@@ -275,7 +281,8 @@ It's the same idea as in a runtime: find what's no longer reachable from your ac
 - [x] `yokoi` command-line companion (`yokoi scan --json`)
 - [x] Shortcuts and App Intents
 - [x] Duplicate finder
-- [ ] A separate helper with fewer rights for deleting files and running tools
+- [x] Scheduled auto-clean
+- [x] `yokoi clean`, to the Trash or permanently
 
 <br>
 

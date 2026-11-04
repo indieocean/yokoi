@@ -44,7 +44,7 @@ opt-in flags and a restore hint. Badge color and name go in `Ecosystem` (`Core/M
 
 ## Safety model (as built)
 
-- Move to Trash by default. Permanent delete only from the confirmation sheet, with an extra
+- Move to Trash by default. In the app, permanent delete is only offered in the confirmation sheet, with an extra
   "I understand" tick every time.
 - Every path goes through `PathGuard`: it must be strictly inside that **category's** allowed roots,
   not excluded, not inside `.git`, and not under `/System`, `/Library`, `/usr`, `/var`, Homebrew's or
@@ -99,7 +99,31 @@ Extra safety added with these:
 - `Yokoi/App/Intents.swift`: App Intents (scan, free space, open a screen) and the `AppShortcutsProvider`.
   Navigation from an intent goes through `IntentRouter`, which waits for `AppModel` if the window isn't up yet.
 
-None of these can delete. Cleaning always goes through the confirmation sheet.
+Shortcuts can't delete. `yokoi scan` can't either.
+
+## What needs an administrator
+
+Yokoi never runs anything as root. When a delete fails on permissions, `CleanupOutcome.adminCommand` builds a
+`sudo rm -rf --` command for the user to read and run, shown in the outcome details and by `yokoi clean`. Only paths that
+passed `PathGuard` can get there, and `CleanupService.needsAdministrator` leaves out what `sudo` wouldn't fix: macOS privacy
+refusals and immutable or SIP-restricted items. Paths are always single-quoted (`^` is a wildcard under zsh's
+EXTENDED_GLOB), and a path with control or text-reordering characters is never put in a command, because it can't be read
+faithfully.
+
+## Cleaning with nobody watching
+
+`yokoi clean` (`Core/Cleanup/HeadlessClean.swift`) and scheduled auto-clean (`BackgroundScheduler.runAutoClean`) have no
+confirmation sheet, so these hold for both:
+
+- `CleanSelection` is the only way they pick items, and Smart Select uses it too. `CleanSelection.unattended` drops anything
+  `permanentOnly`, so neither can empty the Trash, whatever safety level that location has.
+- `InUseSnapshot.split` holds back what a running process uses. Check here before adding another way to start a cleanup:
+  `CleanupService` doesn't do it.
+- `CleanupService` still applies `PathGuard` to every path, and the Dry run setting still holds.
+- The CLI refuses to scan or clean as root, or with launchd as its parent: `open Yokoi.app --args …` would otherwise run with
+  the app's Full Disk Access (`CommandLineTool.refusal`). Text output goes through `PathFormat.printable`.
+- `yokoi clean` only previews without `--yes`, and `--dry-run` beats `--yes`. It takes node_modules, build artifacts and
+  caches only. Auto-clean is off by default, needs automatic scans on, and uses the Trash unless `autoCleanPermanent` is set.
 
 ## Duplicates
 

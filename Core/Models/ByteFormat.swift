@@ -82,6 +82,25 @@ enum PathFormat {
         return p
     }
 
+    /// Control characters and the invisible ones that reorder text. File names can hold them, and a name from a
+    /// cloned repo must not be able to move the cursor, rewrite a line or disguise itself in a terminal.
+    private static func isUnsafe(_ s: Unicode.Scalar) -> Bool {
+        s.value < 0x20 || (0x7F...0x9F).contains(s.value) || (0x202A...0x202E).contains(s.value)
+            || (0x2066...0x2069).contains(s.value) || s.value == 0x200E || s.value == 0x200F
+    }
+
+    static func isPrintable(_ text: String) -> Bool { !text.unicodeScalars.contains(where: isUnsafe) }
+
+    /// `text` with anything unsafe to print written out as `\\u{1B}`.
+    static func printable(_ text: String) -> String {
+        guard !isPrintable(text) else { return text }
+        var out = ""
+        for s in text.unicodeScalars {
+            if isUnsafe(s) { out += "\\u{" + String(s.value, radix: 16, uppercase: true) + "}" } else { out.unicodeScalars.append(s) }
+        }
+        return out
+    }
+
     /// Expands a leading `~` to the home directory.
     static func expand(_ path: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
         if path == "~" { return home }

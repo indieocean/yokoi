@@ -142,6 +142,15 @@ struct GlobalArtifactRule: Sendable, Identifiable, Hashable {
     let summary: String
     let restoreHint: String
 
+    /// What's writing to these folders while it runs. There's no project folder to watch for a global location.
+    static func usedByApps(_ ecosystem: Ecosystem) -> [String] {
+        switch ecosystem {
+        case .xcode: ["Xcode", "xcodebuild"]
+        case .go: ["go"]
+        default: []
+        }
+    }
+
     static let all: [GlobalArtifactRule] = [
         GlobalArtifactRule(
             id: "xcode-deriveddata", ecosystem: .xcode,
