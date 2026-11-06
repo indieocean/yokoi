@@ -11,6 +11,7 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
         case android = "Android"
         case editors = "Editors & IDEs"
         case containers = "Containers"
+        case aiAgents = "AI agents"
         case aiModels = "AI models"
         /// No longer used: installers in Downloads moved to the Downloads screen. Kept so older scan caches decode.
         case downloads = "Downloads"
@@ -39,8 +40,10 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
     var permanentOnly: Bool = false
     /// How the location's contents are listed under its twisty so single items can be cleaned.
     var breakdown: Breakdown = .children
-    /// Apps (bundle names without `.app`) or process names that keep this location open. Cleanup is
-    /// refused while one of them runs: an editor or Docker writing its cache as it's removed can corrupt it.
+    /// Apps (bundle names without `.app`), process names, or path fragments (anything with a `/`) that keep this
+    /// location open. Cleanup is refused while one of them runs: an editor or Docker writing its cache as it's
+    /// removed can corrupt it. Fragments are for tools that can't be told by name: the Claude Code binary's
+    /// process is named after its version, and npm-installed agents all run as `node`.
     var usedByApps: [String] = []
 
     /// How a location's contents become individually selectable rows.
@@ -63,6 +66,12 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
         case huggingface
         /// One row per workspace: `workspaces/<name>/DerivedData` only, never the workspace's other state.
         case workspaceDerivedData
+        /// One row per Claude Code project: its session transcripts only, never its `memory` folder.
+        case claudeProjects
+        /// One row per working directory (`%2FUsers%2Fme%2Fapp`), named from the decoded path.
+        case encodedProjects
+        /// One row per download, leaving out whatever a link in the sibling `bin` folder points at: that's the installed version.
+        case unlinkedDownloads
 
         /// Versioned things read best newest first, so the old ones collect at the bottom.
         var sortsByDate: Bool { [.simulators, .archives, .deviceSupport, .systemImages, .avds].contains(self) }
@@ -86,6 +95,16 @@ struct CacheLocation: Sendable, Identifiable, Hashable {
     /// JetBrains IDEs by process name (their bundles have many names: `IntelliJ IDEA CE.app`, `PyCharm Professional Edition.app`…).
     static let jetBrainsProcesses = ["idea", "webstorm", "pycharm", "goland", "clion", "rider", "rubymine", "phpstorm",
                                      "datagrip", "rustrover", "dataspell", "aqua", "studio"]
+
+    // What keeps each agent's folders open. An agent writes its session files as it runs, so they wait for it to quit.
+    // The `/bin/` fragments are npm installs: `node /opt/homebrew/bin/gemini`, with the link in the arguments unresolved.
+    static let claudeDesktopProcesses = ["Claude"]
+    /// The desktop app is listed too: it runs Claude Code sessions of its own.
+    static let claudeCodeProcesses = ["claude", "Claude", "/.local/share/claude/", "/claude-code/", "/bin/claude"]
+    static let codexProcesses = ["codex", "Codex", "/@openai/codex/", "/bin/codex"]
+    static let grokProcesses = ["grok", "Grok Bot", "/.grok/downloads/", "/.grok/bin/"]
+    static let geminiProcesses = ["gemini", "/@google/gemini-cli/", "/bin/gemini"]
+    static let copilotProcesses = ["copilot", "/@github/copilot", "/bin/copilot"]
 }
 
 extension CacheLocation {
@@ -239,6 +258,12 @@ extension CacheLocation {
                       safety: .safe, badge: "cu", colorHex: 0xE6E8EE, restoreHint: "Cursor rebuilds it; the next start is a little slower", usedByApps: ["Cursor"]),
         CacheLocation(id: "cursor-logs", name: "Cursor logs", section: .editors, relativePath: "Library/Application Support/Cursor/logs",
                       safety: .safe, badge: "cu", colorHex: 0xE6E8EE, restoreHint: "Cursor writes new logs", usedByApps: ["Cursor"]),
+        CacheLocation(id: "windsurf-cache", name: "Windsurf cache", section: .editors, relativePath: "Library/Application Support/Windsurf/Cache",
+                      safety: .safe, badge: "ws", colorHex: 0x34D399, restoreHint: "Windsurf rebuilds it", usedByApps: ["Windsurf"]),
+        CacheLocation(id: "windsurf-cached-data", name: "Windsurf compiled code", section: .editors, relativePath: "Library/Application Support/Windsurf/CachedData",
+                      safety: .safe, badge: "ws", colorHex: 0x34D399, restoreHint: "Windsurf rebuilds it; the next start is a little slower", usedByApps: ["Windsurf"]),
+        CacheLocation(id: "windsurf-logs", name: "Windsurf logs", section: .editors, relativePath: "Library/Application Support/Windsurf/logs",
+                      safety: .safe, badge: "ws", colorHex: 0x34D399, restoreHint: "Windsurf writes new logs", usedByApps: ["Windsurf"]),
         CacheLocation(id: "jetbrains-caches", name: "JetBrains caches", section: .editors, relativePath: "Library/Caches/JetBrains",
                       safety: .safe, badge: "jb", colorHex: 0xF472B6, restoreHint: "the IDE re-indexes projects on the next open", usedByApps: jetBrainsProcesses),
         CacheLocation(id: "jetbrains-logs", name: "JetBrains logs", section: .editors, relativePath: "Library/Logs/JetBrains",
@@ -262,6 +287,61 @@ extension CacheLocation {
                       safety: .safe, badge: "orb", colorHex: 0x8B5CF6, restoreHint: "OrbStack rebuilds it", usedByApps: ["OrbStack"]),
         CacheLocation(id: "orbstack-app-logs", name: "OrbStack app logs", section: .containers, relativePath: "Library/Logs/OrbStack",
                       safety: .safe, badge: "orb", colorHex: 0x8B5CF6, restoreHint: "OrbStack writes new logs", usedByApps: ["OrbStack"]),
+        // AI agents. Only what the agent rebuilds is Safe, because Safe is what auto-clean takes. Anything holding
+        // history is Review. Left out on purpose: logins, settings, skills and plugins, Codex sessions (indexed in
+        // SQLite, so removing the files alone leaves the index wrong) and Cursor's `state.vscdb` (its chats live inside).
+        CacheLocation(id: "claude-desktop-cache", name: "Claude app cache", section: .aiAgents, relativePath: "Library/Application Support/Claude/Cache",
+                      safety: .safe, badge: "cl", colorHex: 0xD97757, restoreHint: "Claude rebuilds it", usedByApps: claudeDesktopProcesses),
+        CacheLocation(id: "claude-desktop-code-cache", name: "Claude app compiled code", section: .aiAgents, relativePath: "Library/Application Support/Claude/Code Cache",
+                      safety: .safe, badge: "cl", colorHex: 0xD97757, restoreHint: "Claude rebuilds it; the next start is a little slower", usedByApps: claudeDesktopProcesses),
+        CacheLocation(id: "claude-desktop-gpu-cache", name: "Claude app GPU cache", section: .aiAgents, relativePath: "Library/Application Support/Claude/GPUCache",
+                      safety: .safe, badge: "cl", colorHex: 0xD97757, restoreHint: "Claude rebuilds it", usedByApps: claudeDesktopProcesses),
+        CacheLocation(id: "claude-desktop-caches", name: "Claude app system cache", section: .aiAgents, relativePath: "Library/Caches/com.anthropic.claudefordesktop",
+                      safety: .safe, badge: "cl", colorHex: 0xD97757, restoreHint: "Claude rebuilds it", usedByApps: claudeDesktopProcesses),
+        CacheLocation(id: "claude-desktop-logs", name: "Claude app logs", section: .aiAgents, relativePath: "Library/Logs/Claude",
+                      safety: .safe, badge: "cl", colorHex: 0xD97757, restoreHint: "Claude writes new logs", usedByApps: claudeDesktopProcesses),
+        CacheLocation(id: "claude-cowork-vm", name: "Claude Cowork virtual machine", section: .aiAgents, relativePath: "Library/Application Support/Claude/vm_bundles",
+                      safety: .review, badge: "cl", colorHex: 0xD97757,
+                      restoreHint: "Cowork downloads it again on next use, and whatever its sessions kept inside the VM is lost",
+                      breakdown: .none, usedByApps: claudeDesktopProcesses),
+        CacheLocation(id: "claude-code-mcp-logs", name: "Claude Code MCP logs", section: .aiAgents, relativePath: "Library/Caches/claude-cli-nodejs",
+                      safety: .safe, badge: "cc", colorHex: 0xD97757, restoreHint: "Claude Code writes new logs", usedByApps: claudeCodeProcesses),
+        CacheLocation(id: "claude-code-debug", name: "Claude Code debug logs", section: .aiAgents, relativePath: ".claude/debug",
+                      safety: .safe, badge: "cc", colorHex: 0xD97757, restoreHint: "Claude Code writes new logs", usedByApps: claudeCodeProcesses),
+        CacheLocation(id: "claude-code-paste-cache", name: "Claude Code pasted text", section: .aiAgents, relativePath: ".claude/paste-cache",
+                      safety: .review, badge: "cc", colorHex: 0xD97757, restoreHint: "pasted text is lost from prompts you recall later",
+                      breakdown: .none, usedByApps: claudeCodeProcesses),
+        CacheLocation(id: "claude-code-file-history", name: "Claude Code checkpoints", section: .aiAgents, relativePath: ".claude/file-history",
+                      safety: .review, badge: "cc", colorHex: 0xD97757, restoreHint: "past sessions can no longer be rewound to a checkpoint",
+                      breakdown: .none, usedByApps: claudeCodeProcesses),
+        CacheLocation(id: "claude-code-transcripts", name: "Claude Code transcripts", section: .aiAgents, relativePath: ".claude/projects",
+                      safety: .review, badge: "cc", colorHex: 0xD97757, restoreHint: "these sessions can't be resumed; project memory is kept",
+                      breakdown: .claudeProjects, usedByApps: claudeCodeProcesses),
+        CacheLocation(id: "codex-cache", name: "Codex cache", section: .aiAgents, relativePath: ".codex/cache",
+                      safety: .safe, badge: "cx", colorHex: 0x10A37F, restoreHint: "Codex fetches it again", usedByApps: codexProcesses),
+        CacheLocation(id: "codex-logs", name: "Codex logs", section: .aiAgents, relativePath: ".codex/log",
+                      safety: .safe, badge: "cx", colorHex: 0x10A37F, restoreHint: "Codex writes new logs", usedByApps: codexProcesses),
+        CacheLocation(id: "chatgpt-caches", name: "ChatGPT app cache", section: .aiAgents, relativePath: "Library/Caches/com.openai.chat",
+                      safety: .safe, badge: "gpt", colorHex: 0x10A37F, restoreHint: "ChatGPT rebuilds it", usedByApps: ["ChatGPT"]),
+        CacheLocation(id: "grok-logs", name: "Grok logs", section: .aiAgents, relativePath: ".grok/logs",
+                      safety: .safe, badge: "gk", colorHex: 0xE6E8EE, restoreHint: "Grok writes new logs", usedByApps: grokProcesses),
+        CacheLocation(id: "grok-marketplace-cache", name: "Grok plugin catalog", section: .aiAgents, relativePath: ".grok/marketplace-cache",
+                      safety: .redownload, badge: "gk", colorHex: 0xE6E8EE, restoreHint: "Grok downloads the catalog again; installed plugins are kept", usedByApps: grokProcesses),
+        CacheLocation(id: "grok-downloads", name: "Old Grok versions", section: .aiAgents, relativePath: ".grok/downloads",
+                      safety: .redownload, badge: "gk", colorHex: 0xE6E8EE, restoreHint: "the installed version is kept; older ones aren't needed to run Grok",
+                      breakdown: .unlinkedDownloads, usedByApps: grokProcesses),
+        CacheLocation(id: "grok-sessions", name: "Grok sessions", section: .aiAgents, relativePath: ".grok/sessions",
+                      safety: .review, badge: "gk", colorHex: 0xE6E8EE, restoreHint: "these sessions can't be resumed; Grok never removes them itself",
+                      breakdown: .encodedProjects, usedByApps: grokProcesses),
+        CacheLocation(id: "gemini-sessions", name: "Gemini CLI sessions", section: .aiAgents, relativePath: ".gemini/tmp",
+                      safety: .review, badge: "gm", colorHex: 0x4285F4, restoreHint: "these sessions can't be resumed; Gemini CLI removes old ones after 30 days by default",
+                      usedByApps: geminiProcesses),
+        CacheLocation(id: "copilot-logs", name: "Copilot CLI logs", section: .aiAgents, relativePath: ".copilot/logs",
+                      safety: .safe, badge: "co", colorHex: 0x8B5CF6, restoreHint: "Copilot CLI writes new logs", usedByApps: copilotProcesses),
+        CacheLocation(id: "copilot-sessions", name: "Copilot CLI sessions", section: .aiAgents, relativePath: ".copilot/session-state",
+                      safety: .review, badge: "co", colorHex: 0x8B5CF6, restoreHint: "these sessions can't be resumed", usedByApps: copilotProcesses),
+        CacheLocation(id: "opencode-logs", name: "OpenCode logs", section: .aiAgents, relativePath: ".local/share/opencode/log",
+                      safety: .safe, badge: "oc", colorHex: 0xE6E8EE, restoreHint: "OpenCode writes new logs", usedByApps: ["opencode"]),
         // AI models (opt-in: unchecked by default)
         CacheLocation(id: "ollama", name: "Ollama models", section: .aiModels, relativePath: ".ollama/models",
                       safety: .review, badge: "ol", colorHex: 0xE6E8EE, restoreHint: "`ollama pull` downloads models again", breakdown: .none),

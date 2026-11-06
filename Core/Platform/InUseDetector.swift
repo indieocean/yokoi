@@ -60,9 +60,15 @@ struct InUseSnapshot: Sendable {
     }
 
     /// The first of `apps` that is running: a process launched from inside `<name>.app`, or named `name`.
+    /// An entry with a `/` is a path fragment instead, matched against what processes run and work in, and
+    /// reported as the list's first name, because the process itself may be called `2.1.319` or `node`.
     func runningApp(_ apps: [String]) -> String? {
         guard !apps.isEmpty else { return nil }
         for app in apps {
+            if app.contains("/") {
+                if uses.contains(where: { $0.path.contains(app) }) { return apps[0] }
+                continue
+            }
             let bundle = "/\(app).app/"
             if uses.contains(where: { $0.process == app || $0.path.contains(bundle) }) { return app }
         }

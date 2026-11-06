@@ -128,7 +128,50 @@ enum CacheBreakdown {
                 let derived = workspace.appendingPathComponent("DerivedData")
                 return isDirectory(derived) ? Group(urls: [derived], name: workspace.lastPathComponent) : nil
             }
+        case .claudeProjects:
+            return entries.compactMap(claudeProject)
+        case .encodedProjects:
+            return entries.map(encodedProject)
+        case .unlinkedDownloads:
+            return unlinkedDownloads(entries).map(plain)
         }
+    }
+
+    /// A Claude Code project's transcripts. Only what's known to be a session is listed, so `memory` and anything
+    /// a later version adds beside it stay. Nil when there are no sessions to remove.
+    static func claudeProject(_ project: URL) -> Group? {
+        guard isDirectory(project) else { return nil }
+        let inside = FileWalker.list(project).map(\.url)
+        // `<session>.jsonl`, and the copies set aside as `<session>.jsonl.superseded-<time>` or `<session>.orphaned-<time>.jsonl`.
+        let transcripts = inside.filter { !isDirectory($0) && $0.lastPathComponent.contains(".jsonl") }
+        // `<session>/`: its subagent transcripts and large tool results.
+        let sessions = inside.filter { isDirectory($0) && UUID(uuidString: $0.lastPathComponent) != nil }
+        guard !transcripts.isEmpty || !sessions.isEmpty else { return nil }
+        return Group(urls: transcripts + sessions, name: claudeProjectName(project.lastPathComponent),
+                     detail: CountFormat.plural(transcripts.count, "transcript"))
+    }
+
+    /// `-Users-me-Code-app` → `Code-app`. Claude Code replaces every `/` with `-`, so the real path can't be recovered.
+    static func claudeProjectName(_ folder: String) -> String {
+        let parts = folder.split(separator: "-", maxSplits: 2).map(String.init)
+        return folder.hasPrefix("-Users-") && parts.count == 3 ? parts[2] : folder
+    }
+
+    /// `%2FUsers%2Fme%2Fapp` → name `app`, detail `/Users/me/app`.
+    static func encodedProject(_ url: URL) -> Group {
+        let path = url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent
+        return Group(urls: [url], name: URL(fileURLWithPath: path).lastPathComponent, detail: path)
+    }
+
+    /// `entries` minus what a link in the sibling `bin` folder points at. With no such link there's no telling
+    /// which download is the installed one, so nothing is offered.
+    static func unlinkedDownloads(_ entries: [URL]) -> [URL] {
+        guard let first = entries.first else { return [] }
+        let bin = first.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("bin")
+        let links = FileWalker.list(bin).filter(\.isSymlink).map(\.url)
+        let installed = Set(links.map { $0.resolvingSymlinksInPath().path })
+        guard !installed.isEmpty else { return [] }
+        return entries.filter { !installed.contains($0.resolvingSymlinksInPath().path) }
     }
 
     /// Newest modification of the items and their direct children. Cheap, unlike a full walk, and it
