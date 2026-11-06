@@ -183,6 +183,7 @@ h2 { margin: 0; font-size: clamp(30px, 4.4vw, 46px); line-height: 1.1; letter-sp
 /* Category cards */
 .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .cards > .card:last-child:nth-child(3n + 1) { grid-column: 1 / -1; }  /* no lone card on the last row */
+.cards > .card:last-child:nth-child(3n + 2) { grid-column: span 2; }  /* or a gap beside the last two */
 .card {
   position: relative; padding: 22px; border-radius: var(--r); overflow: hidden;
   background: linear-gradient(180deg, var(--card), var(--card-2)); border: 1px solid var(--stroke);
@@ -342,6 +343,7 @@ kbd {
   .nav-cta { margin-left: auto; }
   .cards { grid-template-columns: repeat(2, 1fr); }
   .cards > .card:last-child:nth-child(3n + 1) { grid-column: auto; }
+  .cards > .card:last-child:nth-child(3n + 2) { grid-column: 1 / -1; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .safety, .split { grid-template-columns: 1fr; gap: 40px; }
   .footer-inner { grid-template-columns: 1fr; }

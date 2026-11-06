@@ -55,6 +55,7 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 | **📦 Package managers** | **Project `node_modules`** for npm · pnpm · yarn · bun, with framework, lockfile and last-touched date. **Global packages and environments** for 17 managers (Homebrew, Cargo, pip, conda…), with outdated and unused flags | node_modules is marked **stale** after 90 days untouched (configurable), and active projects start unchecked. Every update or uninstall shows the exact command and asks first |
 | **🔨 Build artifacts** | `target/`, `.build/`, DerivedData, `build/`, `.gradle/`, `.venv`, `__pycache__`, `bin/obj`, `.next`, Unity `Library/`, Unreal `Intermediate/` + `DerivedDataCache/`… | Only matched **next to the project's marker file**, so a random `target/` folder is never touched |
 | **🗄️ Caches & Tooling** | JavaScript (npm, Yarn, pnpm, Bun, Deno, Playwright, Puppeteer, Electron), Python (pip, uv, Poetry), Homebrew, Cargo, Go modules, Gradle, Maven, NuGet, Flutter, SwiftPM, CocoaPods, Xcode and simulators, **Android emulators, system images and build cache**, VS Code, Cursor and JetBrains caches, Docker Desktop and OrbStack, browsers, Ollama / Hugging Face / LM Studio, Trash | Every location is tagged **Safe**, **Re-download** or **Review**. Sizes count only what cleaning frees, so caches shared with projects through hardlinks or clones aren't overstated. Running emulators, simulators, Gradle daemons, editors and Docker block their own caches |
+| **🤖 AI agents** | Caches and logs from the Claude app, Claude Code, Codex, ChatGPT, Grok, Copilot CLI and OpenCode. Session history for Claude Code, Grok, Gemini CLI and Copilot CLI, plus Claude Code checkpoints, old Grok versions and the Claude Cowork VM | Only what the agent rebuilds is **Safe**. History is **Review**, so it's never preselected or auto-cleaned. Logins, settings, skills, plugins and Claude project memory are never touched, the installed Grok is kept, and each agent's files wait until it quits. Codex sessions and Cursor chats stay too, because each agent tracks them in its own database |
 | **🧰 Tool cleanups** | Unavailable iOS simulators, local Time Machine snapshots, **unused Docker images, Docker build cache and dangling volumes** | Done through the tool itself (`xcrun simctl`, `tmutil`, `docker`), with the exact command shown first. Volumes are listed by name, so nothing created later is swept up |
 | **🐘 Big files** | Videos, archives, disk images, VMs (`.utm`, `.vmdk`…), 3D and art files | Log-scale size slider from 100 MB to 10 GB+, with filters by type |
 | **👯 Duplicates** | Files of 1 MB or more with identical contents, across your big-file locations or in one folder you choose | Compared by SHA-256, only when you ask, because it reads the files. One copy always stays. Copies that are all inside git repos aren't listed unless you choose that folder, and sizes count what removing a copy really frees |
@@ -74,7 +75,9 @@ Yokoi knows where developer clutter lives and what's safe to remove. It shows yo
 
 **Xcode:** DerivedData · Archives · iOS, watchOS and tvOS device support · simulators and runtimes · test simulator clones · SwiftUI Previews · XcodeBuildMCP / MobileBuildMCP DerivedData from AI agent builds
 
-**Editors and containers:** VS Code · Cursor · JetBrains IDEs · Docker Desktop · OrbStack
+**Editors and containers:** VS Code · Cursor · Windsurf · JetBrains IDEs · Docker Desktop · OrbStack
+
+**AI agents:** Claude app · Claude Code · Claude Cowork · Codex (cache and logs) · ChatGPT (cache) · Grok · Gemini CLI (sessions) · Copilot CLI · OpenCode (logs)
 
 **Android:** emulators (AVDs) · SDK system images · SDK cache · Android Gradle build cache · Gradle wrapper distributions
 
@@ -123,7 +126,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 - **Dry run.** Preview exactly what would happen, with sizes, without touching a byte.
 - **Scoped access.** Each category can only touch its own folders. node_modules cleanup can't reach your Downloads, and caches cleanup can't reach your projects.
 - **Hands off your life.** Keychains, Mail, Messages, iCloud Drive, cloud storage, Photos libraries, `/System` and `.git` are blocked unconditionally, even if you add them by accident.
-- **Busy means no.** Projects open in Xcode, Unity, Unreal or a running `node` process, running apps, and Android emulators that are booted are refused. Yokoi checks twice: when you confirm and again right before acting.
+- **Busy means no.** Projects open in Xcode, Unity, Unreal or a running `node` process, running apps, AI agents that are running, and Android emulators that are booted are refused. Yokoi checks twice: when you confirm and again right before acting.
 - **Recent means careful.** Projects you touched in the last 14 days start unchecked and need an extra confirmation.
 - **One copy stays.** The duplicate finder won't let you pick every copy of a file. Right before removing a copy, Yokoi reads it and a copy being kept again, and refuses if they no longer match.
 - **No escalation.** Yokoi never runs `sudo`. Command-line tools are run without a shell, and arguments are passed literally, so package names can't inject commands.
@@ -147,7 +150,7 @@ Yokoi deletes things for a living, so it's built to be paranoid.
 
 ### Download
 
-**[Download Yokoi 1.5.0](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
+**[Download Yokoi 1.6.0](https://github.com/indieocean/yokoi/releases/latest)** (`.dmg`, signed and notarized). Open it, drag Yokoi to Applications, and launch.
 
 Every release is on the [Releases](https://github.com/indieocean/yokoi/releases) page, with a SHA-256 checksum.
 
@@ -234,6 +237,13 @@ Yokoi only uses the network in two cases:
 <summary><strong>Is it safe to delete node_modules and build folders?</strong></summary>
 <br>
 Yes. They're rebuilt by your package manager or toolchain (<code>npm install</code>, <code>cargo build</code>, reopening the project in Unity…). Yokoi shows the restore command before you confirm, and only matches build folders next to their project files.
+</details>
+
+<details>
+<summary><strong>Will cleaning remove my AI agent history?</strong></summary>
+
+Not unless you pick it. Agent caches and logs are tagged Safe, but session history is tagged Review, so it's never preselected and auto-clean and `yokoi clean` leave it alone. Yokoi never touches agent logins, settings, skills, plugins or Claude project memory. Codex sessions and Cursor chats aren't offered at all, because each agent tracks them in its own database and removing the files alone could leave it out of step.
+
 </details>
 
 <details>
