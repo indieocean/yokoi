@@ -129,6 +129,25 @@ h1 .grad { padding-bottom: 0.08em; display: inline-block; }
 .hero-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 34px; }
 .hero-meta { margin: 16px 0 0; font-size: 12.5px; color: var(--text-3); }
 
+/* One-line Homebrew install */
+.install {
+  display: inline-flex; align-items: center; gap: 12px; max-width: 100%; margin-top: 20px;
+  padding: 10px 10px 10px 18px; border-radius: 10px;
+  background: rgba(124, 92, 255, 0.10); border: 1px solid rgba(124, 92, 255, 0.45);
+  box-shadow: 0 8px 32px -12px rgba(124, 92, 255, 0.55);
+  font: 500 16px var(--mono);
+}
+.install-cmd { background: none; border: 0; padding: 0; font: inherit; color: #fff; white-space: nowrap; }
+.install-copy {
+  display: none; padding: 7px 14px; border-radius: var(--r-btn); cursor: pointer;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid var(--stroke-2); color: var(--text);
+  font: 600 13px var(--sans); min-width: 68px;
+}
+.js .install-copy { display: block; }
+.install-copy:hover { background: rgba(255, 255, 255, 0.14); }
+.install-copy:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.install-copy.done { color: var(--success); border-color: rgba(52, 211, 153, 0.5); }
+
 .term {
   margin-top: 40px; max-width: 100%;
   display: inline-flex; align-items: center; gap: 0;
@@ -357,6 +376,8 @@ kbd {
   .kpi { padding: 16px; }
   .section { padding-top: 96px; }
   .term { font-size: 13px; padding: 11px 14px; }
+  .install { flex-wrap: wrap; justify-content: center; gap: 8px 10px; padding: 12px; font-size: 12.5px; }
+  .js .install-copy { width: 100%; }
   .t-sep { width: .8em; }
   .shot-hero { margin-top: 44px; }
   .privacy { flex-direction: column; padding: 28px 22px; }

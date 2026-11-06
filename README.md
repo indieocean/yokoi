@@ -7,6 +7,16 @@
   It finds the gigabytes your toolchains leave behind and removes them safely.
 </p>
 
+<h3 align="center">🍺 Install with Homebrew</h3>
+
+```sh
+brew install --cask indieocean/tap/yokoi
+```
+
+<p align="center">
+  Or <a href="https://github.com/indieocean/yokoi/releases/latest"><b>download the .dmg</b></a> · macOS 14+ · signed and notarized · free and open source
+</p>
+
 <p align="center">
   <a href="https://www.producthunt.com/products/yokoi?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-yokoi" target="_blank" rel="noopener noreferrer"><img alt="Yokoi - A native macOS cleaner built for developers | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1301013&amp;theme=light&amp;t=1793585003121"></a>
 </p>
@@ -158,11 +168,7 @@ Yokoi updates itself with [Sparkle](https://sparkle-project.org). On the second 
 
 ### Homebrew
 
-```sh
-brew install --cask indieocean/tap/yokoi
-```
-
-Homebrew installs the same signed, notarized build. Yokoi then updates itself with Sparkle as above, so `brew upgrade` leaves it alone (`brew upgrade --greedy` would include it).
+The one-line command at the [top of this page](#readme) installs the same signed, notarized build. Yokoi then updates itself with Sparkle as above, so `brew upgrade` leaves it alone (`brew upgrade --greedy` would include it).
 
 ### Build from source
 

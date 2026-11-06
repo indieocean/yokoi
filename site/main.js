@@ -4,6 +4,28 @@
   doc.classList.add("js");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  // Copy the install command
+  document.querySelectorAll("[data-copy]").forEach((btn) => {
+    let timer;
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy);
+      } catch {
+        getSelection().selectAllChildren(btn.previousElementSibling);
+        return;
+      }
+      btn.textContent = "Copied";
+      btn.classList.add("done");
+      btn.setAttribute("aria-label", "Copied");
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        btn.textContent = "Copy";
+        btn.classList.remove("done");
+        btn.setAttribute("aria-label", "Copy the install command");
+      }, 1800);
+    });
+  });
+
   // Nav border once scrolled
   const nav = document.querySelector(".nav");
   const onScroll = () => nav.classList.toggle("scrolled", scrollY > 8);
