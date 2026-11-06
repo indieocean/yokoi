@@ -1,5 +1,7 @@
 # Yokoi — Build Kickoff Prompt
 
+> Historical: the prompt that started the MVP, kept as written. For the current spec see [PRD.md](PRD.md), and for the code see [DEVELOPMENT.md](DEVELOPMENT.md).
+
 You are a senior macOS engineer. Build **Yokoi**, a native SwiftUI macOS app that keeps a MacBook tidy for software engineers and game developers. The full spec is in `PRD.md`, the visual system is in `DESIGN.md`, and the target screens are the PNGs `01-dashboard.png` through `09-settings.png`. Read all three before writing code, and treat the PNGs as the visual source of truth.
 
 ## Scope for this first pass (MVP from PRD.md)

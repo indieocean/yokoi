@@ -3,6 +3,8 @@
 Questions that came up while building the MVP unattended. Each has the decision I made so work
 could continue. Answer or override any of them and I'll adjust.
 
+This is a log, so the entries below stay as written. For what happened since, see [Status at 1.6.0](#status-at-160).
+
 ## Spec conflicts I resolved
 
 1. **Active-project window: 14 vs 30 days.** The kickoff says warn for projects changed in the last
@@ -90,3 +92,15 @@ could continue. Answer or override any of them and I'll adjust.
   re-rendered the scene forever. It now only writes on real changes.
 - Scheduled jobs would have crashed: Swift 6 asserted main-thread isolation on a background callback.
 - ⌘-number shortcuts would have trapped with 10 screens; capped at ⌘1–⌘9.
+
+## Status at 1.6.0
+
+Settled since these were written:
+
+- **2, 3.** Yokoi now runs `xcrun simctl`, `tmutil`, `docker` and other tools. Cache locations are still cleaned by removing a folder's contents.
+- **8.** Sizes of cleanable folders now count only what cleaning frees, including hard links and clones.
+- **14.** Scheduling, the menu bar helper, launch at login and the auto rule are all built.
+- **18.** The project is in git and public at `indieocean/yokoi`.
+- **24.** Auto-clean stayed, and it's wider now: Safe caches, or everything Smart Select takes. It uses the Trash unless "Delete permanently" is on.
+
+Still as described: **11** (JetBrains Mono isn't bundled; the app uses it only when it's installed) and **17** (Reclaimable includes Review items, and Clean uses only Smart Select).

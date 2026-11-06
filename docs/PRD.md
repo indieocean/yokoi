@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Owner | Michael Irizarry |
-| Status | Draft v0.1 · Oct 31, 2026 |
+| Status | Living spec · built through v1.6.0 · updated Nov 6, 2026 |
 | Platform | Native macOS (Swift / SwiftUI) |
 | Design refs | [DESIGN.md](DESIGN.md) · [contact sheet](../assets/ui/00-contact-sheet.png) |
 
@@ -28,7 +28,6 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 - General consumer "Mac cleaner" features (mail attachments, language packs, malware, RAM boosting).
 - Managing project dependencies beyond deleting folders (no `npm install` orchestration).
 - Windows/Linux versions or cloud sync.
-- Uninstalling apps.
 
 ## 3. Target users & personas
 | Persona | Context | Main pain | Top features |
@@ -55,13 +54,15 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 
 ### 5.1 Dashboard ([01-dashboard.png](../assets/ui/01-dashboard.png))
 - FR-D1 KPI tiles: reclaimable total, projects scanned, last scan (duration, file count), freed all-time.
-- FR-D2 Donut ring + legend of reclaimable space by category (node_modules, build artifacts, caches, big files, screenshots, old packages).
+- FR-D2 Donut ring + legend of reclaimable space by category (package managers, build artifacts, caches, big files, downloads, screenshots, applications).
 - FR-D3 Primary actions: **Scan Again** and **Clean · ⟨size⟩**, which cleans the current Smart Select (only items labeled safe or stale by default).
 - FR-D4 "Top offenders" (largest artifact, largest file, stalest project) that deep-link into their screens.
 - FR-D5 Recent cleanups (from the log) and the next scheduled scan.
 - FR-D6 Sidebar shows a per-category size/count and a disk capsule (used/free).
 
 ### 5.2 node_modules ([02-node-modules.png](../assets/ui/02-node-modules.png))
+This has no sidebar item of its own: it's the project view under **Package Managers → npm**.
+
 - FR-N1 Find every `node_modules` under the scan roots. Don't descend into nested `node_modules`. Report each project root.
 - FR-N2 Columns: project name, framework hint (read from `package.json` dependencies), path, status (Active/Stale), last touched, size bar, size.
 - FR-N3 "Last touched" is the newest mtime of the project's source files (excluding node_modules/.git), falling back to the last git commit date.
@@ -89,8 +90,8 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 
 - FR-B4 Opt-in items (Unreal `Binaries`, `Saved/Config`) are unchecked by default and carry a tooltip explaining the risk.
 
-### 5.4 Caches ([04-caches.png](../assets/ui/04-caches.png))
-- FR-C1 Sections: System & User, JavaScript, Native toolchains, Xcode, Browsers.
+### 5.4 Caches & Tooling ([04-caches.png](../assets/ui/04-caches.png))
+- FR-C1 Sections: System & User, JavaScript, Python, Native toolchains, Xcode, Android, Editors & IDEs, Containers, AI agents, AI models, Downloads, Browsers, Trash.
 - FR-C2 Every location has a safety level:
 
 | Level | Meaning | Default selection | Examples |
@@ -99,8 +100,10 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 | **Re-download** | Safe, but gets refetched over the network (slow next build) | Unselected | pnpm store, Cargo registry (`~/.cargo/registry`), Gradle `~/.gradle/caches` |
 | **Review** | Might contain things the user wants | Unselected, warning shown | iOS simulators, Xcode Archives (contain dSYMs), device support |
 
-- FR-C3 Use the tool's own command when one exists (`brew cleanup --prune=all`, `npm cache clean --force`, `pnpm store prune`, `xcrun simctl delete unavailable`, `pip cache purge`). Fall back to deleting files.
+- FR-C3 Cache locations are cleaned by removing a folder's contents, never the folder. Tool cleanups use the tool's own command, shown first: unavailable simulators and runtimes (`xcrun simctl`), local Time Machine snapshots (`tmutil`), Docker images, build cache and volumes (`docker`), and the Go module cache.
 - FR-C4 "Select safe only" quick action.
+- FR-C5 AI agents (Claude app, Claude Code, Claude Cowork, Codex, ChatGPT, Grok, Gemini CLI, Copilot CLI, OpenCode): only what an agent rebuilds is Safe. Session history, checkpoints and the Cowork VM are Review, so Smart Select and auto-clean never take them. Logins, settings, skills, plugins, Claude Code project memory, Codex sessions and Cursor chats are left out.
+- FR-C6 A location with an agent or app using it is refused until that process quits (§6).
 
 ### 5.5 Big files ([05-big-files.png](../assets/ui/05-big-files.png))
 - FR-F1 Threshold slider on a log scale (100 MB to 10 GB+), default ≥ 1 GB.
@@ -117,7 +120,7 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 - FR-S5 Name conflicts are resolved by adding a suffix. Never overwrite.
 
 ### 5.7 Package managers ([07-package-managers.png](../assets/ui/07-package-managers.png))
-- FR-P1 Tabs only appear for managers that are installed. Each shows a count.
+- FR-P1 Tabs only appear for managers that are installed. Each shows a count. There are 17: npm, pnpm, yarn, bun, Homebrew, casks, MacPorts, mas, Cargo, Go, .NET, pip, pipx, uv, conda, gem and Composer. The table in FR-P4 shows the original seven.
 - FR-P2 Columns: package, installed version, latest version (→ green if newer), status (Outdated / Up to date / Unused > 1y), last used, size, row action (Update or Uninstall).
 - FR-P3 A terminal strip shows the exact command that was run and how long it took (transparency).
 - FR-P4 Version-checking commands:
@@ -142,23 +145,40 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 - "Don't ask again" only applies to Safe-level items and never to permanent deletion.
 
 ### 5.9 Duplicates
-- FR-D1 Find files of 1 MB or more with identical contents (SHA-256), in the big-file locations or in one chosen folder, skipping what Big files skips (FR-F5). The folder must be in a big-file location, since those bound what cleanup may reach.
-- FR-D2 Runs only when asked for. It reads files in full, so full and background scans, the CLI and Shortcuts leave it out. Its bytes aren't in the reclaimable total, because they overlap Big files and Downloads.
-- FR-D3 Group copies by contents, biggest saving first. Each copy shows its path, modified date and what removing it frees. Row actions are Reveal in Finder and Quick Look.
-- FR-D4 Hardlinks count as one file. Groups of APFS clones that would free nothing aren't listed.
-- FR-D5 Groups with every copy inside git work trees aren't listed, unless a folder was chosen. Copies in a repository are tagged and kept first.
-- FR-D6 Nothing is preselected. "Select Extras" picks all but the best copy in each group and never picks a copy in a repository. The best copy is one in a repository, then one outside Downloads, then the shortest path.
-- FR-D7 One copy always stays. The last unpicked copy can't be picked, and cleanup refuses a removal unless the copy still matches its hash and another copy outside that cleanup does too, read again right before acting.
-- FR-D8 Move to Trash, with permanent delete only from the confirmation sheet. No Move to…: a moved copy frees nothing.
-- FR-D9 Cloud-only files are never read, since that would download them. They're listed as not checked, along with unreadable files.
+- FR-DU1 Find files of 1 MB or more with identical contents (SHA-256), in the big-file locations or in one chosen folder, skipping what Big files skips (FR-F5). The folder must be in a big-file location, since those bound what cleanup may reach.
+- FR-DU2 Runs only when asked for. It reads files in full, so full and background scans, the CLI and Shortcuts leave it out. Its bytes aren't in the reclaimable total, because they overlap Big files and Downloads.
+- FR-DU3 Group copies by contents, biggest saving first. Each copy shows its path, modified date and what removing it frees. Row actions are Reveal in Finder and Quick Look.
+- FR-DU4 Hardlinks count as one file. Groups of APFS clones that would free nothing aren't listed.
+- FR-DU5 Groups with every copy inside git work trees aren't listed, unless a folder was chosen. Copies in a repository are tagged and kept first.
+- FR-DU6 Nothing is preselected. "Select Extras" picks all but the best copy in each group and never picks a copy in a repository. The best copy is one in a repository, then one outside Downloads, then the shortest path.
+- FR-DU7 One copy always stays. The last unpicked copy can't be picked, and cleanup refuses a removal unless the copy still matches its hash and another copy outside that cleanup does too, read again right before acting.
+- FR-DU8 Move to Trash, with permanent delete only from the confirmation sheet. No Move to…: a moved copy frees nothing.
+- FR-DU9 Cloud-only files are never read, since that would download them. They're listed as not checked, along with unreadable files.
+
+### 5.10 Downloads
+- FR-W1 List the direct children of `~/Downloads` (files, folders sized as a whole, installers, archives), with when each was added and last opened. Screenshots saved there are left to the Screenshots screen.
+- FR-W2 Items untouched for 30 days (configurable) count as reclaimable.
+- FR-W3 Incomplete downloads and archives already extracted are flagged as leftovers. These are the user's own files, so Smart Select never preselects them.
+
+### 5.11 Applications
+- FR-A1 List apps in `/Applications` and `~/Applications` with size, last opened and leftovers in `~/Library`.
+- FR-A2 Leftovers match by exact bundle id. The app name is only used for Application Support, Caches and Logs, and only when no other installed app uses that name.
+- FR-A3 Anything matched on what an app could simply claim stays unless the user ticks it.
+- FR-A4 Apple apps, Yokoi itself and running apps are locked.
+
+### 5.12 External drives
+- FR-E1 Find local volumes under `/Volumes`, skipping network shares. Read-only volumes and Time Machine disks are never cleaned.
+- FR-E2 Offer the drive's own Trash, `.DS_Store` files, and `._` AppleDouble files on exFAT, FAT and NTFS only.
+- FR-E3 Everything here is delete-only: moving to the Trash on an external drive frees nothing.
+- FR-E4 A drive can be included in project and big-file scans.
 
 ## 6. Deletion safety model
 | Guardrail | Requirement |
 |---|---|
 | Trash by default | All removals use `FileManager.trashItem` unless permanent delete is chosen: in the confirmation sheet each time, with `--permanent` on the command line, or with the opt-in auto-clean setting. |
-| Dry run | Every clean can run as a preview that lists paths and sizes without changing anything. Settings toggle "Always dry run first". |
+| Dry run | Every clean can run as a preview that lists paths and sizes without changing anything. Settings toggle "Dry run". |
 | Exclusions | User paths and globs (for example `**/.git`, `~/Dropbox`) are never scanned or touched. |
-| Active-project protection | Projects touched within N days (default 30) are unselected and flagged. Deleting one needs an extra confirmation. Projects with a running process (open in Xcode/Unity/Unreal, `node` cwd) are blocked. |
+| Active-project protection | Projects touched within N days (default 14) are unselected and flagged. Deleting one needs an extra confirmation. Projects with a running process (open in Xcode/Unity/Unreal, `node` cwd), running apps and agents, and booted Android emulators are blocked. |
 | Never-touch list | `/System`, `/Library` (outside known caches), `.git`, source files, anything outside the scan roots and known global paths. |
 | Marker validation | Build artifacts are only matched next to their marker file (§5.3). |
 | Symlinks | Don't follow symlinks out of the scan root. Deleting removes the link, not its target. |
@@ -168,8 +188,8 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 ## 7. Settings & scheduling ([09-settings.png](../assets/ui/09-settings.png))
 - Scan locations with depth (defaults: `~/dev`, `~/work`, `~/games`, `~/Library/Developer`, plus folders found on first run).
 - Excluded paths and globs.
-- Safety: default delete action (Trash/Permanent), skip projects touched within N days, always dry run.
-- Schedule: automatic scan on/off, Daily/Weekly/Monthly, low priority via `NSBackgroundActivityScheduler`. Optional auto-clean of **Safe** caches only. Notify when reclaimable exceeds X GB (default 50).
+- Safety: default delete action (Trash/Permanent), skip projects touched within N days, dry run.
+- Schedule: automatic scan on/off, Daily/Weekly/Monthly, low priority via `NSBackgroundActivityScheduler`. Optional auto-clean (below). Notify when reclaimable exceeds X GB (default 50).
 - Screenshot auto rule (mirrors §5.6).
 
 **Auto-clean** (opt-in, needs automatic scans): runs after each scheduled scan with no confirmation. Takes Safe caches, or everything Smart Select takes. Uses the Trash unless "Delete permanently" is on. Never empties the Trash, holds back anything in use, and is logged like any other cleanup. `yokoi clean` follows the same rules: it previews until given `--yes`, and `--permanent` deletes for good.
@@ -185,13 +205,13 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 | Scan performance | Full scan of about 1M files in ≤ 20 s on Apple Silicon (M1+) SSD. Incremental rescan in ≤ 5 s. First results stream to the UI in < 1 s. |
 | Resource use | Background scans at utility QoS, < 30% of one core on average, < 300 MB RAM. |
 | UI | 60 fps scrolling with 10k-row tables. Launch to usable in < 1 s. |
-| Correctness | Size = allocated size (`totalFileAllocatedSize`). Hard links counted once. |
+| Correctness | Size = allocated size (`totalFileAllocatedSize`). Hard links counted once, and sizes of cleanable folders count only what cleaning frees. |
 | Permissions | Full Disk Access is requested with an onboarding explainer. The app degrades gracefully without it (shows unscanned locations). |
-| Privacy | 100% local. No network calls except package registry lookups the user starts and Sparkle update checks the user allows. No telemetry by default. Opt-in anonymous crash reports only. |
+| Privacy | 100% local. No network calls except package registry lookups the user starts and Sparkle update checks the user allows. No telemetry and no crash reporting. |
 | Accessibility | Full VoiceOver labels, keyboard navigation (⌘K, ⌘⌫, space to Quick Look), Dynamic Type where possible, respects Reduce Motion/Transparency, color never the only signal (pills carry text). |
-| Appearance | Dark first. Light mode supported in v1.1. |
+| Appearance | Dark only. Light mode isn't built. |
 | Min OS | macOS 14 Sonoma (Observation, latest SwiftUI Table/Inspector, SMAppService). |
-| Localization | English at launch. Strings externalized via String Catalogs. |
+| Localization | English only. Strings aren't externalized yet. |
 
 ### Distribution tradeoff
 | | Mac App Store (sandboxed) | Direct (Developer ID + notarized) |
@@ -201,15 +221,17 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 | Discovery/payments | Built in | Own site, Paddle/Stripe, Sparkle updates |
 | **Recommendation** | n/a | **Direct distribution for v1.** An App Store "Lite" edition (folder-scoped cleaning, no package managers) could be considered later. |
 
+**Shipped:** direct distribution, signed and notarized, free and open source (GPL-3.0). Available as a `.dmg` from GitHub Releases and with `brew install --cask indieocean/tap/yokoi`. Updates come through Sparkle.
+
 ## 10. Technical architecture
 | Layer | Approach |
 |---|---|
 | UI | SwiftUI, `NavigationSplitView` (sidebar + detail), `Table` with `KeyPathComparator` sorting and `Set<ID>` selection, `.sheet` for confirmations, `.inspector` for the screenshot action panel, Swift Charts `SectorMark` for the ring, materials per DESIGN.md |
 | State | `@Observable` models per feature, with one `ScanStore` as the source of truth |
 | Scanning | Swift Concurrency: a `TaskGroup` per scan root that streams results (`AsyncStream`) to the UI, cancellable. `FileManager.enumerator(at:includingPropertiesForKeys:options:)` prefetching `.isDirectoryKey, .contentModificationDateKey, .totalFileAllocatedSizeKey, .isSymbolicLinkKey, .fileResourceIdentifierKey`. Pattern matches are pruned so the scanner skips their subtrees and sizes them in parallel |
-| Incremental | `FSEvents` watcher plus a cached index (SQLite/SwiftData) keyed by path + mtime |
-| Detectors | `ArtifactDetector` protocol (marker, paths, safety, restore hint), one per ecosystem, data-driven so new ones are easy to add |
-| CLI | A `ProcessRunner` actor wrapping `Process` with a login-shell PATH (`/opt/homebrew/bin`, nvm/asdf shims), timeouts, JSON parsing, and a streamed output log |
+| Incremental | FSEvents history replayed from a saved event ID (`ChangeJournal`), plus saved measurements in `scan-index.json` (`ScanIndex`), reused only if nothing at or under a path changed and its inode is the same |
+| Detectors | One data-driven table, `ArtifactRule` (markers, target folders, opt-in flags, restore hint), so a new ecosystem is one new entry |
+| CLI | A `ProcessRunner` actor wrapping `Process` with a login-shell PATH (`/opt/homebrew/bin`, nvm/asdf shims), tools resolved to trusted absolute paths and run without a shell, timeouts, JSON parsing, and a streamed output log |
 | Deletion | `CleanupService`: dry-run plan → confirm → `trashItem`/`removeItem` → log entry. Runs in the main app (no privileged helper in v1) |
 | Thumbnails | `QLThumbnailGenerator`, Spotlight `NSMetadataQuery` for screenshot detection |
 | Background | `MenuBarExtra` + login item via `SMAppService`, `NSBackgroundActivityScheduler`, `UNUserNotificationCenter` |
@@ -224,31 +246,34 @@ Developers' Macs fill up with files they can rebuild or re-download: `node_modul
 | Retention: users with ≥ 1 scheduled scan active at day 30 | ≥ 40% |
 | Full-scan p50 time on reference machine | ≤ 20 s |
 | App rating / NPS among beta devs | ≥ 4.5★ / NPS ≥ 40 |
-*(Tracked from opt-in analytics or beta surveys only. There is no telemetry by default.)*
+*(The app has no telemetry, so these can only come from beta surveys.)*
 
-## 12. Release milestones (proposed)
+## 12. Release milestones
 | Release | Scope |
 |---|---|
 | **MVP (v1.0)** | Dashboard, node_modules, Build Artifacts (Rust, Xcode, Swift PM, Gradle, Python, Unity, Unreal), Caches (Safe + Re-download levels), Big Files, Screenshots (manual move/delete), confirmation sheet, Trash default + dry run + exclusions + active-project protection + log, Settings (locations, exclusions, safety), direct distribution, macOS 14+ |
-| **v1.1** | Package managers (npm -g, pnpm -g, Homebrew formulae/casks, Cargo, pip, gem) with update/uninstall confirmation, screenshot auto rule, scheduling + menu bar helper + notifications, Go/.NET/CMake detectors, Xcode simulators/archives (Review level), undo from log, light mode |
-| **Later (v1.2+)** | FSEvents incremental index, duplicate finder (built, see §5.9), Docker images/volumes, Android SDK/emulators, conda/poetry/uv, per-project "archive & restore" (lockfile kept, deps removed), CLI companion (`yokoi scan --json`), App Store Lite edition, Shortcuts/AppIntents |
+| **v1.1** | Package managers (npm -g, pnpm -g, Homebrew formulae/casks, Cargo, pip, gem) with update/uninstall confirmation, screenshot auto rule, scheduling + menu bar helper + notifications, Go/.NET/CMake detectors, Xcode simulators/archives (Review level), undo from log |
+| **Shipped through v1.6** | FSEvents incremental index, Applications, External Drives, Docker, Android SDK/emulators, 17 package managers, CLI (`yokoi scan`, `yokoi clean`), Shortcuts/App Intents, Downloads, Duplicates (§5.9), auto-clean, AI agent cleanup (§5.4) |
+| **Later** | Per-project "archive & restore" (lockfile kept, deps removed), light mode, App Store Lite edition |
 
 ## 13. Risks & open questions
 **Risks**
 | Risk | Mitigation |
 |---|---|
 | Deleting something the user needed | Trash default, Review level, marker validation, active-project protection, undo log |
-| Wrong PATH, so the app can't find CLIs (nvm, asdf, Homebrew prefix) | Resolve PATH from the login shell, with manual override in Settings |
+| Wrong PATH, so the app can't find CLIs (nvm, asdf, Homebrew prefix) | Resolve PATH from the login shell, and run only tools from locations no other account can write to |
 | Slow scans on huge trees or network volumes | Skip network/external volumes by default, prune matched subtrees, stream results, cancel |
 | Full Disk Access friction | Clear onboarding, partial mode without it |
 | CLI output formats change | Prefer JSON flags, version-gated parsers, tests with fixtures |
 | Upgrading a global package breaks a toolchain | Show version changes, single-package default, keep output log |
 
 **Open questions**
-1. Business model: paid upfront, freemium (scan free, clean paid), or open source?
-2. Should "Clean safe caches" ever run fully automatically without confirmation?
-3. Should "Unused" package detection use binary atime (unreliable) or shell history parsing (privacy-sensitive)?
-4. Should package managers move into MVP? They're in the original ask but carry the most risk.
-5. Support Intel Macs, or Apple Silicon only?
-6. Unreal `Saved/`: always opt-in, or split into Logs/Crashes (safe) vs Config (never)?
-7. Is a sandboxed App Store edition worth maintaining?
+1. Should "Unused" package detection use binary atime (unreliable) or shell history parsing (privacy-sensitive)?
+2. Unreal `Saved/`: always opt-in, or split into Logs/Crashes (safe) vs Config (never)?
+3. Is a sandboxed App Store edition worth maintaining?
+
+**Decided**
+- Business model: free and open source (GPL-3.0).
+- Unattended cleaning: yes, but only as opt-in auto-clean, under the rules in §7.
+- Package managers: shipped after the MVP, in v1.1.
+- Intel Macs: supported, alongside Apple Silicon.

@@ -1,4 +1,6 @@
-# Yokoi: UI Design Spec (mock content only)
+# Yokoi: UI Design Spec
+
+The mockups hold sample content only. Where this spec and the app differ, the app (`Yokoi/Theme`) is right.
 
 ## Direction
 Dark-first, native macOS developer tool. Translucent sidebar, a violet→cyan accent, monospace for every path, size, version and command. Category colors double as language/tool badges. It should feel close to Xcode, Raycast and Linear.
@@ -25,14 +27,14 @@ Dark-first, native macOS developer tool. Translucent sidebar, a violet→cyan ac
 - Mono: SF Mono / JetBrains Mono for paths (11.5), sizes (12/500, right-aligned, `.monospacedDigit()`), versions, commands and KPIs (20–26/700).
 
 ## Spacing and shape
-4-pt grid. Content padding is 20/22. Card gap is 16. Rows are 38pt (30 in dense grouped lists). Corner radii: window 12, card 12, button/field 7, badge 7, pill 5. The window is 1280×820, the sidebar 232pt and the toolbar 52pt.
+4-pt grid. Content padding is 20/22. Card gap is 16. Rows are 38pt (30 in dense grouped lists). Corner radii: window 12, card 12, button/field 7, badge 7, pill 5. The mockups and README screenshots are 1280×820, and the app opens at 1280×920. The sidebar is 232pt and the toolbar 52pt.
 
 ## Components
 Sidebar nav item (icon, label, mono count badge), disk-usage capsule, KPI tile, donut ring + legend with mini bars, Table with checkbox column, grouped section rows, status pill, language badge, segmented control, threshold slider with tick labels, thumbnail grid cell (selection ring + glass caption), action inspector panel (radio cards, auto-rule toggle), terminal command strip, bottom selection bar (count · size · Reveal · destructive CTA), confirmation sheet (size/items stats, path preview, Trash vs Permanent radio), Settings rows (toggle, segmented, pop-up).
 
 ## SwiftUI notes
 - `NavigationSplitView` with a `List(selection:)` sidebar, `.listStyle(.sidebar)`, `.navigationSplitViewColumnWidth(232)`, and the disk capsule in `.safeAreaInset(edge: .bottom)`.
-- `.preferredColorScheme(.dark)` by default. Set `.tint(Color("Accent"))`. Use `.windowStyle(.hiddenTitleBar)` + `.toolbar` with `.searchable` (⌘K).
+- `.preferredColorScheme(.dark)` by default. Set `.tint(Color("Accent"))`. Use `.windowStyle(.hiddenTitleBar)`. Each screen has its own `HeaderBar` with a `SearchField` (⌘K), hidden on screens with nothing to search.
 - Lists use `Table` with `TableColumn` sorting via `KeyPathComparator`, plus `Set<ID>` selection. Group with `Section` / `DisclosureGroup` for Build Artifacts and Caches.
 - Cards use `RoundedRectangle(12).fill(.white.opacity(0.03)).overlay(stroke .white.opacity(0.07))`. Overlays and HUDs use `.ultraThinMaterial`.
 - Ring: `Circle().trim(from:to:)` per category, `.stroke(style: StrokeStyle(lineWidth: 18, lineCap: .butt))`, or Swift Charts `SectorMark(innerRadius: .ratio(0.78))`.
@@ -47,14 +49,17 @@ Sidebar nav item (icon, label, mono count badge), disk-usage capsule, KPI tile, 
 | Item | Symbol |
 |---|---|
 | Dashboard | `gauge.with.dots.needle.67percent` |
-| node_modules | `shippingbox` |
 | Build Artifacts | `hammer` |
-| Caches | `archivebox` |
-| Big Files | `doc.badge.ellipsis` / `externaldrive.badge.exclamationmark` |
+| Caches & Tooling | `archivebox` |
+| Big Files | `externaldrive.badge.exclamationmark` |
+| Duplicates | `doc.on.doc` |
+| Downloads | `arrow.down.circle` |
 | Screenshots | `camera.viewfinder` |
+| Applications | `app.dashed` |
+| External Drives | `externaldrive.connected.to.line.below` |
 | Package Managers | `cube.box` |
 | Settings | `gearshape` |
 Actions: `arrow.clockwise` (Rescan), `trash` (Clean), `magnifyingglass` (Reveal), `arrow.up.circle` (Update), `folder.badge.plus` (Move to folder).
 
 ## Files
-`01–09-*.html/png` are per-screen mockups rendered at 2× (2880×1920), `00-contact-sheet.png` shows all screens, and `gen.py` is the generator.
+In `assets/ui/`, `01–09-*.png` are per-screen mockups, `00-contact-sheet.png` shows all screens, and `yokoi-logo.jpg` is the source of the app icon. Duplicates, Downloads, Applications and External Drives were built without mockups.

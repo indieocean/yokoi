@@ -27,10 +27,12 @@ every screen, the confirmation sheet and a dry-run cleanup animation to PNG, the
 | Folder | What's in it |
 |---|---|
 | `Core/` | Everything testable, compiled into both the app and the test bundle (no UI). |
-| `Core/Models` | Categories, `ArtifactRule` table, `CacheLocation` table, item types, package-manager model (v1.1 stub). |
+| `Core/Models` | Categories, `ArtifactRule` table, `CacheLocation` table, item types, package-manager model. |
 | `Core/Scanning` | `CategoryScanner` protocol, `ProjectWalker` (parallel `TaskGroup` walk with pruning), the `ScanEngine` actor and one scanner per category. |
 | `Core/Safety` | `GlobMatcher` (exclusions) and `PathGuard`, the single gate for every file operation. |
-| `Core/Cleanup` | `CleanupService` actor (trash / delete / move, dry run) and the JSON Lines `CleanupLog`. |
+| `Core/Cleanup` | `CleanupService` actor (trash / delete / move, dry run), the JSON Lines `CleanupLog`, `CleanSelection` and `HeadlessClean`. |
+| `Core/Platform` | `ProcessRunner`, `ToolActions` (cleanups done through a tool) and `InUseDetector`. |
+| `Core/CLI` | The `yokoi` command. |
 | `Core/Settings` | `SettingsData` (Codable) plus default scan-root detection. |
 | `Yokoi/App` | App entry, `AppModel`, `ScanStore` (single source of truth), `SettingsStore`, platform helpers. |
 | `Yokoi/ViewModels` | One `@Observable` view model per screen. |
@@ -73,19 +75,19 @@ opt-in flags and a restore hint. Badge color and name go in `Ecosystem` (`Core/M
 
 ## Status
 
-Built: Dashboard, node_modules, Build Artifacts, Caches (+ Trash, installers, AI models, unavailable
-simulators, local Time Machine snapshots), Big Files, Screenshots (+ daily auto rule), **Applications**
+Built: Dashboard, Build Artifacts, Caches & Tooling (+ Trash, installers, AI agents, AI models, unavailable
+simulators, local Time Machine snapshots), Big Files, **Duplicates**, **Downloads**, Screenshots (+ daily auto rule), **Applications**
 (uninstall + `~/Library` leftovers), **External Drives** (drive Trash, `.DS_Store`, `._` files, include a
-drive in scans), **Package Managers** (npm/pnpm/brew/casks/cargo/pip/gem with confirmed update/uninstall),
+drive in scans), **Package Managers** (17 managers with confirmed update/uninstall, and project `node_modules` under npm),
 confirmation sheet, Put Back (undo from the log), open-project blocking, menu bar helper, scheduled scans,
 launch at login, notifications, Settings, **Docker** (unused images, build cache, dangling volumes via `docker`),
-**Android** (AVDs, system images, SDK and build caches, Gradle wrapper dists), the **`yokoi` CLI** and **App Intents**.
+**Android** (AVDs, system images, SDK and build caches, Gradle wrapper dists), the **`yokoi` CLI**, **App Intents** and auto-clean.
 
 Extra safety added with these:
 - Personal data is hard-blocked regardless of roots: Keychains, Mail, Messages, iCloud Drive
   (`Mobile Documents`), `CloudStorage`, Safari, Calendars, Photos libraries, and the top-level home folders themselves.
 - Nothing is cleaned while a running process uses it (project open in Xcode/Unity/Unreal, `node` cwd,
-  running app). Checked when the sheet opens and again right before acting.
+  running app or agent, booted emulator). Checked when the sheet opens and again right before acting.
 - Command-line tools run without a shell, arguments passed literally; `sudo`, `su`, `osascript` and shells
   are refused outright.
 
@@ -145,6 +147,21 @@ CLI and Shortcuts. Its bytes aren't in the reclaimable total, because they're th
 - Copies inside a git work tree are tagged, kept first, and never picked by "Select Extras". A group with every
   copy inside work trees isn't shown unless a folder was chosen: on a real home folder that's nearly all of them, and it's build output and
   vendored code.
+
+## AI agents
+
+The AI agents section of Caches & Tooling is ordinary `CacheLocation` entries, with a few rules of its own:
+
+- Only what an agent rebuilds is Safe, because Safe is what auto-clean takes. Anything holding history is Review.
+- Left out on purpose: logins, settings, skills and plugins, Codex sessions (indexed in SQLite, so removing the files
+  alone leaves the index wrong) and Cursor's `state.vscdb` (its chats live inside).
+- `breakdown` decides how a location splits into rows. `.claudeProjects` lists only what's known to be a session, so
+  `memory` and anything a later version adds beside it stay. `.unlinkedDownloads` leaves out whatever a link in the
+  sibling `bin` folder points at, and offers nothing when there's no such link.
+- `usedByApps` entries with a `/` are path fragments, matched against what processes run and work in. The Claude Code
+  binary's process is named after its version and npm installs run as `node`, so a name alone can't find them.
+
+Tests are in `YokoiTests/AgentCleanupTests.swift`.
 
 ## Incremental rescans
 
@@ -224,18 +241,34 @@ The certificate goes into a temporary keychain and the keys into temporary files
 ## README screenshots
 
 Screenshots come from **demo mode**: the real app, filled with sample data. It never scans, deletes, runs tools,
-or reads your settings, scan cache or cleanup log. To regenerate them:
+or reads your settings, scan cache or cleanup log. To regenerate them, from a Debug build (`-DKSnapshotDir` is debug-only):
 
 ```sh
 Yokoi.app/Contents/MacOS/Yokoi -YokoiDemo YES -ApplePersistenceIgnoreState YES -DKSnapshotDir /tmp/shots
 # then copy /tmp/shots/*.png into assets/readme/screenshots/ (resize to 1600 px wide: sips -Z 1600 *.png)
+# and make the site's copies: cwebp -q 82 -m 6 assets/readme/screenshots/NAME.png -o site/img/NAME.webp
 ```
+
+Look at each image before committing. A capture can come out with the window shifted, which cuts off the sidebar.
+`caches-items.png` is also written but isn't used. The demo video keeps its own copies in `video/public/`.
 
 The cleanup animation GIF (`assets/readme/cleaning.gif`) is recorded the same way, from a Debug build:
 
 ```sh
 scripts/make-cleanup-gif.sh path/to/Debug/Yokoi.app   # needs ffmpeg; WIDTH= and SPEED= to tweak
 ```
+
+## Marketing site
+
+`site/` is plain HTML, CSS and JS with no build step. `.github/workflows/pages.yml` publishes it to GitHub Pages
+(<https://indieocean.github.io/yokoi/>) on every push to `main` that changes it. `main.js` fills every `data-version`
+element from the latest GitHub release, so the version written in `index.html` is only a fallback.
+
+The Homebrew command appears in the README and twice in `site/index.html`. Change them together.
+
+## Demo video
+
+`video/` is the [Remotion](https://www.remotion.dev) source of the demo video. See `video/README.md` for its commands.
 
 ## App icon
 
