@@ -65,7 +65,7 @@ final class ArtifactsViewModel: SelectionPruning {
             let byProject = Dictionary(grouping: items) { $0.isGlobal ? "Global" : $0.projectURL.path }
             return byProject.map { key, items in
                 let first = items[0]
-                let title = key == "Global" ? "Global caches" : first.projectName
+                let title = key == "Global" ? String(localized: "Global caches", comment: "Build Artifacts group for caches shared by all projects") : first.projectName
                 let ecos = Array(Set(items.map(\.ecosystem))).sorted { $0.rawValue < $1.rawValue }
                 return Group(id: key, title: title,
                              subtitle: key == "Global" ? "DerivedData · go-build" : PathFormat.abbreviate(first.projectURL),
@@ -112,9 +112,11 @@ final class ArtifactsViewModel: SelectionPruning {
     func cleanupRequest() -> CleanupRequest {
         let items = selectedItems.sorted { $0.size > $1.size }
         let hints = Set(items.map(\.restoreHint))
-        let hint = hints.count == 1 ? "Rebuild anytime: `\(hints.first!)`." : "Everything here is rebuilt by its toolchain on the next build."
+        let hint = hints.count == 1
+            ? String(localized: "Rebuild anytime: `\(hints.first!)`.", comment: "Confirmation hint; placeholder is a build command")
+            : String(localized: "Everything here is rebuilt by its toolchain on the next build.")
         return CleanupRequest(
-            title: "Clean \(items.count) build target\(items.count == 1 ? "" : "s")?",
+            title: String(localized: "Clean \(items.count) build targets?", comment: "Confirmation title"),
             restoreHint: hint,
             entries: items.map { CleanupEntry($0, displayPath: $0.displayPath) }
         )

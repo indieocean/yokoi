@@ -14,7 +14,7 @@ struct DownloadsView: View {
 
         VStack(spacing: 0) {
             HeaderBar(title: "Downloads",
-                      subtitle: "\(CountFormat.plural(totals.count, "item")) · \(ByteFormat.string(totals.size))") {
+                      subtitle: "\(totals.count) items · \(ByteFormat.string(totals.size))") {
                 Button {
                     NSWorkspace.shared.open(vm.folder)
                 } label: {
@@ -49,13 +49,16 @@ struct DownloadsView: View {
                                     .lineLimit(1).truncationMode(.middle)
                                     .help(row.item.url.path)
                                 if let note = row.item.note {
-                                    StatusPill(text: note.uppercased(), color: noteColor(row.item))
+                                    StatusPill(text: note.localizedUppercase, color: noteColor(row.item))
                                 }
                             }
                         }
                         .width(min: 220)
                         TableColumn("Kind", value: \.kind) { row in
-                            Text(row.item.kind == .folder ? "Folder · \(CountFormat.compact(row.item.fileCount)) files" : row.kind)
+                            Text(row.item.kind == .folder
+                             ? String(localized: "Folder · \(CountFormat.compact(row.item.fileCount)) files",
+                                      comment: "Kind column for a folder; placeholder is an abbreviated file count such as 412k")
+                             : row.kind)
                                 .font(.system(size: 12.5)).foregroundStyle(Theme.textSecondary).lineLimit(1)
                         }
                         .width(120)
@@ -66,7 +69,7 @@ struct DownloadsView: View {
                         }
                         .width(100)
                         TableColumn("Last opened", value: \.lastOpened) { row in
-                            Text(row.item.lastOpened.map { RelativeDate.string($0) } ?? "Never")
+                            Text(row.item.lastOpened.map { RelativeDate.string($0) } ?? String(localized: "Never", comment: "Last opened: the download was never opened"))
                                 .font(.system(size: 12.5)).foregroundStyle(Theme.textSecondary)
                         }
                         .width(100)
@@ -95,9 +98,10 @@ struct DownloadsView: View {
             .padding(Theme.Metrics.contentPadding)
 
             SelectionBar(state: vm.checkState(for: rows), toggleAll: { vm.toggleAll(rows) },
-                         count: vm.checked.count, noun: vm.checked.count == 1 ? "item" : "items", size: vm.selectedSize) {
+                         count: vm.checked.count, selection: "**\(vm.checked.count) items** selected", size: vm.selectedSize,
+                         reclaim: "**\(ByteFormat.string(vm.selectedSize))** will be reclaimed") {
                 Button {
-                    if let dest = Finder.chooseFolder(title: "Move \(vm.checked.count) downloads to…", prompt: "Move Here") {
+                    if let dest = Finder.chooseFolder(title: String(localized: "Move \(vm.checked.count) downloads to…", comment: "Folder picker title"), prompt: String(localized: "Move Here", comment: "Folder picker button")) {
                         let entries = vm.selectedItems.map { CleanupEntry($0) }
                         Task { await app.run(entries, action: .move(destination: dest, organizeByDate: false)) }
                     }
@@ -120,9 +124,9 @@ struct DownloadsView: View {
     }
 
     private func badge(_ item: DownloadItem) -> String {
-        if item.kind == .folder { return "DIR" }
+        if item.kind == .folder { return String(localized: "DIR", comment: "Short badge for a folder, at most 4 letters") }
         let ext = item.url.pathExtension.uppercased()
-        return ext.isEmpty ? "FILE" : String(ext.prefix(4))
+        return ext.isEmpty ? String(localized: "FILE", comment: "Short badge for a file without an extension, at most 4 letters") : String(ext.prefix(4))
     }
 
     private func noteColor(_ item: DownloadItem) -> Color {
@@ -153,7 +157,7 @@ private struct DownloadsSummaryCard: View {
                                 Button(label(d)) { vm.ageDays = d }
                             }
                         } label: {
-                            Text(label(vm.ageDays) + "+").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accentLight)
+                            Text("\(label(vm.ageDays))+", comment: "Age threshold, e.g. 30 days+").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accentLight)
                         }
                         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
                         .help("Downloads not added or opened for this long count as reclaimable")
@@ -161,7 +165,7 @@ private struct DownloadsSummaryCard: View {
                     Text(ByteFormat.string(totals.oldSize))
                         .font(Theme.mono(22, .bold))
                         .foregroundStyle(Theme.accentLight)
-                    Text("\(CountFormat.plural(totals.oldCount, "item")) of \(totals.count)")
+                    Text("\(totals.oldCount) items of \(totals.count)")
                         .font(.system(size: 11.5)).foregroundStyle(Theme.textSecondary)
                 }
                 .frame(width: 170, alignment: .leading)
@@ -184,7 +188,7 @@ private struct DownloadsSummaryCard: View {
 
             SegmentedTabs(selection: $vm.filter, items:
                 [.init(value: .all, title: "All"), .init(value: .old, title: "Old")]
-                + DownloadKind.filters.map { .init(value: .kind($0), title: $0.filterTitle) },
+                + DownloadKind.filters.map { .init(value: .kind($0), verbatim: $0.filterTitle) },
                 compact: true)
         }
         .card(padding: 18)
@@ -192,14 +196,14 @@ private struct DownloadsSummaryCard: View {
 
     private func label(_ days: Int) -> String {
         switch days {
-        case 7: "1 week"
-        case 14: "2 weeks"
-        case 30: "30 days"
-        case 60: "60 days"
-        case 90: "3 months"
-        case 180: "6 months"
-        case 365: "1 year"
-        default: "\(days) days"
+        case 7: String(localized: "1 week")
+        case 14: String(localized: "2 weeks")
+        case 30: String(localized: "30 days")
+        case 60: String(localized: "60 days")
+        case 90: String(localized: "3 months")
+        case 180: String(localized: "6 months")
+        case 365: String(localized: "1 year")
+        default: String(localized: "\(days) days")
         }
     }
 }

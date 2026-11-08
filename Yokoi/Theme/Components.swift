@@ -46,11 +46,23 @@ struct Badge: View {
 
 /// Status pill like `STALE`, `SAFE`, `REVIEW`. Text always carries the meaning, not just color.
 struct StatusPill: View {
-    let text: String
+    let text: Text
     let color: Color
 
+    init(text: LocalizedStringKey, color: Color) {
+        self.text = Text(text)
+        self.color = color
+    }
+
+    /// For text that is already localized, or data such as a package manager's name.
+    @_disfavoredOverload
+    init(text: String, color: Color) {
+        self.text = Text(verbatim: text)
+        self.color = color
+    }
+
     var body: some View {
-        Text(text)
+        text
             .font(Theme.mono(10.5, .bold))
             .tracking(0.4)
             .foregroundStyle(color)
@@ -63,11 +75,23 @@ struct StatusPill: View {
 
 /// Small neutral tag, e.g. a framework hint (`next 14`) or a version.
 struct Tag: View {
-    let text: String
+    let text: Text
     var color: Color = Theme.textSecondary
 
+    init(text: LocalizedStringKey, comment: StaticString? = nil, color: Color = Theme.textSecondary) {
+        self.text = Text(text, comment: comment)
+        self.color = color
+    }
+
+    /// For data such as a version or a framework hint, shown as is.
+    @_disfavoredOverload
+    init(text: String, color: Color = Theme.textSecondary) {
+        self.text = Text(verbatim: text)
+        self.color = color
+    }
+
     var body: some View {
-        Text(text)
+        text
             .font(Theme.mono(11, .medium))
             .foregroundStyle(color)
             .padding(.horizontal, 7)
@@ -78,10 +102,16 @@ struct Tag: View {
 }
 
 struct SectionLabel: View {
-    let text: String
+    let text: Text
+
+    init(text: LocalizedStringKey) { self.text = Text(text) }
+
+    /// For text that is already localized.
+    init(verbatim text: String) { self.text = Text(verbatim: text) }
 
     var body: some View {
-        Text(text.uppercased())
+        text
+            .textCase(.uppercase)
             .font(Theme.section)
             .tracking(0.9)
             .foregroundStyle(Theme.textTertiary)
@@ -126,7 +156,7 @@ struct CheckBox: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(state == .on ? "Selected" : "Not selected")
+        .accessibilityLabel(state == .on ? Text("Selected", comment: "Checkbox state") : Text("Not selected", comment: "Checkbox state"))
         .accessibilityAddTraits(.isButton)
     }
 }
@@ -212,8 +242,21 @@ extension ButtonStyle where Self == DKButtonStyle {
 struct SegmentedTabs<Value: Hashable>: View {
     struct Item {
         let value: Value
-        let title: String
+        let title: Text
         var count: String? = nil
+
+        init(value: Value, title: LocalizedStringKey, count: String? = nil) {
+            self.value = value
+            self.title = Text(title)
+            self.count = count
+        }
+
+        /// For titles that are already localized.
+        init(value: Value, verbatim title: String, count: String? = nil) {
+            self.value = value
+            self.title = Text(verbatim: title)
+            self.count = count
+        }
     }
 
     @Binding var selection: Value
@@ -228,7 +271,7 @@ struct SegmentedTabs<Value: Hashable>: View {
                     selection = item.value
                 } label: {
                     HStack(spacing: 6) {
-                        Text(item.title)
+                        item.title
                         if let count = item.count {
                             Text(count).font(Theme.mono(11.5)).foregroundStyle(selected ? Theme.textPrimary : Theme.textSecondary)
                         }
@@ -294,9 +337,9 @@ struct SizeText: View {
 
 struct EmptyStateView: View {
     let symbol: String
-    let title: String
-    let message: String
-    var actionTitle: String? = nil
+    let title: LocalizedStringKey
+    let message: LocalizedStringKey
+    var actionTitle: LocalizedStringKey? = nil
     var action: (() -> Void)? = nil
 
     var body: some View {
@@ -322,7 +365,7 @@ struct EmptyStateView: View {
 /// Tag for features that land in v1.1.
 struct ComingSoonTag: View {
     var body: some View {
-        Text("v1.1")
+        Text(verbatim: "v1.1")
             .font(Theme.mono(10, .bold))
             .foregroundStyle(Theme.accentLight)
             .padding(.horizontal, 6)
@@ -372,6 +415,6 @@ struct AppIconMark: View {
             .resizable()
             .interpolation(.high)
             .frame(width: size, height: size)
-            .accessibilityLabel("Yokoi")
+            .accessibilityLabel(Text(verbatim: "Yokoi"))
     }
 }

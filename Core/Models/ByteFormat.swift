@@ -112,25 +112,36 @@ enum PathFormat {
 enum RelativeDate {
     /// "Today", "Yesterday", "3 weeks ago", "4 months ago", "2 years ago".
     static func string(_ date: Date?, now: Date = Date()) -> String {
-        guard let date else { return "Unknown" }
+        guard let date else { return String(localized: "Unknown", comment: "Date that isn't known") }
         let cal = Calendar.current
-        if cal.isDate(date, inSameDayAs: now) { return "Today" }
-        if let y = cal.date(byAdding: .day, value: -1, to: now), cal.isDate(date, inSameDayAs: y) { return "Yesterday" }
+        if cal.isDate(date, inSameDayAs: now) { return String(localized: "Today") }
+        if let y = cal.date(byAdding: .day, value: -1, to: now), cal.isDate(date, inSameDayAs: y) { return String(localized: "Yesterday") }
         let days = max(1, Int(now.timeIntervalSince(date) / 86_400))
-        if days < 14 { return "\(days) days ago" }
-        if days < 60 { return "\(days / 7) weeks ago" }
-        if days < 365 { return "\(days / 30) months ago" }
+        if days < 14 { return String(localized: "\(days) days ago") }
+        let weeks = days / 7
+        if days < 60 { return String(localized: "\(weeks) weeks ago") }
+        let months = days / 30
+        if days < 365 { return String(localized: "\(months) months ago") }
         let years = days / 365
-        return years == 1 ? "1 year ago" : "\(years) years ago"
+        return years == 1 ? String(localized: "1 year ago") : String(localized: "\(years) years ago")
+    }
+
+    /// True when `date` is today or yesterday, the cases where `string` names the day rather than an age.
+    static func isTodayOrYesterday(_ date: Date, now: Date = Date()) -> Bool {
+        let cal = Calendar.current
+        if cal.isDate(date, inSameDayAs: now) { return true }
+        guard let y = cal.date(byAdding: .day, value: -1, to: now) else { return false }
+        return cal.isDate(date, inSameDayAs: y)
     }
 
     static func ago(_ date: Date?, now: Date = Date()) -> String {
-        guard let date else { return "never" }
+        guard let date else { return String(localized: "never", comment: "Relative time: something has never happened") }
         let s = Int(now.timeIntervalSince(date))
-        if s < 60 { return "just now" }
-        if s < 3600 { return "\(s / 60) min ago" }
-        if s < 86_400 { return "\(s / 3600) h ago" }
-        return "\(s / 86_400) d ago"
+        if s < 60 { return String(localized: "just now") }
+        let minutes = s / 60, hours = s / 3600, days = s / 86_400
+        if s < 3600 { return String(localized: "\(minutes) min ago", comment: "Relative time, abbreviated minutes") }
+        if s < 86_400 { return String(localized: "\(hours) h ago", comment: "Relative time, abbreviated hours") }
+        return String(localized: "\(days) d ago", comment: "Relative time, abbreviated days")
     }
 
     /// "Mar 3", or "Nov 2025" when not in the current year.
@@ -138,7 +149,7 @@ enum RelativeDate {
         guard let date else { return "—" }
         let cal = Calendar.current
         let f = DateFormatter()
-        f.dateFormat = cal.component(.year, from: date) == cal.component(.year, from: now) ? "MMM d" : "MMM yyyy"
+        f.setLocalizedDateFormatFromTemplate(cal.component(.year, from: date) == cal.component(.year, from: now) ? "MMMd" : "MMMyyyy")
         return f.string(from: date)
     }
 }

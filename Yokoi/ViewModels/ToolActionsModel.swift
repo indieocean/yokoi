@@ -38,16 +38,18 @@ final class ToolActionsModel {
         let title = status.action.title
         let entries: [CleanupEntry] = status.items.isEmpty
             ? [CleanupEntry(id: "tool:\(status.action.rawValue)", category: .caches, label: title,
-                            displayPath: CountFormat.plural(status.count, status.action.noun), urls: [], size: status.size ?? 0,
+                            displayPath: status.action.countPhrase(status.count), urls: [], size: status.size ?? 0,
                             fileCount: status.count, safety: .review)]
             : status.items.map { item in
                 CleanupEntry(id: "tool:\(status.action.rawValue):\(item.id)", category: .caches, label: item.label,
                              displayPath: [item.label, item.detail].compactMap { $0 }.joined(separator: "  ·  "), urls: [],
                              size: item.size ?? 0, fileCount: 1, safety: .review)
             }
-        let tool = status.commands.first?.first ?? "the tool"
-        return CleanupRequest(title: "Delete \(CountFormat.plural(status.count, status.action.noun))?",
-                              restoreHint: status.action.explanation + " Removed with `\(tool)`, so they can't go to the Trash.",
+        let tool = status.commands.first?.first ?? String(localized: "the tool", comment: "Fallback for the command name in “Removed with `the tool`”")
+        return CleanupRequest(title: String(localized: "Delete \(status.action.countPhrase(status.count))?",
+                                            comment: "Confirmation title; placeholder is a counted phrase like “3 images”"),
+                              restoreHint: String(localized: "\(status.action.explanation) Removed with `\(tool)`, so they can't go to the Trash.",
+                                                  comment: "Confirmation hint; first placeholder explains what the items are, second is a command name"),
                               entries: entries, forcePermanent: true, tool: status)
     }
 
@@ -80,19 +82,25 @@ final class ToolActionsModel {
 
     /// Runs a confirmed tool cleanup and reports the result as a toast.
     func confirm(_ status: ToolActionStatus, app: AppModel) async {
-        let commands = CountFormat.plural(status.commands.count, "command")
+        let commands = status.commands.count
         if store.isDemo || store.settings.data.dryRun {
-            app.toast = Toast(kind: .info, message: "Dry run: would run \(commands)",
+            app.toast = Toast(kind: .info, message: String(localized: "Dry run: would run \(commands) commands"),
                               detail: status.commands.first.map { $0.joined(separator: " ") })
             return
         }
         await run(status)
         let failed = results.filter { !$0.succeeded }
         if failed.isEmpty {
-            app.toast = Toast(kind: .success, message: "Deleted \(CountFormat.plural(status.count, status.action.noun))"
-                                + (status.size.map { " · \(ByteFormat.string($0))" } ?? ""))
+            let deleted = status.action.countPhrase(status.count)
+            let message = if let size = status.size {
+                String(localized: "Deleted \(deleted) · \(ByteFormat.string(size))",
+                       comment: "Toast; first placeholder is a counted phrase like “3 images”, second a size like 1.2 GB")
+            } else {
+                String(localized: "Deleted \(deleted)", comment: "Toast; placeholder is a counted phrase like “3 images”")
+            }
+            app.toast = Toast(kind: .success, message: message)
         } else {
-            app.toast = Toast(kind: .warning, message: "\(failed.count) of \(commands) failed",
+            app.toast = Toast(kind: .warning, message: String(localized: "\(failed.count) of \(commands) commands failed", comment: "Toast after tool commands ran"),
                               detail: failed.first?.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
         }
     }
@@ -112,5 +120,20 @@ final class ToolActionsModel {
         picked[status.action] = nil
         running = false
         await refresh()
+    }
+}
+
+extension ToolAction {
+    /// The counted phrase shown for this action's items ("3 images"), localized with plural forms.
+    func countPhrase(_ n: Int) -> String {
+        switch self {
+        case .unavailableSimulators: String(localized: "\(n) devices", comment: "Count of unavailable simulator devices")
+        case .simulatorRuntimes: String(localized: "\(n) runtimes", comment: "Count of simulator runtimes")
+        case .localSnapshots: String(localized: "\(n) snapshots", comment: "Count of local Time Machine snapshots")
+        case .dockerImages: String(localized: "\(n) images", comment: "Count of Docker images")
+        case .dockerBuildCache: String(localized: "\(n) records", comment: "Count of Docker build cache records")
+        case .dockerVolumes: String(localized: "\(n) volumes", comment: "Count of Docker volumes")
+        case .goModuleCache: String(localized: "\(n) modules", comment: "Count of Go modules")
+        }
     }
 }

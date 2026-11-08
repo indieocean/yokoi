@@ -17,15 +17,15 @@ enum CleanCategory: String, CaseIterable, Codable, Sendable, Identifiable {
     var title: String {
         switch self {
         case .nodeModules: "node_modules"
-        case .buildArtifacts: "Build artifacts"
-        case .caches: "Caches & Tooling"
-        case .bigFiles: "Big files"
-        case .duplicates: "Duplicates"
-        case .downloads: "Downloads"
-        case .screenshots: "Screenshots"
-        case .applications: "Applications"
-        case .externalDrives: "External drives"
-        case .packages: "Package managers"
+        case .buildArtifacts: String(localized: "Build artifacts", comment: "Category title")
+        case .caches: String(localized: "Caches & Tooling", comment: "Category title")
+        case .bigFiles: String(localized: "Big files", comment: "Category title")
+        case .duplicates: String(localized: "Duplicates", comment: "Category title")
+        case .downloads: String(localized: "Downloads", comment: "Category title: the Downloads folder")
+        case .screenshots: String(localized: "Screenshots", comment: "Category title")
+        case .applications: String(localized: "Applications", comment: "Category title")
+        case .externalDrives: String(localized: "External drives", comment: "Category title")
+        case .packages: String(localized: "Package managers", comment: "Category title")
         }
     }
 
@@ -72,9 +72,9 @@ enum SafetyLevel: String, Codable, Sendable, CaseIterable, Comparable {
 
     var label: String {
         switch self {
-        case .safe: "SAFE"
-        case .redownload: "RE-DOWNLOAD"
-        case .review: "REVIEW"
+        case .safe: String(localized: "SAFE", comment: "Safety pill: removing it loses nothing, it is rebuilt automatically")
+        case .redownload: String(localized: "RE-DOWNLOAD", comment: "Safety pill: safe to remove, but it is downloaded again")
+        case .review: String(localized: "REVIEW", comment: "Safety pill: may contain things the user wants, check first")
         }
     }
 
@@ -108,7 +108,7 @@ enum Ecosystem: String, Codable, Sendable, CaseIterable, Identifiable {
         case .python: "Python"
         case .go: "Go"
         case .dotnet: ".NET"
-        case .javascript: "JS frameworks"
+        case .javascript: String(localized: "JS frameworks", comment: "Ecosystem name: JavaScript framework build output")
         case .cmake: "CMake"
         }
     }

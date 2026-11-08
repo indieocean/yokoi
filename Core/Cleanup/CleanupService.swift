@@ -55,11 +55,11 @@ struct KeepCheck: Sendable, Hashable {
     ///   - removing: every path in the cleanup. A copy in it isn't one that survives.
     ///   - verified: paths already read in this cleanup, so a copy kept for several others is read once.
     func refusal(removing: Set<String>, verified: inout Set<String>) -> String? {
-        guard matches(target, &verified) else { return "Changed since the last scan, or can't be read. Rescan, then clean it" }
+        guard matches(target, &verified) else { return String(localized: "Changed since the last scan, or can't be read. Rescan, then clean it", comment: "Why cleanup skipped an item") }
         for copy in keep where !removing.contains(copy.url.path) {
             if matches(copy, &verified) { return nil }
         }
-        return "Refused: no unchanged copy would be left. Rescan, then clean it"
+        return String(localized: "Refused: no unchanged copy would be left. Rescan, then clean it", comment: "Why cleanup skipped a duplicate: no other identical copy would remain")
     }
 
     private func matches(_ file: FileSnapshot, _ verified: inout Set<String>) -> Bool {
@@ -120,7 +120,7 @@ struct CleanupEntry: Sendable, Identifiable, Hashable {
         case let i as DuplicateFile: projectRoot = i.repository
         case let i as AppItem:
             projectRoot = i.url
-            refusal = i.protectedReason
+            refusal = i.protectedReasonText
         case let i as CacheItem:
             permanentOnly = i.permanentOnly
             // A running emulator keeps its AVD's files open: block like an open project.
@@ -261,7 +261,7 @@ struct SystemFileOperations: FileOperations {
 
     private static func refused(_ real: URL, checkedAs url: URL) -> NSError {
         NSError(domain: "Yokoi.Cleanup", code: 1, userInfo: [
-            NSLocalizedDescriptionKey: "Refused: \(real.path) is not where the item was checked",
+            NSLocalizedDescriptionKey: String(localized: "Refused: \(real.path) is not where the item was checked", comment: "Cleanup error; the placeholder is a file path"),
             NSFilePathErrorKey: url.path,
         ])
     }
@@ -402,7 +402,7 @@ actor CleanupService {
             }
             let pathGuard = guards[entry.category] ?? PathGuard(allowedRoots: [], exclusions: GlobMatcher(patterns: []))
             if let why = entry.refusal {
-                failures.append(.init(path: entry.displayPath, reason: "Refused: \(why)"))
+                failures.append(.init(path: entry.displayPath, reason: String(localized: "Refused: \(why)", comment: "A command or cleanup was refused; the placeholder says why")))
                 failedHere = 1
                 continue
             }
@@ -412,28 +412,28 @@ actor CleanupService {
                 continue
             }
             if entry.permanentOnly, case .trash = action {
-                failures.append(.init(path: entry.displayPath, reason: "Refused: items already in the Trash can only be deleted permanently"))
+                failures.append(.init(path: entry.displayPath, reason: String(localized: "Refused: items already in the Trash can only be deleted permanently", comment: "Why cleanup skipped an item")))
                 continue
             }
             for url in entry.urls {
                 if let violation = pathGuard.check(url) {
-                    failures.append(.init(path: url.path, reason: "Refused: \(violation.description)"))
+                    failures.append(.init(path: url.path, reason: String(localized: "Refused: \(violation.description)", comment: "A command or cleanup was refused; the placeholder says why")))
                     failedHere += 1
                     continue
                 }
                 if case .move(let destination, _) = action,
                    destination.standardizedFileURL.path.hasPrefix(url.standardizedFileURL.path + "/") {
-                    failures.append(.init(path: url.path, reason: "Refused: destination is inside the item"))
+                    failures.append(.init(path: url.path, reason: String(localized: "Refused: destination is inside the item", comment: "Why a move was refused: the destination folder is inside the item being moved")))
                     failedHere += 1
                     continue
                 }
                 guard ops.exists(url) else {
-                    failures.append(.init(path: url.path, reason: "No longer exists"))
+                    failures.append(.init(path: url.path, reason: String(localized: "No longer exists", comment: "Why cleanup skipped an item")))
                     failedHere += 1
                     continue
                 }
                 if let scannedAt = entry.scannedAt, entry.category.checksReplacement, Self.created(url, after: scannedAt) {
-                    failures.append(.init(path: url.path, reason: "Replaced since the last scan. Rescan, then clean it"))
+                    failures.append(.init(path: url.path, reason: String(localized: "Replaced since the last scan. Rescan, then clean it", comment: "Why cleanup skipped an item")))
                     failedHere += 1
                     continue
                 }
@@ -492,7 +492,7 @@ actor CleanupService {
         do {
             try await log.append(records)
         } catch {
-            failures.append(.init(path: log.url.path, reason: "Couldn't write the cleanup log: \(error.localizedDescription)"))
+            failures.append(.init(path: log.url.path, reason: String(localized: "Couldn't write the cleanup log: \(error.localizedDescription)", comment: "The placeholder is a system error message")))
         }
         return CleanupOutcome(batchID: batchID, action: action, dryRun: dryRun, records: records,
                               failures: failures, completedIDs: completed, bytes: bytes)
@@ -532,16 +532,16 @@ actor CleanupService {
                 let original = URL(fileURLWithPath: item.original)
                 // The log is a plain file: only move things out of a Trash, back to a place cleanup may touch.
                 if !Self.isInTrash(trashed, home: home) {
-                    failures.append(.init(path: item.original, reason: "Refused: the logged Trash location isn't in a Trash"))
+                    failures.append(.init(path: item.original, reason: String(localized: "Refused: the logged Trash location isn't in a Trash", comment: "Why Put Back skipped an item")))
                     failed += 1
                 } else if let violation = (guards[record.category] ?? PathGuard(allowedRoots: [], exclusions: GlobMatcher(patterns: []))).check(original) {
-                    failures.append(.init(path: item.original, reason: "Refused: \(violation.description)"))
+                    failures.append(.init(path: item.original, reason: String(localized: "Refused: \(violation.description)", comment: "A command or cleanup was refused; the placeholder says why")))
                     failed += 1
                 } else if !ops.exists(trashed) {
-                    failures.append(.init(path: item.original, reason: "No longer in the Trash"))
+                    failures.append(.init(path: item.original, reason: String(localized: "No longer in the Trash", comment: "Why Put Back skipped an item")))
                     failed += 1
                 } else if ops.exists(original) {
-                    failures.append(.init(path: item.original, reason: "Something else is at the original path now"))
+                    failures.append(.init(path: item.original, reason: String(localized: "Something else is at the original path now", comment: "Why Put Back skipped an item")))
                     failed += 1
                 } else {
                     do {

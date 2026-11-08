@@ -127,10 +127,10 @@ final class CachesViewModel: SelectionPruning {
     func emptyTrashRequest() -> CleanupRequest? {
         guard let trash, !trash.contents.isEmpty else { return nil }
         return CleanupRequest(
-            title: "Empty the Trash?",
-            restoreHint: "Permanently deletes \(CountFormat.plural(trash.contents.count, "item")) in the Trash. This can't be undone.",
+            title: String(localized: "Empty the Trash?"),
+            restoreHint: String(localized: "Permanently deletes \(trash.contents.count) items in the Trash. This can't be undone."),
             entries: [CleanupEntry(trash, displayPath: "~/.Trash/*")],
-            forcePermanent: true, confirmVerb: "Empty Trash")
+            forcePermanent: true, confirmVerb: String(localized: "Empty Trash", comment: "Confirmation button"))
     }
     var selectedSize: Int64 {
         selectedItems.reduce(0) { $0 + $1.size } + partialSelections.reduce(0) { $0 + $1.children.reduce(0) { $0 + $1.size } }
@@ -141,16 +141,18 @@ final class CachesViewModel: SelectionPruning {
         let partial = partialSelections
         let review = (items + partial.map(\.item)).filter { $0.safety == .review }
         let hint = review.isEmpty
-            ? "Tools refill these caches as needed. Re-download items are fetched again over the network."
-            : "Includes Review items: \(review.map(\.name).joined(separator: ", ")). \(review.first!.restoreHint.prefix(1).uppercased() + review.first!.restoreHint.dropFirst())."
+            ? String(localized: "Tools refill these caches as needed. Re-download items are fetched again over the network.",
+                     comment: "Confirmation hint; Re-download is a safety level")
+            : String(localized: "Includes Review items: \(review.map(\.name).joined(separator: ", ")). \(review.first!.restoreHint.prefix(1).uppercased() + review.first!.restoreHint.dropFirst()).",
+                     comment: "Confirmation hint; Review is a safety level. First placeholder lists cache names, second is how to restore the first one")
         let singles = partial.flatMap { p in p.children.map { p.item.entry(for: $0) } }
         let title: String
         if partial.isEmpty {
-            title = "Clear \(items.count) cache\(items.count == 1 ? "" : "s")?"
+            title = String(localized: "Clear \(items.count) caches?", comment: "Confirmation title")
         } else if items.isEmpty {
-            title = "Delete \(CountFormat.plural(singles.count, "item"))?"
+            title = String(localized: "Delete \(singles.count) items?", comment: "Confirmation title")
         } else {
-            title = "Clear \(CountFormat.plural(items.count, "cache")) and \(CountFormat.plural(singles.count, "item"))?"
+            title = String(localized: "Clear \(items.count) caches and \(singles.count) items?", comment: "Confirmation title: whole cache locations plus single items inside others")
         }
         return CleanupRequest(
             title: title,

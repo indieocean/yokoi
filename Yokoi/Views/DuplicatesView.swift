@@ -12,7 +12,7 @@ struct DuplicatesView: View {
         let selected = vm.selectedItems
 
         VStack(spacing: 0) {
-            HeaderBar(title: "Duplicates", subtitle: subtitle(count: vm.groups.count, total: total)) {
+            HeaderBar(title: "Duplicates", subtitle: "\(subtitle(count: vm.groups.count, total: total))") {
                 if store.duplicateFolder != nil {
                     Button {
                         vm.checked = []
@@ -54,7 +54,8 @@ struct DuplicatesView: View {
             .padding(Theme.Metrics.contentPadding)
 
             SelectionBar(state: vm.checkState(for: groups), toggleAll: { vm.toggleExtras(groups) },
-                         count: selected.count, noun: selected.count == 1 ? "copy" : "copies", size: vm.selectedSize) {
+                         count: selected.count, selection: "**\(selected.count) copies** selected", size: vm.selectedSize,
+                         reclaim: "**\(ByteFormat.string(vm.selectedSize))** will be reclaimed") {
                 Button {
                     vm.toggleExtras(groups)
                 } label: {
@@ -80,14 +81,18 @@ struct DuplicatesView: View {
     }
 
     private func subtitle(count: Int, total: Int64) -> String {
-        let summary = "\(CountFormat.plural(count, "file")) · \(ByteFormat.string(total))"
-        return app.store.duplicateFolder.map { "\(PathFormat.abbreviate($0)) · \(summary)" } ?? summary
+        let size = ByteFormat.string(total)
+        if let folder = app.store.duplicateFolder {
+            return String(localized: "\(PathFormat.abbreviate(folder)) · \(count) files · \(size)",
+                          comment: "Duplicates subtitle: scanned folder path, file count, reclaimable size")
+        }
+        return String(localized: "\(count) files · \(size)", comment: "Duplicates subtitle: file count, reclaimable size")
     }
 
     private func chooseFolder() {
-        guard let folder = Finder.chooseFolder(title: "Choose a folder to look through for duplicates", prompt: "Scan Folder") else { return }
+        guard let folder = Finder.chooseFolder(title: String(localized: "Choose a folder to look through for duplicates"), prompt: String(localized: "Scan Folder", comment: "Folder picker button")) else { return }
         if let why = app.settings.context().duplicateFolderRefusal(folder) {
-            app.toast = Toast(kind: .warning, message: "Can't scan that folder", detail: why)
+            app.toast = Toast(kind: .warning, message: String(localized: "Can't scan that folder"), detail: why)
             return
         }
         app.duplicatesVM.checked = []
@@ -139,7 +144,7 @@ private struct SkippedFilesCard: View {
             .padding(.top, 8)
         } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(CountFormat.plural(files.count, "file")) not checked")
+                Text("\(files.count) files not checked")
                     .font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.textPrimary)
                 Text("These may have copies that aren't listed.")
                     .font(.system(size: 12)).foregroundStyle(Theme.textSecondary)

@@ -84,8 +84,8 @@ final class DownloadsViewModel: SelectionPruning {
     func cleanupRequest() -> CleanupRequest {
         let items = selectedItems.sorted { $0.size > $1.size }
         return CleanupRequest(
-            title: "Move \(CountFormat.plural(items.count, "download")) to the Trash?",
-            restoreHint: "Files you downloaded. They stay in the Trash until you empty it, and Put Back restores them.",
+            title: String(localized: "Move \(items.count) downloads to the Trash?", comment: "Confirmation title"),
+            restoreHint: String(localized: "Files you downloaded. They stay in the Trash until you empty it, and Put Back restores them."),
             entries: items.map { CleanupEntry($0) }
         )
     }

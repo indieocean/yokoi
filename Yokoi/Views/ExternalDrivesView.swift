@@ -59,22 +59,28 @@ final class ExternalDrivesViewModel {
         switch kind {
         case "trash":
             (urls, size) = (j.trashContents, j.trashSize)
-            title = "Empty the Trash on \(drive.name)?"
-            hint = "Permanently deletes \(CountFormat.plural(urls.count, "item")) you already deleted from this drive."
+            title = String(localized: "Empty the Trash on \(drive.name)?", comment: "Placeholder is a drive name")
+            hint = String(localized: "Permanently deletes \(urls.count) items you already deleted from this drive.")
         case "ds":
             (urls, size) = (j.dsStores, j.dsStoreSize)
-            title = "Delete \(CountFormat.plural(urls.count, ".DS_Store file"))?"
-            hint = "Finder view settings. Finder recreates them as needed."
+            title = String(localized: "Delete \(urls.count) .DS_Store files?")
+            hint = String(localized: "Finder view settings. Finder recreates them as needed.")
         default:
             (urls, size) = (j.appleDoubles, j.appleDoubleSize)
-            title = "Delete \(CountFormat.plural(urls.count, "AppleDouble (._) file"))?"
-            hint = "Mac metadata copies on a non-Mac drive. Removing them drops Finder tags and comments for files on this drive."
+            title = String(localized: "Delete \(urls.count) AppleDouble (._) files?")
+            hint = String(localized: "Mac metadata copies on a non-Mac drive. Removing them drops Finder tags and comments for files on this drive.")
         }
         guard !urls.isEmpty else { return nil }
-        let entry = CleanupEntry(id: "\(drive.id)|\(kind)", category: .externalDrives, label: "\(drive.name) · \(kind == "trash" ? "Trash" : kind == "ds" ? ".DS_Store" : "._ files")",
+        let label: String
+        switch kind {
+        case "trash": label = String(localized: "\(drive.name) · Trash", comment: "Cleanup item: a drive's Trash; placeholder is the drive name")
+        case "ds": label = "\(drive.name) · .DS_Store"
+        default: label = String(localized: "\(drive.name) · ._ files", comment: "Cleanup item: AppleDouble files on a drive; placeholder is the drive name")
+        }
+        let entry = CleanupEntry(id: "\(drive.id)|\(kind)", category: .externalDrives, label: label,
                                  displayPath: drive.url.path + (kind == "trash" ? "/.Trashes/*" : kind == "ds" ? "/**/.DS_Store" : "/**/._*"),
                                  urls: urls, size: size, fileCount: urls.count, safety: .safe)
-        return CleanupRequest(title: title, restoreHint: hint, entries: [entry], forcePermanent: true, confirmVerb: "Delete")
+        return CleanupRequest(title: title, restoreHint: hint, entries: [entry], forcePermanent: true, confirmVerb: String(localized: "Delete", comment: "Confirm button verb"))
     }
 
     func clearResults(for drive: ExternalDrive) { junk[drive.id] = nil }
@@ -90,7 +96,7 @@ final class ExternalDrivesViewModel {
                 try await FileManager.default.unmountVolume(at: drive.url, options: [.allPartitionsAndEjectDisk, .withoutUI])
                 junk[drive.id] = nil
             } catch {
-                ejectError = "Couldn't eject \(drive.name): \(error.localizedDescription)"
+                ejectError = String(localized: "Couldn't eject \(drive.name): \(error.localizedDescription)", comment: "Placeholders are the drive name and the system error")
             }
             ejecting.remove(drive.id)
             settings.refreshDrives()
@@ -104,7 +110,7 @@ struct ExternalDrivesView: View {
     var body: some View {
         let vm = app.drivesVM
         VStack(spacing: 0) {
-            HeaderBar(title: "External Drives", subtitle: CountFormat.plural(vm.drives.count, "drive"), showsSearch: false) {
+            HeaderBar(title: "External Drives", subtitle: "\(vm.drives.count) drives", showsSearch: false) {
                 Button {
                     app.settings.refreshDrives()
                 } label: {
@@ -157,7 +163,7 @@ private struct DriveCard: View {
                     HStack(spacing: 8) {
                         Text(drive.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.textPrimary)
                         Tag(text: drive.format)
-                        if let reason = drive.lockReason { StatusPill(text: reason.uppercased(), color: Theme.textSecondary) }
+                        if let reason = drive.lockReason { StatusPill(text: reason.localizedUppercase, color: Theme.textSecondary) }
                     }
                     Text(drive.url.path).font(Theme.mono(11.5)).foregroundStyle(Theme.textTertiary)
                 }
@@ -207,7 +213,9 @@ private struct DriveCard: View {
                         ProgressView().controlSize(.small)
                         Text("\(CountFormat.compact(vm.progress[drive.id] ?? 0)) files").font(Theme.mono(11)).foregroundStyle(Theme.textSecondary)
                     } else if let junk {
-                        Text("\(CountFormat.compact(junk.filesVisited)) files checked\(junk.truncated ? " (stopped early)" : "")")
+                        (junk.truncated
+                            ? Text("\(CountFormat.compact(junk.filesVisited)) files checked (stopped early)", comment: "Placeholder is an abbreviated file count such as 412k")
+                            : Text("\(CountFormat.compact(junk.filesVisited)) files checked", comment: "Placeholder is an abbreviated file count such as 412k"))
                             .font(Theme.mono(11)).foregroundStyle(Theme.textTertiary)
                     }
                     Spacer()
@@ -231,14 +239,14 @@ private struct DriveCard: View {
         .card(padding: 20)
     }
 
-    private func junkRow(_ title: String, _ subtitle: String, count: Int, size: Int64, kind: String) -> some View {
+    private func junkRow(_ title: LocalizedStringKey, _ subtitle: LocalizedStringKey, count: Int, size: Int64, kind: String) -> some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 13.5)).foregroundStyle(Theme.textPrimary)
                 Text(subtitle).font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary)
             }
             Spacer()
-            Text(count == 0 ? "none" : CountFormat.plural(count, "item")).font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
+            (count == 0 ? Text("none", comment: "Drive junk row: nothing found") : Text("\(count) items")).font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
                 .frame(width: 100, alignment: .trailing)
             SizeText(bytes: size).frame(width: 80, alignment: .trailing)
             Button("Delete…") {

@@ -73,7 +73,7 @@ struct ScanContext: Sendable {
             let root = PathFormat.canonical(root.standardizedFileURL.path)
             return path == root || path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
         }
-        return inside ? nil : "It isn't in your big-file locations. Add it in Settings first."
+        return inside ? nil : String(localized: "It isn't in your big-file locations. Add it in Settings first.", comment: "Why a folder can't be searched for duplicates")
     }
 
     var downloadsURL: URL { downloadsFolder ?? home.appendingPathComponent("Downloads") }

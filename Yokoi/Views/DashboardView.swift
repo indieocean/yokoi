@@ -51,28 +51,30 @@ struct DashboardView: View {
                     let delta = store.reclaimableTotal - prev
                     HStack(spacing: 4) {
                         Image(systemName: delta >= 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill").font(.system(size: 9))
-                        Text("\(ByteFormat.string(abs(delta))) since last scan")
+                        Text("\(ByteFormat.string(abs(delta))) since last scan", comment: "Dashboard tile: change in reclaimable size")
                     }
                     .foregroundStyle(delta >= 0 ? Theme.success : Theme.textSecondary)
                 } else {
-                    Text("across \(CleanCategory.allCases.count - 2) categories").foregroundStyle(Theme.textSecondary)
+                    Text("across \(CleanCategory.allCases.count - 2) categories", comment: "Dashboard tile footer under the reclaimable size")
+                        .foregroundStyle(Theme.textSecondary)
                 }
             }
             KPITile(label: "Projects scanned", value: store.projectCount.formatted()) {
-                Text(roots.prefix(3).joined(separator: " · ") + (roots.count > 3 ? " +\(roots.count - 3)" : ""))
+                Text(verbatim: roots.prefix(3).joined(separator: " · ") + (roots.count > 3 ? " +\(roots.count - 3)" : ""))
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
             }
-            KPITile(label: "Last scan", value: store.isScanning ? "scanning…" : RelativeDate.ago(summary?.date)) {
+            KPITile(label: "Last scan", value: store.isScanning ? String(localized: "scanning…", comment: "Dashboard 'Last scan' tile while a scan runs") : RelativeDate.ago(summary?.date)) {
                 if let summary {
-                    Text("took \(String(format: "%.1f", summary.duration))s · \(CountFormat.compact(summary.filesVisited)) files")
+                    Text("took \(summary.duration, format: .number.precision(.fractionLength(1)))s · \(CountFormat.compact(summary.filesVisited)) files",
+                         comment: "Dashboard 'Last scan' tile: seconds the scan took, files visited (already short, like 412k)")
                         .foregroundStyle(Theme.textSecondary)
                 } else {
                     Text("no scan yet").foregroundStyle(Theme.textSecondary)
                 }
             }
             KPITile(label: "Freed all-time", value: ByteFormat.string(store.freedAllTime)) {
-                Text("across \(store.cleanupCount) cleanup\(store.cleanupCount == 1 ? "" : "s")")
+                Text("across \(store.cleanupCount) cleanups", comment: "Dashboard tile footer under the space freed all-time")
                     .foregroundStyle(Theme.accentLight)
             }
         }
@@ -80,7 +82,7 @@ struct DashboardView: View {
 }
 
 struct KPITile<Footer: View>: View {
-    let label: String
+    let label: LocalizedStringKey
     let value: String
     @ViewBuilder var footer: () -> Footer
 
@@ -139,7 +141,8 @@ struct CategoryRingCard: View {
                     Text("reclaimable").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
                     let parts = ByteFormat.parts(total)
                     Text(parts.number).font(Theme.mono(26, .bold)).foregroundStyle(Theme.textPrimary)
-                    Text("\(parts.unit) of \(ByteFormat.string(store.disk.used))")
+                    Text("\(parts.unit) of \(ByteFormat.string(store.disk.used))",
+                         comment: "Under the big number in the ring: its unit (GB), then the disk's used space")
                         .font(Theme.mono(11.5))
                         .foregroundStyle(Theme.textSecondary)
                 }
@@ -176,20 +179,26 @@ struct CategoryRingCard: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help(slice.category == .packages ? "node_modules folders (npm, pnpm, yarn, bun) plus global packages unused for a year" : "")
+                    .help(slice.category == .packages
+                          ? Text("node_modules folders (npm, pnpm, yarn, bun) plus global packages unused for a year")
+                          : Text(verbatim: ""))
                     Rectangle().fill(Theme.hairline).frame(height: 1)
                 }
                 HStack(spacing: 10) {
                     Button { app.store.scan() } label: {
-                        Label(app.store.isScanning ? "Scanning…" : "Scan Again", systemImage: "arrow.clockwise")
-                            .frame(maxWidth: .infinity)
+                        Label {
+                            if app.store.isScanning { Text("Scanning…") } else { Text("Scan Again") }
+                        } icon: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.dkPrimary)
                     .disabled(app.store.isScanning)
                     Button {
                         app.requestCleanup(CleanupRequest(
-                            title: "Clean \(smart.count) smart-selected item\(smart.count == 1 ? "" : "s")?",
-                            restoreHint: "Only stale node_modules, artifacts of inactive projects and Safe caches. All of it can be rebuilt or re-downloaded.",
+                            title: String(localized: "Clean \(smart.count) smart-selected items?", comment: "Confirmation sheet title"),
+                            restoreHint: String(localized: "Only stale node_modules, artifacts of inactive projects and Safe caches. All of it can be rebuilt or re-downloaded."),
                             entries: smart))
                     } label: {
                         Label("Clean · \(ByteFormat.string(smartSize))", systemImage: "delete.left")
@@ -255,14 +264,14 @@ struct TopOffendersCard: View {
     static func age(_ date: Date?) -> String {
         guard let date else { return "?" }
         let days = Int(Date().timeIntervalSince(date) / 86_400)
-        if days >= 365 { return "\(days / 365)Y" }
-        if days >= 30 { return "\(days / 30)MO" }
-        return "\(days)D"
+        if days >= 365 { return String(localized: "\(days / 365)Y", comment: "Short age badge in capitals: years, like 2Y") }
+        if days >= 30 { return String(localized: "\(days / 30)MO", comment: "Short age badge in capitals: months, like 5MO") }
+        return String(localized: "\(days)D", comment: "Short age badge in capitals: days, like 12D")
     }
 }
 
 private struct OffenderTile: View {
-    let label: String
+    let label: LocalizedStringKey
     let badge: (String, Color)?
     let name: String?
     let size: Int64?
@@ -302,7 +311,11 @@ struct RecentCleanupsCard: View {
             HStack {
                 Text("Recent cleanups").font(.system(size: 14.5, weight: .semibold)).foregroundStyle(Theme.textPrimary)
                 Spacer()
-                Button(showAll ? "Show less" : "View all →") { showAll.toggle() }
+                Button {
+                    showAll.toggle()
+                } label: {
+                    if showAll { Text("Show less") } else { Text("View all →", comment: "Recent cleanups card; flip the arrow for right-to-left languages") }
+                }
                     .buttonStyle(.plain)
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.textSecondary)
@@ -360,17 +373,25 @@ struct RecentCleanupsCard: View {
 
     private var scheduleLine: String {
         let d = app.settings.data
-        guard let next = app.scheduler.nextScan else { return "Automatic scans are off" }
+        guard let next = app.scheduler.nextScan else {
+            return String(localized: "Automatic scans are off", comment: "Dashboard 'Next scheduled scan' box")
+        }
         let f = DateFormatter()
-        f.dateFormat = "EEE HH:mm"
-        var parts = [f.string(from: next), d.scanFrequency.rawValue]
-        if d.showInMenuBar { parts.append("menu bar helper active") }
+        f.setLocalizedDateFormatFromTemplate("EEE HH:mm")
+        let frequency = switch d.scanFrequency {
+        case .daily: String(localized: "daily", comment: "Scan frequency, lowercase, in 'Mon 09:00 · daily'")
+        case .weekly: String(localized: "weekly", comment: "Scan frequency, lowercase, in 'Mon 09:00 · weekly'")
+        case .monthly: String(localized: "monthly", comment: "Scan frequency, lowercase, in 'Mon 09:00 · monthly'")
+        }
+        var parts = [f.string(from: next), frequency]
+        if d.showInMenuBar { parts.append(String(localized: "menu bar helper active", comment: "Dashboard 'Next scheduled scan' box")) }
         return parts.joined(separator: " · ")
     }
 
     private func dateLabel(_ date: Date) -> String {
-        let r = RelativeDate.string(date)
-        return r == "Today" || r == "Yesterday" ? r : RelativeDate.short(date)
+        // Decide by the date, not by comparing RelativeDate's text (which is translated).
+        let cal = Calendar.current
+        return cal.isDateInToday(date) || cal.isDateInYesterday(date) ? RelativeDate.string(date) : RelativeDate.short(date)
     }
 }
 
@@ -462,7 +483,11 @@ struct UpdateStatusBar: View {
                     .disabled(!updater.canCheckForUpdates)
             }
         } else if updater.isAvailable && updater.status != .checking {
-            Button(updater.status == .failed ? "Try Again" : "Check Now") { updater.refreshStatus() }
+            Button {
+                updater.refreshStatus()
+            } label: {
+                if updater.status == .failed { Text("Try Again") } else { Text("Check Now") }
+            }
                 .buttonStyle(.plain)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.accentLight)
@@ -505,18 +530,20 @@ private struct RecentCleanupRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(batch.title).font(.system(size: 13.5)).foregroundStyle(Theme.textPrimary).lineLimit(1)
-                    if batch.restored { Tag(text: "restored") }
+                    if batch.restored { Tag(text: "restored", comment: "Recent cleanups: this batch was put back") }
                 }
                 Text(dateLabel).font(.system(size: 11.5)).foregroundStyle(Theme.textSecondary)
             }
             Spacer(minLength: 8)
             if batch.canPutBack && (hovering || working) {
-                Button(working ? "…" : "Put Back") {
+                Button {
                     working = true
                     Task {
                         await app.putBack(batch)
                         working = false
                     }
+                } label: {
+                    if working { Text(verbatim: "…") } else { Text("Put Back") }
                 }
                 .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
                 .disabled(working)

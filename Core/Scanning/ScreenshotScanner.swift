@@ -11,6 +11,8 @@ struct ScreenshotScanner: CategoryScanner {
         "Bildschirmfoto", "Bildschirmaufnahme", "Capture d’écran", "Capture d'écran", "Enregistrement de l’écran",
         "Captura de pantalla", "Grabación de pantalla", "Schermafbeelding", "Skärmavbild", "Istantanea",
         "スクリーンショット", "画面収録", "截屏", "屏幕录制", "Снимок экрана",
+        "Captura de Tela", "Gravação de Tela", "스크린샷", "화면 기록", "截圖", "螢幕錄影",
+        "لقطة شاشة", "تسجيل الشاشة", "צילום מסך", "הקלטת מסך",
     ]
     static let movieExtensions: Set<String> = ["mov", "mp4", "m4v"]
     static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "heic", "tiff", "gif", "pdf"]

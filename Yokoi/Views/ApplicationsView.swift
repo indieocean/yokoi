@@ -13,7 +13,7 @@ struct ApplicationsView: View {
         let total = store.applications.reduce(Int64(0)) { $0 + $1.size }
 
         VStack(spacing: 0) {
-            HeaderBar(title: "Applications", subtitle: "\(CountFormat.plural(counts.all, "app")) · \(ByteFormat.string(total))") {
+            HeaderBar(title: "Applications", subtitle: "\(counts.all) apps · \(ByteFormat.string(total))") {
                 RescanButton(category: .applications)
             }
 
@@ -44,7 +44,7 @@ struct ApplicationsView: View {
                             } else {
                                 Image(systemName: "lock.fill").font(.system(size: 10)).foregroundStyle(Theme.textTertiary)
                                     .frame(width: 16)
-                                    .help(row.running ? "Quit the app first" : (row.item.protectedReason ?? ""))
+                                    .help(row.running ? String(localized: "Quit the app first") : (row.item.protectedReasonText ?? ""))
                             }
                         }
                         .width(24)
@@ -56,7 +56,7 @@ struct ApplicationsView: View {
                                         Text(row.name).font(.system(size: 13.5, weight: .medium)).foregroundStyle(Theme.textPrimary).lineLimit(1)
                                         if row.item.isAppStore { Tag(text: "App Store", color: Theme.info) }
                                     }
-                                    Text("\(row.item.version.isEmpty ? "" : "v\(row.item.version) · ")\(row.item.bundleID)")
+                                    Text(verbatim: "\(row.item.version.isEmpty ? "" : "v\(row.item.version) · ")\(row.item.bundleID)")
                                         .font(Theme.mono(10.5)).foregroundStyle(Theme.textTertiary).lineLimit(1)
                                 }
                             }
@@ -74,7 +74,7 @@ struct ApplicationsView: View {
                         }
                         .width(90)
                         TableColumn("Last opened", value: \.lastUsed) { row in
-                            Text(row.item.lastUsed.map { RelativeDate.string($0) } ?? "Never")
+                            Text(row.item.lastUsed.map { RelativeDate.string($0) } ?? String(localized: "Never", comment: "App last opened: never"))
                                 .font(.system(size: 12.5)).foregroundStyle(Theme.textSecondary)
                         }
                         .width(110)
@@ -102,7 +102,8 @@ struct ApplicationsView: View {
             .padding(Theme.Metrics.contentPadding)
 
             SelectionBar(state: vm.checkState(for: rows), toggleAll: { vm.toggleAll(rows) },
-                         count: vm.checked.count, noun: vm.checked.count == 1 ? "app" : "apps", size: vm.selectedSize) {
+                         count: vm.checked.count, selection: "**\(vm.checked.count) apps** selected", size: vm.selectedSize,
+                         reclaim: "**\(ByteFormat.string(vm.selectedSize))** will be reclaimed") {
                 Button("Reveal in Finder") { Finder.reveal(vm.selectedItems.map(\.url)) }
                     .buttonStyle(.dkSecondary)
                     .disabled(vm.checked.isEmpty)

@@ -10,7 +10,25 @@ final class PackagesStore {
     enum Filter: Hashable { case all, outdated, unused }
     /// The npm tab shows project node_modules folders or global `npm -g` packages.
     enum NpmMode: Hashable { case projects, global }
-    enum Action: String { case update = "Update", uninstall = "Uninstall" }
+    enum Action: String {
+        case update = "Update", uninstall = "Uninstall"
+
+        /// Button title. The raw value stays English: it goes into the cleanup log.
+        var title: String {
+            switch self {
+            case .update: String(localized: "Update", comment: "Button: update a package")
+            case .uninstall: String(localized: "Uninstall", comment: "Button: uninstall a package")
+            }
+        }
+
+        /// Confirmation sheet title, e.g. "Update 3 packages?".
+        func confirmTitle(_ n: Int) -> String {
+            switch self {
+            case .update: String(localized: "Update \(n) packages?", comment: "Confirmation title")
+            case .uninstall: String(localized: "Uninstall \(n) packages?", comment: "Confirmation title")
+            }
+        }
+    }
 
     struct PendingAction: Identifiable {
         let id = UUID()
@@ -142,7 +160,7 @@ final class PackagesStore {
         defer { loading.remove(kind) }
         do {
             guard let (latest, result) = try await service(kind).outdated() else {
-                errors[kind] = kind == .cargo ? "Install cargo-update (`cargo install cargo-update`) to check Cargo packages." : nil
+                errors[kind] = kind == .cargo ? String(localized: "Install cargo-update (`cargo install cargo-update`) to check Cargo packages.") : nil
                 return
             }
             lastCommands[kind] = result
@@ -204,7 +222,8 @@ final class PackagesStore {
         Task {
             // Resolve the tool first: the sheet shows its full path, and that same path is what runs.
             guard let tool = pendingAction.commands.first?.first, let exe = await runner.which(tool) else {
-                errors[kind] = "\(kind.title) isn't installed, or only in a folder another account can write to."
+                errors[kind] = String(localized: "\(kind.title) isn't installed, or only in a folder another account can write to.",
+                                      comment: "Placeholder is a package manager name like Homebrew")
                 return
             }
             var resolved = pendingAction

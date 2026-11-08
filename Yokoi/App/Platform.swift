@@ -54,8 +54,11 @@ enum Finder {
         NSWorkspace.shared.activateFileViewerSelecting(Array(existing.prefix(50)))
     }
 
+    /// `title` and `prompt` are shown as is, so pass localized strings.
     @MainActor
-    static func chooseFolder(title: String, prompt: String = "Choose", startingAt: URL? = nil) -> URL? {
+    static func chooseFolder(title: String,
+                             prompt: String = String(localized: "Choose", comment: "Open panel button: pick a folder"),
+                             startingAt: URL? = nil) -> URL? {
         let panel = NSOpenPanel()
         panel.title = title
         panel.prompt = prompt

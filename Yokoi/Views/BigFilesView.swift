@@ -12,7 +12,7 @@ struct BigFilesView: View {
 
         VStack(spacing: 0) {
             HeaderBar(title: "Big Files",
-                      subtitle: "\(CountFormat.plural(visible.count, "file")) ≥ \(ByteFormat.string(vm.threshold)) · \(ByteFormat.string(visible.size))") {
+                      subtitle: "\(visible.count) files ≥ \(ByteFormat.string(vm.threshold)) · \(ByteFormat.string(visible.size))") {
                 Button {
                     Finder.reveal(vm.selectedItems.map(\.url))
                 } label: {
@@ -80,12 +80,14 @@ struct BigFilesView: View {
             .padding(Theme.Metrics.contentPadding)
 
             SelectionBar(state: vm.checkState(for: rows), toggleAll: { vm.toggleAll(rows) },
-                         count: vm.checked.count, noun: vm.checked.count == 1 ? "file" : "files", size: vm.selectedSize) {
+                         count: vm.checked.count, selection: "**\(vm.checked.count) files** selected", size: vm.selectedSize,
+                         reclaim: "**\(ByteFormat.string(vm.selectedSize))** will be reclaimed") {
                 Button("Reveal in Finder") { Finder.reveal(vm.selectedItems.map(\.url)) }
                     .buttonStyle(.dkSecondary)
                     .disabled(vm.checked.isEmpty)
                 Button {
-                    if let dest = Finder.chooseFolder(title: "Move \(vm.checked.count) files to…", prompt: "Move Here") {
+                    if let dest = Finder.chooseFolder(title: String(localized: "Move \(vm.checked.count) files to…", comment: "Folder picker title"),
+                                                        prompt: String(localized: "Move Here", comment: "Folder picker button")) {
                         let entries = vm.selectedItems.map { CleanupEntry($0) }
                         Task { await app.run(entries, action: .move(destination: dest, organizeByDate: false)) }
                     }
@@ -149,7 +151,7 @@ private struct ThresholdCard: View {
             Spacer(minLength: 0)
 
             SegmentedTabs(selection: $vm.kindFilter, items:
-                [.init(value: .all, title: "All")] + BigFileKind.filters.map { .init(value: .kind($0), title: $0.filterTitle) },
+                [.init(value: .all, title: "All")] + BigFileKind.filters.map { .init(value: .kind($0), verbatim: $0.filterTitle) },
                 compact: true)
         }
         .card(padding: 18)

@@ -84,7 +84,7 @@ struct ConfirmCleanupSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Total size").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
                 // macOS doesn't report a Time Machine snapshot's size.
-                Text(request.tool != nil && totalSize == 0 ? "Unknown" : ByteFormat.string(totalSize))
+                Text(request.tool != nil && totalSize == 0 ? String(localized: "Unknown", comment: "Total size of a tool cleanup whose size macOS does not report") : ByteFormat.string(totalSize))
                     .font(Theme.mono(24, .bold)).foregroundStyle(Theme.accentLight)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -94,7 +94,7 @@ struct ConfirmCleanupSheet: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(entries.count)").font(Theme.mono(24, .bold)).foregroundStyle(Theme.textPrimary)
                     if request.tool == nil {
-                        Text("· \(CountFormat.compact(fileCount)) files").font(Theme.mono(12.5)).foregroundStyle(Theme.textSecondary)
+                        Text("· \(CountFormat.compact(fileCount)) files", comment: "Next to the item count; the placeholder is an abbreviated file count such as 412k").font(Theme.mono(12.5)).foregroundStyle(Theme.textSecondary)
                     }
                 }
             }
@@ -161,7 +161,7 @@ struct ConfirmCleanupSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning)
-                Text("\(recentEntries.count) item\(recentEntries.count == 1 ? " belongs" : "s belong") to projects changed in the last \(protectDays) days")
+                Text("\(recentEntries.count) items belong to projects changed in the last \(protectDays) days")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
             }
@@ -183,12 +183,12 @@ struct ConfirmCleanupSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "lock.fill").foregroundStyle(Theme.danger)
-                Text("\(CountFormat.plural(request.blocked.count, "item")) skipped: in use right now")
+                Text("\(request.blocked.count) items skipped: in use right now")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
             }
             ForEach(request.blocked.prefix(4)) { b in
-                Text("\(b.entry.label) · in use by \(b.process)").font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
+                Text("\(b.entry.label) · in use by \(b.process)", comment: "Blocked cleanup item: item name, then the app or process holding it").font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
             }
             Text("Close the project, quit the app or stop the tool (`./gradlew --stop` for a Gradle daemon), then try again.").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
         }
@@ -237,11 +237,15 @@ struct ConfirmCleanupSheet: View {
 
     private var confirmTitle: String {
         let size = ByteFormat.string(totalSize)
-        if running { return "Working…" }
-        if dryRun { return "Preview · \(size)" }
-        if let verb = request.confirmVerb { return "\(verb) · \(size)" }
-        if request.tool != nil && totalSize == 0 { return "Delete permanently" }
-        return mode == .trash ? "Move to Trash · \(size)" : "Delete permanently · \(size)"
+        if running { return String(localized: "Working…", comment: "Confirm button while a cleanup starts") }
+        if dryRun { return String(localized: "Preview · \(size)", comment: "Confirm button in dry-run mode; placeholder is a byte size") }
+        if let verb = request.confirmVerb {
+            return String(localized: "\(verb) · \(size)", comment: "Confirm button: action verb, then a byte size")
+        }
+        if request.tool != nil && totalSize == 0 { return String(localized: "Delete permanently") }
+        return mode == .trash
+            ? String(localized: "Move to Trash · \(size)", comment: "Confirm button; placeholder is a byte size")
+            : String(localized: "Delete permanently · \(size)", comment: "Confirm button; placeholder is a byte size")
     }
 
     private func confirm() {
@@ -318,16 +322,23 @@ struct OutcomeSheet: View {
     }
 
     private var summary: String {
-        let verb: String
-        switch outcome.action {
-        case .trash: verb = "move to the Trash"
-        case .delete: verb = "permanently delete"
-        case .move(let dest, _): verb = "move to \(PathFormat.abbreviate(dest))"
-        }
+        let n = outcome.itemCount
+        let size = ByteFormat.string(outcome.bytes)
         if outcome.dryRun {
-            return "Yokoi would \(verb) \(outcome.itemCount) item\(outcome.itemCount == 1 ? "" : "s") (\(ByteFormat.string(outcome.bytes))). Turn off Dry run in Settings to do it for real."
+            switch outcome.action {
+            case .trash:
+                return String(localized: "Yokoi would move to the Trash \(n) items (\(size)). Turn off Dry run in Settings to do it for real.",
+                              comment: "Dry-run report; placeholders are an item count and a byte size")
+            case .delete:
+                return String(localized: "Yokoi would permanently delete \(n) items (\(size)). Turn off Dry run in Settings to do it for real.",
+                              comment: "Dry-run report; placeholders are an item count and a byte size")
+            case .move(let dest, _):
+                return String(localized: "Yokoi would move to \(PathFormat.abbreviate(dest)) \(n) items (\(size)). Turn off Dry run in Settings to do it for real.",
+                              comment: "Dry-run report; placeholders are a destination folder path, an item count and a byte size")
+            }
         }
-        return "\(outcome.itemCount) item\(outcome.itemCount == 1 ? "" : "s") done (\(ByteFormat.string(outcome.bytes))). \(outcome.failures.count) path\(outcome.failures.count == 1 ? " was" : "s were") skipped."
+        return String(localized: "\(n) items done (\(size)). \(outcome.failures.count) paths were skipped.",
+                      comment: "Cleanup report; placeholders are an item count, a byte size and a skipped path count")
     }
 }
 
@@ -374,7 +385,7 @@ struct OnboardingSheet: View {
         }
     }
 
-    private func step(_ n: Int, _ text: String) -> some View {
+    private func step(_ n: Int, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text("\(n)").font(Theme.mono(12, .bold)).foregroundStyle(Theme.accentLight)
                 .frame(width: 22, height: 22)

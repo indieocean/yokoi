@@ -24,9 +24,9 @@ enum ScanRootPolicy {
     static func refusal(for url: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> String? {
         let path = PathFormat.canonical(url.standardizedFileURL.path)
         let homePath = PathFormat.canonical(home.path)
-        if path == "/" { return "The whole disk can't be a scan location." }
-        if homePath.hasPrefix(path + "/") { return "Folders above your home folder can't be scan locations." }
-        if PathGuard.isProtectedSystemPath(PathGuard.fold(path)) { return "System folders can't be scan locations." }
+        if path == "/" { return String(localized: "The whole disk can't be a scan location.") }
+        if homePath.hasPrefix(path + "/") { return String(localized: "Folders above your home folder can't be scan locations.") }
+        if PathGuard.isProtectedSystemPath(PathGuard.fold(path)) { return String(localized: "System folders can't be scan locations.") }
         return nil
     }
 }

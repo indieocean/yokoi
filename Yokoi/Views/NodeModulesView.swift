@@ -15,7 +15,7 @@ struct NodeModulesView: View {
         VStack(spacing: 0) {
             if !embedded {
                 HeaderBar(title: "node_modules",
-                          subtitle: "\(CountFormat.plural(store.nodeModules.count, "folder")) · \(ByteFormat.string(store.total(.nodeModules)))") {
+                          subtitle: "\(store.nodeModules.count) folders · \(ByteFormat.string(store.total(.nodeModules)))") {
                     RescanButton(category: .nodeModules)
                 }
             }
@@ -92,7 +92,8 @@ struct NodeModulesView: View {
             .padding(.bottom, Theme.Metrics.contentPadding)
 
             SelectionBar(state: vm.checkState(for: rows), toggleAll: { vm.toggleAll(rows) },
-                         count: vm.checked.count, noun: vm.checked.count == 1 ? "folder" : "folders", size: vm.selectedSize) {
+                         count: vm.checked.count, selection: "**\(vm.checked.count) folders** selected", size: vm.selectedSize,
+                         reclaim: "**\(ByteFormat.string(vm.selectedSize))** will be reclaimed") {
                 Button("Reveal in Finder") { Finder.reveal(vm.selectedItems.map(\.url)) }
                     .buttonStyle(.dkSecondary)
                     .disabled(vm.checked.isEmpty)
@@ -126,8 +127,9 @@ struct StaleThresholdMenu: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text("Untouched >").font(.system(size: 13)).foregroundStyle(Theme.textPrimary)
-                Text("\(days)d").font(Theme.mono(13, .bold)).foregroundStyle(Theme.textPrimary)
+                let threshold = Text("\(days)d", comment: "Stale threshold in days, e.g. 90d").font(Theme.mono(13, .bold))
+                Text("Untouched > \(threshold)", comment: "Stale threshold menu; placeholder is a number of days like 90d")
+                    .font(.system(size: 13)).foregroundStyle(Theme.textPrimary)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.textSecondary)
             }
             .padding(.horizontal, 12)
@@ -152,7 +154,7 @@ struct RescanButton: View {
         Button {
             if scanning { app.store.cancelScan() } else { app.store.scan([category]) }
         } label: {
-            Label(scanning ? "Stop" : "Rescan", systemImage: scanning ? "stop.fill" : "arrow.clockwise")
+            Label(scanning ? String(localized: "Stop") : String(localized: "Rescan"), systemImage: scanning ? "stop.fill" : "arrow.clockwise")
         }
         .buttonStyle(.dkPrimary)
         .disabled(app.store.isScanning && !scanning)

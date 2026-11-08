@@ -8,18 +8,18 @@ enum Screen: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .dashboard: "Dashboard"
+        case .dashboard: String(localized: "Dashboard", comment: "Sidebar screen title")
         case .nodeModules: "node_modules"
-        case .buildArtifacts: "Build Artifacts"
-        case .caches: "Caches & Tooling"
-        case .bigFiles: "Big Files"
-        case .duplicates: "Duplicates"
-        case .downloads: "Downloads"
-        case .screenshots: "Screenshots"
-        case .applications: "Applications"
-        case .externalDrives: "External Drives"
-        case .packageManagers: "Package Managers"
-        case .settings: "Settings"
+        case .buildArtifacts: String(localized: "Build Artifacts", comment: "Sidebar screen title")
+        case .caches: String(localized: "Caches & Tooling", comment: "Sidebar screen title")
+        case .bigFiles: String(localized: "Big Files", comment: "Sidebar screen title")
+        case .duplicates: String(localized: "Duplicates", comment: "Sidebar screen title")
+        case .downloads: String(localized: "Downloads", comment: "Sidebar screen title")
+        case .screenshots: String(localized: "Screenshots", comment: "Sidebar screen title")
+        case .applications: String(localized: "Applications", comment: "Sidebar screen title")
+        case .externalDrives: String(localized: "External Drives", comment: "Sidebar screen title")
+        case .packageManagers: String(localized: "Package Managers", comment: "Sidebar screen title")
+        case .settings: String(localized: "Settings", comment: "Sidebar screen title")
         }
     }
 
@@ -287,11 +287,14 @@ extension AppModel {
         let outcome = await store.putBack(batch)
         lastOutcome = outcome
         if outcome.failures.isEmpty {
-            toast = Toast(kind: .success, message: "Put back \(CountFormat.plural(outcome.records.count, "item")) · \(ByteFormat.string(outcome.bytes))",
-                          detail: "Rescan to see them again")
+            toast = Toast(kind: .success,
+                          message: String(localized: "Put back \(outcome.records.count) items · \(ByteFormat.string(outcome.bytes))",
+                                          comment: "Toast after restoring cleaned items from the Trash. Second placeholder is a size like 1.2 GB"),
+                          detail: String(localized: "Rescan to see them again"))
         } else {
-            toast = Toast(kind: .warning, message: "Put back \(CountFormat.plural(outcome.records.count, "item"))",
-                          detail: "\(outcome.failures.count) couldn't be restored")
+            toast = Toast(kind: .warning,
+                          message: String(localized: "Put back \(outcome.records.count) items", comment: "Toast after restoring cleaned items from the Trash"),
+                          detail: String(localized: "\(outcome.failures.count) couldn't be restored", comment: "Number of items that failed to be put back"))
         }
     }
 
@@ -300,8 +303,8 @@ extension AppModel {
         let entries = store.caches.filter { $0.safety == .safe && $0.size > 0 && !$0.permanentOnly }
             .map { CleanupEntry($0, displayPath: PathFormat.abbreviate($0.url) + "/*") }
         screen = .caches
-        requestCleanup(CleanupRequest(title: "Clear \(CountFormat.plural(entries.count, "Safe cache"))?",
-                                      restoreHint: "Tools refill these caches as needed.", entries: entries))
+        requestCleanup(CleanupRequest(title: String(localized: "Clear \(entries.count) Safe caches?", comment: "Confirmation title; Safe is the safety level"),
+                                      restoreHint: String(localized: "Tools refill these caches as needed."), entries: entries))
     }
 }
 

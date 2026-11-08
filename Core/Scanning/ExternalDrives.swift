@@ -18,8 +18,8 @@ struct ExternalDrive: Sendable, Identifiable, Hashable, Codable {
     /// Read-only volumes and Time Machine backup disks are never cleaned.
     var canClean: Bool { !isReadOnly && !isTimeMachine }
     var lockReason: String? {
-        if isTimeMachine { return "Time Machine backup disk" }
-        if isReadOnly { return "Read-only volume" }
+        if isTimeMachine { return String(localized: "Time Machine backup disk", comment: "Why a drive is never cleaned") }
+        if isReadOnly { return String(localized: "Read-only volume", comment: "Why a drive is never cleaned") }
         return nil
     }
 }
@@ -69,7 +69,7 @@ enum ExternalDrives {
 
     static func drive(at url: URL, values v: URLResourceValues? = nil, timeMachine: Set<String> = []) -> ExternalDrive {
         let v = v ?? (try? url.resourceValues(forKeys: Set(keys)))
-        let format = v?.volumeLocalizedFormatDescription ?? "Unknown"
+        let format = v?.volumeLocalizedFormatDescription ?? String(localized: "Unknown", comment: "Drive format that couldn't be read")
         let lower = format.lowercased()
         return ExternalDrive(
             url: url,

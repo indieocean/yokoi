@@ -23,16 +23,16 @@ enum PackageManagerKind: String, Codable, Sendable, CaseIterable, Identifiable {
         case .yarn: "yarn global"
         case .bun: "bun -g"
         case .homebrew: "Homebrew"
-        case .casks: "Casks"
+        case .casks: String(localized: "Casks", comment: "Package manager tab: Homebrew casks (apps)")
         case .macports: "MacPorts"
-        case .mas: "App Store (mas)"
+        case .mas: String(localized: "App Store (mas)", comment: "Package manager tab; mas is a command-line tool, keep it")
         case .cargo: "Cargo"
         case .go: "Go"
-        case .dotnet: ".NET tools"
+        case .dotnet: String(localized: ".NET tools", comment: "Package manager tab: .NET global tools")
         case .pip: "pip"
         case .pipx: "pipx"
-        case .uv: "uv tools"
-        case .conda: "conda envs"
+        case .uv: String(localized: "uv tools", comment: "Package manager tab: tools installed with uv")
+        case .conda: String(localized: "conda envs", comment: "Package manager tab: conda environments")
         case .gem: "gem"
         case .composer: "Composer"
         }
@@ -154,8 +154,8 @@ enum PackageManagerKind: String, Codable, Sendable, CaseIterable, Identifiable {
     /// Why the whole manager is list-only, if it is.
     var readOnlyReason: String? {
         switch self {
-        case .macports: "MacPorts needs sudo to change ports. Yokoi never uses sudo; run `sudo port …` yourself."
-        case .mas: "mas needs root to update or remove App Store apps. Use the App Store, or the Applications screen to uninstall."
+        case .macports: String(localized: "MacPorts needs sudo to change ports. Yokoi never uses sudo; run `sudo port …` yourself.")
+        case .mas: String(localized: "mas needs root to update or remove App Store apps. Use the App Store, or the Applications screen to uninstall.")
         default: nil
         }
     }
@@ -163,9 +163,9 @@ enum PackageManagerKind: String, Codable, Sendable, CaseIterable, Identifiable {
     /// Shown under the tab when some actions aren't available.
     var note: String? {
         switch self {
-        case .go: "Go has no uninstall command: delete the binary from your Go bin folder to remove a tool."
-        case .conda: "Each row is a conda environment. Removing one deletes everything installed in it."
-        case .yarn, .bun, .pipx, .dotnet: "This manager can't check for newer versions; Update installs the latest."
+        case .go: String(localized: "Go has no uninstall command: delete the binary from your Go bin folder to remove a tool.")
+        case .conda: String(localized: "Each row is a conda environment. Removing one deletes everything installed in it.")
+        case .yarn, .bun, .pipx, .dotnet: String(localized: "This manager can't check for newer versions; Update installs the latest.")
         default: nil
         }
     }
@@ -383,7 +383,7 @@ enum PackageParsers {
                 let url = URL(fileURLWithPath: path)
                 let isNamed = url.deletingLastPathComponent().lastPathComponent == "envs"
                 return pkg(isNamed ? url.lastPathComponent : "base", "env", id: path,
-                           locked: isNamed ? nil : "The base environment holds conda itself and can't be removed.")
+                           locked: isNamed ? nil : String(localized: "The base environment holds conda itself and can't be removed."))
             }
 
         case .gem:
@@ -503,10 +503,10 @@ struct PackageManagerService: Sendable {
         if let reason = kind.readOnlyReason { return reason }
         switch kind {
         case .pip:
-            return await runner.which("python3") == "/usr/bin/python3" ? "This is Apple's system Python. Yokoi won't change it." : nil
+            return await runner.which("python3") == "/usr/bin/python3" ? String(localized: "This is Apple's system Python. Yokoi won't change it.") : nil
         case .gem:
             return await runner.which("gem") == "/usr/bin/gem"
-                ? "This is macOS's system Ruby; changing its gems needs sudo, which Yokoi never uses." : nil
+                ? String(localized: "This is macOS's system Ruby; changing its gems needs sudo, which Yokoi never uses.") : nil
         default:
             return nil
         }
@@ -546,7 +546,7 @@ struct PackageManagerService: Sendable {
         var packages = await enrich(PackageParsers.installed(.casks, lines.joined(separator: "\n")))
         for i in packages.indices {
             if let tap = untrusted[packages[i].name] {
-                packages[i].locked = "Homebrew won't load this cask until you trust its tap: brew trust \(tap)"
+                packages[i].locked = String(localized: "Homebrew won't load this cask until you trust its tap: brew trust \(tap)", comment: "The placeholder is a Homebrew tap name; brew trust is a command, keep it")
             }
         }
         return (packages, r)

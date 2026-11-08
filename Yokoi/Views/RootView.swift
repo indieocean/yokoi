@@ -76,8 +76,8 @@ struct RootView: View {
 
 /// The 52pt screen header: title, subtitle, search (⌘K) and trailing actions.
 struct HeaderBar<Trailing: View>: View {
-    let title: String
-    var subtitle: String? = nil
+    let title: LocalizedStringKey
+    var subtitle: LocalizedStringKey? = nil
     var showsSearch = true
     @ViewBuilder var trailing: () -> Trailing
 
@@ -106,7 +106,7 @@ struct HeaderBar<Trailing: View>: View {
 }
 
 extension HeaderBar where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, showsSearch: Bool = true) {
+    init(title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, showsSearch: Bool = true) {
         self.init(title: title, subtitle: subtitle, showsSearch: showsSearch) { EmptyView() }
     }
 }
@@ -156,26 +156,64 @@ struct SelectionBar<Actions: View>: View {
     let state: CheckState
     let toggleAll: () -> Void
     let count: Int
-    let noun: String
+    private let selection: Text
     let size: Int64
-    var sizeSuffix = "will be reclaimed"
+    private let reclaim: Text?
     @ViewBuilder var actions: () -> Actions
+
+    /// `selection` is the whole phrase, with the counted part in `**`: `"**\(n) folders** selected"`.
+    /// `reclaim` puts the size in `**`: `"**\(size) GB** will be reclaimed"`; nil hides it.
+    /// The `**` part is drawn bold in the primary color, the rest as secondary text.
+    init(state: CheckState, toggleAll: @escaping () -> Void, count: Int,
+         selection: LocalizedStringResource, size: Int64,
+         reclaim: LocalizedStringResource? = nil,
+         @ViewBuilder actions: @escaping () -> Actions) {
+        self.state = state
+        self.toggleAll = toggleAll
+        self.count = count
+        self.size = size
+        self.selection = Text(Self.emphasized(selection, font: .system(size: 13.5, weight: .semibold), color: Theme.textPrimary))
+        self.reclaim = reclaim.map { Text(Self.emphasized($0, font: Theme.mono(14, .bold), color: Theme.accentLight)) }
+        self.actions = actions
+    }
+
+    /// Older form: `"\(count) \(noun)"` + "selected". Glues words together, so prefer `selection:`.
+    init(state: CheckState, toggleAll: @escaping () -> Void, count: Int, noun: String, size: Int64,
+         sizeSuffix: String = String(localized: "will be reclaimed", comment: "After a size in the selection bar: '5.86 GB will be reclaimed'"),
+         @ViewBuilder actions: @escaping () -> Actions) {
+        self.state = state
+        self.toggleAll = toggleAll
+        self.count = count
+        self.size = size
+        self.selection = Text(verbatim: noun.isEmpty ? "\(count)" : "\(count) \(noun)").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+            + Text(verbatim: " ")
+            + Text("selected", comment: "Selection bar, after '9 folders'")
+        self.reclaim = sizeSuffix.isEmpty ? nil
+            : Text(ByteFormat.string(size)).font(Theme.mono(14, .bold)).foregroundStyle(Theme.accentLight)
+                + Text(verbatim: "  ") + Text(sizeSuffix)
+        self.actions = actions
+    }
+
+    /// The localized string with its `**` runs in `font` and `color` instead of plain bold.
+    private static func emphasized(_ resource: LocalizedStringResource, font: Font, color: Color) -> AttributedString {
+        var text = AttributedString(localized: resource)
+        for run in text.runs where run.inlinePresentationIntent?.contains(.stronglyEmphasized) == true {
+            text[run.range].inlinePresentationIntent = nil
+            text[run.range].font = font
+            text[run.range].foregroundColor = color
+        }
+        return text
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             Rectangle().fill(Theme.hairline).frame(height: 1)
             HStack(spacing: 12) {
                 CheckBox(state: state, action: toggleAll)
-                HStack(spacing: 5) {
-                    Text("\(count) \(noun)").font(.system(size: 13.5, weight: .semibold)).foregroundStyle(Theme.textPrimary)
-                    Text("selected").font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
-                }
-                if !sizeSuffix.isEmpty && (size > 0 || count > 0) {
-                    Text(ByteFormat.string(size))
-                        .font(Theme.mono(14, .bold))
-                        .foregroundStyle(Theme.accentLight)
+                selection.font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+                if let reclaim, size > 0 || count > 0 {
+                    reclaim.font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                         .padding(.leading, 6)
-                    Text(sizeSuffix).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                 }
                 Spacer()
                 actions()
@@ -201,7 +239,8 @@ struct ScanProgressStrip: View {
                 Text("Scanning")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.textPrimary)
-                Text("\(CountFormat.compact(store.progress.filesVisited)) files · \(store.progress.itemsFound) found")
+                Text("\(CountFormat.compact(store.progress.filesVisited)) files · \(store.progress.itemsFound) found",
+                     comment: "Scan progress: files visited (already short, like 412k) and items found so far")
                     .font(Theme.mono(11.5))
                     .foregroundStyle(Theme.textSecondary)
                 Text(PathFormat.abbreviate(store.progress.currentPath))

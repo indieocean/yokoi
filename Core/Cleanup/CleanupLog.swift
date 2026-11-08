@@ -139,24 +139,45 @@ struct CleanupBatch: Identifiable, Sendable, Hashable {
     }
 
     var title: String {
-        let noun: String
-        switch category {
-        case .nodeModules: noun = count == 1 ? "node_modules" : "node_modules"
-        case .buildArtifacts: noun = count == 1 ? "build folder" : "build folders"
-        case .caches: noun = count == 1 ? "cache" : "caches"
-        case .bigFiles: noun = count == 1 ? "big file" : "big files"
-        case .duplicates: noun = count == 1 ? "duplicate" : "duplicates"
-        case .downloads: noun = count == 1 ? "download" : "downloads"
-        case .screenshots: noun = count == 1 ? "screenshot" : "screenshots"
-        case .applications: noun = count == 1 ? "app" : "apps"
-        case .externalDrives: noun = "drive items"
-        case .packages: noun = "packages"
-        }
         if count == 1 && category != .nodeModules { return firstLabel }
         switch action {
-        case "move": return "Moved \(count) \(noun)"
+        case "move": return movedTitle
         case "command": return firstLabel
-        default: return "Cleared \(count) \(noun)"
+        default: return clearedTitle
+        }
+    }
+
+    /// "Moved 3 downloads": one whole localized phrase per category, so word order and plurals can change.
+    private var movedTitle: String {
+        let n = count
+        return switch category {
+        case .nodeModules: String(localized: "Moved \(n) node_modules", comment: "Recent cleanups row; node_modules is a folder name, don't translate it")
+        case .buildArtifacts: String(localized: "Moved \(n) build folders", comment: "Recent cleanups row")
+        case .caches: String(localized: "Moved \(n) caches", comment: "Recent cleanups row")
+        case .bigFiles: String(localized: "Moved \(n) big files", comment: "Recent cleanups row")
+        case .duplicates: String(localized: "Moved \(n) duplicates", comment: "Recent cleanups row")
+        case .downloads: String(localized: "Moved \(n) downloads", comment: "Recent cleanups row")
+        case .screenshots: String(localized: "Moved \(n) screenshots", comment: "Recent cleanups row")
+        case .applications: String(localized: "Moved \(n) apps", comment: "Recent cleanups row")
+        case .externalDrives: String(localized: "Moved \(n) drive items", comment: "Recent cleanups row: junk items on external drives")
+        case .packages: String(localized: "Moved \(n) packages", comment: "Recent cleanups row")
+        }
+    }
+
+    /// "Cleared 3 caches".
+    private var clearedTitle: String {
+        let n = count
+        return switch category {
+        case .nodeModules: String(localized: "Cleared \(n) node_modules", comment: "Recent cleanups row; node_modules is a folder name, don't translate it")
+        case .buildArtifacts: String(localized: "Cleared \(n) build folders", comment: "Recent cleanups row")
+        case .caches: String(localized: "Cleared \(n) caches", comment: "Recent cleanups row")
+        case .bigFiles: String(localized: "Cleared \(n) big files", comment: "Recent cleanups row")
+        case .duplicates: String(localized: "Cleared \(n) duplicates", comment: "Recent cleanups row")
+        case .downloads: String(localized: "Cleared \(n) downloads", comment: "Recent cleanups row")
+        case .screenshots: String(localized: "Cleared \(n) screenshots", comment: "Recent cleanups row")
+        case .applications: String(localized: "Cleared \(n) apps", comment: "Recent cleanups row")
+        case .externalDrives: String(localized: "Cleared \(n) drive items", comment: "Recent cleanups row: junk items on external drives")
+        case .packages: String(localized: "Cleared \(n) packages", comment: "Recent cleanups row")
         }
     }
 }

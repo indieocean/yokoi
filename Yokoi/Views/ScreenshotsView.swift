@@ -25,14 +25,12 @@ struct ScreenshotsView: View {
                             .init(value: .screenshots, title: "Screenshots", count: "\(vm.screenshotCount)"),
                             .init(value: .recordings, title: "Recordings", count: "\(vm.recordingCount)"),
                         ])
-                        HStack(spacing: 4) {
-                            Text("Older than").foregroundStyle(Theme.textSecondary)
-                            Text("\(app.settings.data.screenshotAgeDays) days").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
-                            Text("highlighted").foregroundStyle(Theme.textSecondary)
-                        }
-                        .font(.system(size: 13))
+                        let days = Text("\(app.settings.data.screenshotAgeDays) days").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.textPrimary)
+                        Text("Older than \(days) highlighted", comment: "Placeholder is a number of days, e.g. “30 days”")
+                            .foregroundStyle(Theme.textSecondary)
+                            .font(.system(size: 13))
                         Spacer()
-                        Button(items.allSatisfy { vm.checked.contains($0.id) } && !items.isEmpty ? "Deselect all" : "Select all") { vm.toggleAll(items) }
+                        Button(items.allSatisfy { vm.checked.contains($0.id) } && !items.isEmpty ? String(localized: "Deselect all") : String(localized: "Select all")) { vm.toggleAll(items) }
                             .buttonStyle(.dkGhost)
                             .disabled(items.isEmpty)
                     }
@@ -148,7 +146,13 @@ private struct ActionPanel: View {
         @Bindable var vm = app.screenshotsVM
         @Bindable var settings = app.settings
         let count = vm.checked.count
-        let noun = vm.tab == .recordings ? "Recording" : "Screenshot"
+        let buttonTitle = switch (running, vm.action == .move, vm.tab == .recordings) {
+        case (true, _, _): String(localized: "Working…")
+        case (false, true, true): String(localized: "Move \(count) Recordings", comment: "Button; screen recordings")
+        case (false, true, false): String(localized: "Move \(count) Screenshots", comment: "Button")
+        case (false, false, true): String(localized: "Delete \(count) Recordings", comment: "Button; screen recordings")
+        case (false, false, false): String(localized: "Delete \(count) Screenshots", comment: "Button")
+        }
 
         VStack(alignment: .leading, spacing: 14) {
             Text("Action").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.textPrimary)
@@ -166,7 +170,7 @@ private struct ActionPanel: View {
                         .background(RoundedRectangle(cornerRadius: 7).fill(.black.opacity(0.25)))
                     HStack {
                         Button("Choose…") {
-                            if let url = Finder.chooseFolder(title: "Move screenshots to…", startingAt: vm.destination) {
+                            if let url = Finder.chooseFolder(title: String(localized: "Move screenshots to…", comment: "Folder picker title"), startingAt: vm.destination) {
                                 settings.data.screenshotDestination = PathFormat.abbreviate(url)
                             }
                         }
@@ -199,8 +203,8 @@ private struct ActionPanel: View {
                 .accessibilityLabel("Auto rule")
             }
             Text(settings.data.screenshotAutoAction == .delete && settings.data.screenshotAutoRule
-                 ? "Every day, move screenshots older than \(settings.data.screenshotAgeDays) days to the Trash. Logged like any cleanup."
-                 : "Every day, move screenshots older than \(settings.data.screenshotAgeDays) days to the folder above. Logged like any cleanup.")
+                 ? String(localized: "Every day, move screenshots older than \(settings.data.screenshotAgeDays) days to the Trash. Logged like any cleanup.")
+                 : String(localized: "Every day, move screenshots older than \(settings.data.screenshotAgeDays) days to the folder above. Logged like any cleanup."))
                 .font(.system(size: 12.5))
                 .foregroundStyle(Theme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -218,7 +222,7 @@ private struct ActionPanel: View {
                     }
                 }
             } label: {
-                Text(running ? "Working…" : (vm.action == .move ? "Move \(count) \(noun)\(count == 1 ? "" : "s")" : "Delete \(count) \(noun)\(count == 1 ? "" : "s")"))
+                Text(buttonTitle)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 3)
             }
@@ -232,8 +236,8 @@ private struct ActionPanel: View {
 
 struct RadioCard<Extra: View>: View {
     let selected: Bool
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
     var titleColor: Color = Theme.textPrimary
     let action: () -> Void
     @ViewBuilder var extra: () -> Extra

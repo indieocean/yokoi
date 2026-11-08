@@ -9,7 +9,7 @@ struct PackageManagersView: View {
         VStack(spacing: 0) {
             if pm.showingProjects {
                 HeaderBar(title: "Package Managers",
-                          subtitle: "npm · \(CountFormat.plural(app.store.nodeModules.count, "node_modules folder")) · \(ByteFormat.string(app.store.total(.nodeModules)))") {
+                          subtitle: "npm · \(app.store.nodeModules.count) node_modules folders · \(ByteFormat.string(app.store.total(.nodeModules)))") {
                     RescanButton(category: .nodeModules)
                 }
                 ManagerTabs(showFilter: false)
@@ -35,11 +35,11 @@ private struct ManagerTabs: View {
         HStack(spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
                 SegmentedTabs(selection: Binding(get: { pm.selected }, set: { k in Task { await pm.select(k) } }),
-                              items: pm.installed.map { .init(value: $0, title: $0.title, count: pm.count($0).map(String.init)) })
+                              items: pm.installed.map { .init(value: $0, verbatim: $0.title, count: pm.count($0).map(String.init)) })
             }
             if pm.selected == .npm {
                 SegmentedTabs(selection: Binding(get: { pm.npmMode }, set: { m in Task { await pm.setNpmMode(m) } }), items: [
-                    .init(value: .projects, title: "node_modules"),
+                    .init(value: .projects, verbatim: "node_modules"),
                     .init(value: .global, title: "Global"),
                 ], compact: true)
             }
@@ -67,7 +67,7 @@ private struct PackageTablePanel: View {
         let readOnly = pm.readOnly[pm.selected]
 
         VStack(spacing: 0) {
-            HeaderBar(title: "Package Managers", subtitle: pm.selected == .npm ? "npm global" : pm.selected.title) {
+            HeaderBar(title: "Package Managers", subtitle: pm.selected == .npm ? "npm global" : "\(pm.selected.title)") {
                 Button {
                     Task { await pm.checkOutdated(pm.selected) }
                 } label: {
@@ -129,7 +129,7 @@ private struct PackageTablePanel: View {
                             } else {
                                 Image(systemName: "lock.fill").font(.system(size: 10)).foregroundStyle(Theme.textTertiary)
                                     .frame(width: 16)
-                                    .help(p.locked ?? readOnly ?? "No safe command for this")
+                                    .help(p.locked ?? readOnly ?? String(localized: "No safe command for this", comment: "Tooltip on a package that has no update or uninstall command"))
                             }
                         }
                         .width(24)
@@ -140,17 +140,17 @@ private struct PackageTablePanel: View {
                         TableColumn("Installed") { p in
                             Text(p.installedVersion).font(Theme.mono(12.5)).foregroundStyle(Theme.textPrimary)
                         }
-                        .width(110)
+                        .width(100)
                         TableColumn("Latest") { p in
                             if let latest = p.latestVersion {
-                                Text(p.isOutdated ? "→ \(latest)" : latest)
+                                (p.isOutdated ? Text("→ \(latest)", comment: "Latest column: a newer version is available; placeholder is its version") : Text(verbatim: latest))
                                     .font(Theme.mono(12.5))
                                     .foregroundStyle(p.isOutdated ? Theme.success : Theme.textTertiary)
                             } else {
                                 Text("—").foregroundStyle(Theme.textTertiary)
                             }
                         }
-                        .width(120)
+                        .width(100)
                         TableColumn("Status") { p in
                             HStack(spacing: 4) {
                                 switch p.status {
@@ -161,7 +161,7 @@ private struct PackageTablePanel: View {
                                 if p.isUnused { StatusPill(text: "UNUSED", color: Theme.danger) }
                             }
                         }
-                        .width(180)
+                        .width(150)
                         TableColumn("Last used") { p in
                             Text(p.lastUsed.map { RelativeDate.string($0) } ?? "—")
                                 .font(.system(size: 12.5)).foregroundStyle(Theme.textSecondary)
@@ -176,7 +176,7 @@ private struct PackageTablePanel: View {
                         TableColumn("") { p in
                             let action: PackagesStore.Action = p.isOutdated && pm.can(.update, p) ? .update : .uninstall
                             if pm.can(action, p) {
-                                Button(action.rawValue) { pm.request(action, [p]) }
+                                Button(action == .update ? "Update" : "Uninstall") { pm.request(action, [p]) }
                                     .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
                                     .disabled(busy)
                             } else if pm.can(.update, p) {
@@ -185,7 +185,8 @@ private struct PackageTablePanel: View {
                                     .disabled(busy)
                             }
                         }
-                        .width(90)
+                        // Wide enough for longer labels ("Deinstallieren"); the total stays under the old one.
+                        .width(120)
                     }
                     .tableStyle(.inset(alternatesRowBackgrounds: false))
                     .scrollContentBackground(.hidden)
@@ -232,7 +233,10 @@ private struct TerminalStrip: View {
             Text("$").font(Theme.mono(13, .bold)).foregroundStyle(Theme.success)
             if let result {
                 Text(result.commandLine).font(Theme.mono(12.5)).foregroundStyle(Theme.textPrimary).lineLimit(1).textSelection(.enabled)
-                Text("· \(result.succeeded ? "resolved" : "exit \(result.exitCode)") in \(String(format: "%.1f", result.duration))s")
+                let seconds = String(format: "%.1f", result.duration)
+                (result.succeeded
+                    ? Text("· resolved in \(seconds)s", comment: "After a package manager command; placeholder is seconds such as 1.2")
+                    : Text("· exit \(Int(result.exitCode)) in \(seconds)s", comment: "After a failed package manager command; placeholders are the exit code and seconds"))
                     .font(Theme.mono(11.5)).foregroundStyle(Theme.textSecondary)
             } else {
                 Text(busy ? "running…" : "nothing run yet").font(Theme.mono(12.5)).foregroundStyle(Theme.textSecondary)
@@ -259,7 +263,9 @@ struct PackageActionSheet: View {
     var body: some View {
         let pm = app.packages
         VStack(alignment: .leading, spacing: 14) {
-            Text("\(action.action.rawValue) \(CountFormat.plural(action.packages.count, "package"))?")
+            (action.action == .update
+                ? Text("Update \(action.packages.count) packages?")
+                : Text("Uninstall \(action.packages.count) packages?"))
                 .font(.system(size: 17, weight: .semibold))
             Text(action.action == .update ? "Each package is updated to its latest version." : "These packages are removed from \(action.kind.title).")
                 .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
@@ -271,7 +277,7 @@ struct PackageActionSheet: View {
                         HStack {
                             Text(pkg.name).font(Theme.mono(12.5, .medium))
                             if action.action == .update, let latest = pkg.latestVersion {
-                                Text("\(pkg.installedVersion) → \(latest)").font(Theme.mono(12)).foregroundStyle(Theme.success)
+                                Text("\(pkg.installedVersion) → \(latest)", comment: "Version change: installed version, then the latest version").font(Theme.mono(12)).foregroundStyle(Theme.success)
                             }
                             Spacer()
                             if let log = pm.runLog.first(where: { $0.package == pkg.name }) {

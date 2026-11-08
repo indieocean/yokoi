@@ -21,12 +21,12 @@ struct PathGuard: Sendable {
 
         var description: String {
             switch self {
-            case .outsideAllowedRoots: "outside the scan locations"
-            case .excluded: "in an excluded folder"
-            case .protectedSystemPath: "a protected system location"
-            case .isRootItself: "a scan location itself"
-            case .insideGitFolder: "inside a .git folder"
-            case .protectedUserData: "protected personal data (Keychains, Mail, Messages, iCloud, Photos…)"
+            case .outsideAllowedRoots: String(localized: "outside the scan locations", comment: "Why cleanup refused a path; follows \"Refused: \"")
+            case .excluded: String(localized: "in an excluded folder", comment: "Why cleanup refused a path; follows \"Refused: \"")
+            case .protectedSystemPath: String(localized: "a protected system location", comment: "Why cleanup refused a path; follows \"Refused: \"")
+            case .isRootItself: String(localized: "a scan location itself", comment: "Why cleanup refused a path; follows \"Refused: \"")
+            case .insideGitFolder: String(localized: "inside a .git folder", comment: "Why cleanup refused a path; follows \"Refused: \"")
+            case .protectedUserData: String(localized: "protected personal data (Keychains, Mail, Messages, iCloud, Photos…)", comment: "Why cleanup refused a path; follows \"Refused: \"")
             }
         }
     }

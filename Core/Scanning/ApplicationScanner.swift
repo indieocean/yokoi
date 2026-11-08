@@ -24,7 +24,8 @@ struct AppItem: Reclaimable, Codable, Hashable {
     let leftovers: [AppLeftover]
     let lastUsed: Date?
     let isAppStore: Bool
-    /// Apple apps and Yokoi itself can't be uninstalled here.
+    /// Apple apps and Yokoi itself can't be uninstalled here. A fixed English identity ("Apple app",
+    /// "Yokoi itself") that's compared and cached: show `protectedReasonText` instead.
     let protectedReason: String?
     let fileCount: Int
     /// Paths of the uncertain leftovers the user picked.
@@ -42,8 +43,18 @@ struct AppItem: Reclaimable, Codable, Hashable {
     var safety: SafetyLevel { .review }
     var restoreHint: String {
         isAppStore
-            ? "Put it back from the Trash, or download it again from the App Store."
-            : "Put it back from the Trash. Its settings come back with it."
+            ? String(localized: "Put it back from the Trash, or download it again from the App Store.")
+            : String(localized: "Put it back from the Trash. Its settings come back with it.")
+    }
+
+    /// `protectedReason`, localized for display.
+    var protectedReasonText: String? {
+        switch protectedReason {
+        case nil: nil
+        case "Apple app": String(localized: "Apple app", comment: "Why an app can't be uninstalled: it comes with macOS")
+        case "Yokoi itself": String(localized: "Yokoi itself", comment: "Why an app can't be uninstalled: it is this app")
+        case let other?: other
+        }
     }
 
     func isUnused(days: Int, now: Date = Date()) -> Bool {

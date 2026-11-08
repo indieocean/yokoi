@@ -21,11 +21,21 @@ final class CleanupActivity: Identifiable {
     var isFinished: Bool { outcome != nil }
 
     var verb: String {
-        if dryRun { return "Previewing cleanup" }
+        if dryRun { return String(localized: "Previewing cleanup") }
         switch action {
-        case .trash: return "Moving to Trash"
-        case .delete: return "Deleting permanently"
-        case .move: return "Moving files"
+        case .trash: return String(localized: "Moving to Trash")
+        case .delete: return String(localized: "Deleting permanently")
+        case .move: return String(localized: "Moving files")
+        }
+    }
+
+    /// `verb` with a trailing ellipsis, as one string per case so translators control the punctuation.
+    var verbInProgress: String {
+        if dryRun { return String(localized: "Previewing cleanup…") }
+        switch action {
+        case .trash: return String(localized: "Moving to Trash…")
+        case .delete: return String(localized: "Deleting permanently…")
+        case .move: return String(localized: "Moving files…")
         }
     }
 }
@@ -114,24 +124,32 @@ struct CleanupOverlay: View {
     }
 
     private var title: String {
-        guard let outcome = activity.outcome else { return activity.verb + "…" }
-        if activity.dryRun { return "Dry run: nothing was changed" }
+        guard let outcome = activity.outcome else { return activity.verbInProgress }
+        if activity.dryRun { return String(localized: "Dry run: nothing was changed") }
         let skipped = outcome.failures.count + activity.lateBlocked.count
-        if skipped > 0 { return "Done, \(skipped) skipped" }
+        if skipped > 0 { return String(localized: "Done, \(skipped) skipped", comment: "Cleanup finished; placeholder is how many items were skipped") }
         switch activity.action {
-        case .move: return "Moved"
-        case .trash: return "Moved to Trash"
-        case .delete: return "Freed"
+        case .move: return String(localized: "Moved", comment: "Cleanup finished title, shown above the byte count")
+        case .trash: return String(localized: "Moved to Trash", comment: "Cleanup finished title, shown above the byte count")
+        case .delete: return String(localized: "Freed", comment: "Cleanup finished title, shown above the byte count")
         }
     }
 
     private var subtitle: String {
         let s = activity.snapshot
         if let outcome = activity.outcome {
-            return "\(CountFormat.plural(outcome.itemCount, "item")) · \(CountFormat.compact(max(s.filesDone, s.filesTotal))) files"
+            let files = CountFormat.compact(max(s.filesDone, s.filesTotal))
+            return String(localized: "\(outcome.itemCount) items · \(files) files",
+                          comment: "Cleanup finished; placeholders are an item count and an abbreviated file count such as 412k")
         }
         let current = min(s.entriesDone + 1, max(s.entriesTotal, 1))
-        return "item \(current) of \(s.entriesTotal) · \(CountFormat.compact(s.filesDone)) files" + (s.currentLabel.isEmpty ? "" : " · \(s.currentLabel)")
+        let files = CountFormat.compact(s.filesDone)
+        if s.currentLabel.isEmpty {
+            return String(localized: "item \(current) of \(s.entriesTotal) · \(files) files",
+                          comment: "Cleanup progress; placeholders are the current item number, total items and an abbreviated file count")
+        }
+        return String(localized: "item \(current) of \(s.entriesTotal) · \(files) files · \(s.currentLabel)",
+                      comment: "Cleanup progress; placeholders are the current item number, total items, an abbreviated file count and the item being cleaned")
     }
 }
 
@@ -230,7 +248,7 @@ private final class SSDModel {
         gc.fill(ctrlPath, with: .linearGradient(Gradient(colors: [Color(hex: 0x3A3F52), Color(hex: 0x1F2330)]),
                                                 startPoint: CGPoint(x: ctrl.minX, y: ctrl.minY), endPoint: CGPoint(x: ctrl.maxX, y: ctrl.maxY)))
         gc.stroke(ctrlPath, with: .color(.white.opacity(0.14)), lineWidth: 1)
-        gc.draw(Text("YOKOI").font(.system(size: ctrl.height * 0.17, weight: .heavy, design: .rounded)).foregroundColor(.white.opacity(0.85)),
+        gc.draw(Text(verbatim: "YOKOI").font(.system(size: ctrl.height * 0.17, weight: .heavy, design: .rounded)).foregroundColor(.white.opacity(0.85)),
                 at: CGPoint(x: ctrl.midX, y: ctrl.midY))
 
         // NAND chips
@@ -337,7 +355,7 @@ private final class SSDModel {
         gc.fill(Path(ellipseIn: led), with: .color(ledColor.opacity(ledAlpha)))
 
         // Label
-        gc.draw(Text("NVMe").font(.system(size: H * 0.075, weight: .semibold, design: .monospaced)).foregroundColor(.white.opacity(0.25)),
+        gc.draw(Text(verbatim: "NVMe").font(.system(size: H * 0.075, weight: .semibold, design: .monospaced)).foregroundColor(.white.opacity(0.25)),
                 at: CGPoint(x: ctrl.midX, y: ctrl.maxY + H * 0.1))
     }
 

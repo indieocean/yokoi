@@ -58,10 +58,21 @@ struct ScanReclaimableSpaceIntent: AppIntent {
         let wanted = categories.map { Set($0.map(\.category)) }.flatMap { $0.isEmpty ? nil : $0 } ?? Set(ScanReport.scannable)
         let report = await ScanReport.run(settings: SettingsStore.loadStandard(), categories: wanted, index: ScanIndex.defaultURL)
         let top = report.categories.filter { $0.reclaimableBytes > 0 }.sorted { $0.reclaimableBytes > $1.reclaimableBytes }.prefix(3)
-        let breakdown = top.map { "\($0.title) \(ByteFormat.string($0.reclaimableBytes))" }.joined(separator: ", ")
-        let dialog = report.reclaimableBytes == 0
-            ? "Nothing to reclaim right now."
-            : "\(ByteFormat.string(report.reclaimableBytes)) reclaimable" + (breakdown.isEmpty ? "." : ": \(breakdown).")
+        // The report's titles are for the English-only CLI, so take the category's own (localized) title here.
+        let breakdown = top.map { c in
+            let title = CleanCategory(rawValue: c.id)?.title ?? c.title
+            return String(localized: "\(title) \(ByteFormat.string(c.reclaimableBytes))",
+                          comment: "Shortcuts dialog breakdown entry: category name, then a size like 1.2 GB")
+        }.joined(separator: ", ")
+        let total = ByteFormat.string(report.reclaimableBytes)
+        let dialog = if report.reclaimableBytes == 0 {
+            String(localized: "Nothing to reclaim right now.", comment: "Shortcuts dialog")
+        } else if breakdown.isEmpty {
+            String(localized: "\(total) reclaimable.", comment: "Shortcuts dialog; placeholder is a size like 12 GB")
+        } else {
+            String(localized: "\(total) reclaimable: \(breakdown).",
+                   comment: "Shortcuts dialog; first placeholder is a size like 12 GB, second a list of categories with sizes")
+        }
         return .result(value: Int(report.reclaimableBytes), dialog: IntentDialog(stringLiteral: dialog))
     }
 }
@@ -75,7 +86,9 @@ struct GetFreeSpaceIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {
         let disk = ScanReport.currentDisk()
         return .result(value: Int(disk.freeBytes),
-                       dialog: IntentDialog(stringLiteral: "\(ByteFormat.string(disk.freeBytes)) free of \(ByteFormat.string(disk.totalBytes)) on \(disk.name)."))
+                       dialog: IntentDialog(stringLiteral: String(
+                           localized: "\(ByteFormat.string(disk.freeBytes)) free of \(ByteFormat.string(disk.totalBytes)) on \(disk.name).",
+                           comment: "Shortcuts dialog: free size, total size, disk name")))
     }
 }
 

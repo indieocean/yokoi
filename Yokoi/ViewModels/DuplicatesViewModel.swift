@@ -56,8 +56,8 @@ final class DuplicatesViewModel: SelectionPruning {
     func cleanupRequest() -> CleanupRequest {
         let entries = groups.flatMap { $0.entries(removing: checked) }.sorted { $0.size > $1.size }
         return CleanupRequest(
-            title: "Remove \(CountFormat.plural(entries.count, "duplicate"))?",
-            restoreHint: "The copies you didn't pick stay where they are. Move to Trash keeps these recoverable until you empty it.",
+            title: String(localized: "Remove \(entries.count) duplicates?", comment: "Confirmation title"),
+            restoreHint: String(localized: "The copies you didn't pick stay where they are. Move to Trash keeps these recoverable until you empty it."),
             entries: entries
         )
     }

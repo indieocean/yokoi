@@ -32,8 +32,8 @@ struct SettingsView: View {
 // MARK: - Shared bits
 
 private struct CardTitle: View {
-    let title: String
-    var subtitle: String? = nil
+    let title: LocalizedStringKey
+    var subtitle: LocalizedStringKey? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -45,8 +45,8 @@ private struct CardTitle: View {
 }
 
 private struct SettingRow<Control: View>: View {
-    let title: String
-    var subtitle: String? = nil
+    let title: LocalizedStringKey
+    var subtitle: LocalizedStringKey? = nil
     var divider = true
     @ViewBuilder var control: () -> Control
 
@@ -142,7 +142,14 @@ private struct ScanLocationsCard: View {
                                     Button("\(d) levels") { settings.setDepth(d, for: root) }
                                 }
                             } label: {
-                                Text(root.maxDepth.map { "depth \($0)" } ?? "depth ∞").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+                                Group {
+                                    if let depth = root.maxDepth {
+                                        Text("depth \(depth)", comment: "Scan location: how many folder levels deep it is walked")
+                                    } else {
+                                        Text("depth ∞", comment: "Scan location walked with no depth limit")
+                                    }
+                                }
+                                .font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
                             }
                             .menuStyle(.button)
                             .buttonStyle(.plain)
@@ -160,9 +167,10 @@ private struct ScanLocationsCard: View {
                 }
             }
             Button {
-                if let url = Finder.chooseFolder(title: "Add a scan location", prompt: "Add"),
+                if let url = Finder.chooseFolder(title: String(localized: "Add a scan location"),
+                                                 prompt: String(localized: "Add", comment: "Open panel button")),
                    let why = settings.addScanRoot(url) {
-                    app.toast = Toast(kind: .warning, message: "Not added", detail: why)
+                    app.toast = Toast(kind: .warning, message: String(localized: "Not added", comment: "Toast: a folder was refused as a location"), detail: why)
                 }
             } label: {
                 Label("Add Folder…", systemImage: "plus")
@@ -176,9 +184,10 @@ private struct ScanLocationsCard: View {
                     ChipView(text: path) { settings.data.bigFileRoots.removeAll { $0 == path } }
                 }
                 Button {
-                    if let url = Finder.chooseFolder(title: "Add a big-file location", prompt: "Add"),
+                    if let url = Finder.chooseFolder(title: String(localized: "Add a big-file location"),
+                                                     prompt: String(localized: "Add", comment: "Open panel button")),
                        let why = settings.addBigFileRoot(url) {
-                        app.toast = Toast(kind: .warning, message: "Not added", detail: why)
+                        app.toast = Toast(kind: .warning, message: String(localized: "Not added", comment: "Toast: a folder was refused as a location"), detail: why)
                     }
                 } label: {
                     Label("Add", systemImage: "plus").font(.system(size: 12))
@@ -194,7 +203,7 @@ private struct ScanLocationsCard: View {
                 }
             }
             HStack(spacing: 8) {
-                TextField("~/work/acme/prod-*", text: $newExclusion)
+                TextField(Self.exclusionExample, text: $newExclusion)
                     .textFieldStyle(.plain)
                     .font(Theme.mono(12))
                     .padding(.horizontal, 10)
@@ -204,7 +213,8 @@ private struct ScanLocationsCard: View {
                     .onSubmit(addExclusion)
                 Button("Add", action: addExclusion).buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
                 Button {
-                    if let url = Finder.chooseFolder(title: "Exclude a folder", prompt: "Exclude") {
+                    if let url = Finder.chooseFolder(title: String(localized: "Exclude a folder"),
+                                                     prompt: String(localized: "Exclude", comment: "Open panel button")) {
                         settings.addExclusion(PathFormat.abbreviate(url))
                     }
                 } label: { Image(systemName: "folder") }
@@ -214,6 +224,9 @@ private struct ScanLocationsCard: View {
         }
         .card(padding: 22)
     }
+
+    /// A path, so it's shown as is.
+    private static let exclusionExample: String = "~/work/acme/prod-*"
 
     private func addExclusion() {
         app.settings.addExclusion(newExclusion)
@@ -287,7 +300,7 @@ private struct ScreenshotSettingsCard: View {
                 HStack(spacing: 8) {
                     Text(settings.data.screenshotFolderOverride ?? detected).font(Theme.mono(12)).foregroundStyle(Theme.textPrimary)
                     Button("Change…") {
-                        if let url = Finder.chooseFolder(title: "Where are your screenshots?") {
+                        if let url = Finder.chooseFolder(title: String(localized: "Where are your screenshots?")) {
                             settings.data.screenshotFolderOverride = PathFormat.abbreviate(url)
                         }
                     }
@@ -302,7 +315,7 @@ private struct ScreenshotSettingsCard: View {
                 HStack(spacing: 8) {
                     Text(settings.data.screenshotDestination).font(Theme.mono(12)).foregroundStyle(Theme.textPrimary)
                     Button("Change…") {
-                        if let url = Finder.chooseFolder(title: "Move screenshots to…") {
+                        if let url = Finder.chooseFolder(title: String(localized: "Move screenshots to…")) {
                             settings.data.screenshotDestination = PathFormat.abbreviate(url)
                         }
                     }
@@ -361,7 +374,9 @@ private struct ScheduleCard: View {
                         ForEach([10, 25, 50, 100, 200], id: \.self) { gb in Button("\(gb) GB") { settings.data.notifyThresholdGB = gb } }
                         Button("Never") { settings.data.notifyThresholdGB = 0 }
                     } label: {
-                        Text(settings.data.notifyThresholdGB == 0 ? "Never" : "\(settings.data.notifyThresholdGB) GB")
+                        Group {
+                            if settings.data.notifyThresholdGB == 0 { Text("Never") } else { Text("\(settings.data.notifyThresholdGB) GB") }
+                        }
                             .font(Theme.mono(12.5, .medium)).foregroundStyle(Theme.textPrimary)
                             .padding(.horizontal, 12).padding(.vertical, 6)
                             .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.04)))
@@ -397,8 +412,8 @@ private struct ScheduleCard: View {
         }
     }
 
-    private var loginItemSubtitle: String? {
-        if let error = app.scheduler.loginItemError { return error }
+    private var loginItemSubtitle: LocalizedStringKey? {
+        if let error = app.scheduler.loginItemError { return "\(error)" }
         if app.scheduler.loginItem == .needsApproval { return "Turned off in System Settings. Allow Yokoi in Login Items" }
         return nil
     }
@@ -426,10 +441,12 @@ private struct AutomationCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 8).fill(.black.opacity(0.25)))
             HStack(spacing: 8) {
-                Button(copied ? "Copied" : "Copy Install Command") {
+                Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(installCommand, forType: .string)
                     copied = true
+                } label: {
+                    if copied { Text("Copied") } else { Text("Copy Install Command") }
                 }
                 .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
                 Button("Open Shortcuts") {
@@ -466,7 +483,7 @@ private struct UpdatesCard: View {
                 Toggle("", isOn: $updater.automaticallyChecks).toggleStyle(.dk).fixedSize()
             }
             SettingRow(title: "Last checked",
-                       subtitle: updater.lastCheck.map { $0.formatted(.relative(presentation: .named)) } ?? "Never",
+                       subtitle: updater.lastCheck.map { "\($0.formatted(.relative(presentation: .named)))" } ?? "Never",
                        divider: false) {
                 Button("Check Now") { updater.checkForUpdates() }
                     .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
@@ -485,7 +502,11 @@ private struct AboutCard: View {
             CardTitle(title: "Privacy & logs", subtitle: "100% local. No telemetry. The network is only used for checks you ask for.")
             HStack(spacing: 8) {
                 Button("Reveal Cleanup Log") { Finder.reveal([app.store.logURL]) }.buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
-                Button(app.fullDiskAccess ? "Full Disk Access: On" : "Grant Full Disk Access…") { FullDiskAccess.openSystemSettings() }
+                Button {
+                    FullDiskAccess.openSystemSettings()
+                } label: {
+                    if app.fullDiskAccess { Text("Full Disk Access: On") } else { Text("Grant Full Disk Access…") }
+                }
                     .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
             }
             Text(PathFormat.abbreviate(app.store.logURL)).font(Theme.mono(11)).foregroundStyle(Theme.textTertiary).textSelection(.enabled)

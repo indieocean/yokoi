@@ -17,8 +17,14 @@ struct MenuBarContent: View {
                             .help("Your Mac, garbage collected")
                         Tag(text: app.updater.currentVersion, color: Theme.textTertiary)
                     }
-                    Text(store.isScanning ? "Scanning…" : "Last scan \(RelativeDate.ago(store.lastScan?.date))")
-                        .font(.system(size: 11)).foregroundStyle(Theme.textSecondary)
+                    Group {
+                        if store.isScanning {
+                            Text("Scanning…")
+                        } else {
+                            Text("Last scan \(RelativeDate.ago(store.lastScan?.date))", comment: "Menu bar helper; the value is like '5 min ago' or 'never'")
+                        }
+                    }
+                    .font(.system(size: 11)).foregroundStyle(Theme.textSecondary)
                 }
                 Spacer()
             }
@@ -33,7 +39,10 @@ struct MenuBarContent: View {
             }
 
             if store.isScanning {
-                ProgressView(value: nil as Double?) { Text("\(CountFormat.compact(store.progress.filesVisited)) files").font(Theme.mono(10.5)) }
+                ProgressView(value: nil as Double?) {
+                    Text("\(CountFormat.compact(store.progress.filesVisited)) files", comment: "Scan progress; the count is already short, like 412k")
+                        .font(Theme.mono(10.5))
+                }
                     .controlSize(.small)
             }
 
@@ -41,8 +50,14 @@ struct MenuBarContent: View {
                 Button {
                     store.isScanning ? store.cancelScan() : store.scan()
                 } label: {
-                    Label(store.isScanning ? "Stop Scan" : "Scan Now", systemImage: store.isScanning ? "stop.fill" : "arrow.clockwise")
-                        .frame(maxWidth: .infinity)
+                    Group {
+                        if store.isScanning {
+                            Label("Stop Scan", systemImage: "stop.fill")
+                        } else {
+                            Label("Scan Now", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.dkPrimary)
                 Button {
@@ -79,7 +94,7 @@ struct MenuBarContent: View {
         .background(Theme.bgWindow)
     }
 
-    private func stat(_ label: String, _ value: String, _ color: Color) -> some View {
+    private func stat(_ label: LocalizedStringKey, _ value: String, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.system(size: 11)).foregroundStyle(Theme.textSecondary)
             Text(value).font(Theme.mono(15, .bold)).foregroundStyle(color)
@@ -112,7 +127,11 @@ struct MenuBarContent: View {
         let updater = app.updater
         let hasUpdate: Bool = if case .available = updater.status { true } else { false }
         if updater.isAvailable && !hasUpdate {
-            Button(updater.status == .checking ? "Checking…" : "Check for Updates") { installUpdate() }
+            Button {
+                installUpdate()
+            } label: {
+                if updater.status == .checking { Text("Checking…") } else { Text("Check for Updates") }
+            }
                 .buttonStyle(.plain)
                 .font(.system(size: 11.5))
                 .foregroundStyle(Theme.accentLight)

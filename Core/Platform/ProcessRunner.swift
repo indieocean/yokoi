@@ -31,8 +31,8 @@ actor ProcessRunner {
 
         var errorDescription: String? {
             switch self {
-            case .refused(let why): "Refused: \(why)"
-            case .launchFailed(let why): "Couldn't start: \(why)"
+            case .refused(let why): String(localized: "Refused: \(why)", comment: "A command or cleanup was refused; the placeholder says why")
+            case .launchFailed(let why): String(localized: "Couldn't start: \(why)", comment: "A command-line tool couldn't be started; the placeholder says why")
             }
         }
     }
@@ -70,13 +70,13 @@ actor ProcessRunner {
 
     /// Why `command` would be refused, or nil when it may run.
     nonisolated func refusal(_ command: [String]) -> String? {
-        guard let tool = command.first, !tool.isEmpty else { return "empty command" }
+        guard let tool = command.first, !tool.isEmpty else { return String(localized: "empty command", comment: "Why a command was refused") }
         let name = (tool as NSString).lastPathComponent
-        if Self.forbidden.contains(name) { return "\(name) is never run by Yokoi" }
-        if let allowedTools, !allowedTools.contains(name) { return "\(name) isn't a tool Yokoi runs" }
+        if Self.forbidden.contains(name) { return String(localized: "\(name) is never run by Yokoi", comment: "Why a command was refused; the placeholder is a tool name") }
+        if let allowedTools, !allowedTools.contains(name) { return String(localized: "\(name) isn't a tool Yokoi runs", comment: "Why a command was refused; the placeholder is a tool name") }
         // python3 is only ever used for pip.
-        if name == "python3", Array(command.dropFirst().prefix(2)) != ["-m", "pip"] { return "python3 only runs pip" }
-        if command.contains(where: { $0.contains("\0") }) { return "argument contains a NUL byte" }
+        if name == "python3", Array(command.dropFirst().prefix(2)) != ["-m", "pip"] { return String(localized: "python3 only runs pip", comment: "Why a command was refused") }
+        if command.contains(where: { $0.contains("\0") }) { return String(localized: "argument contains a NUL byte", comment: "Why a command was refused") }
         return nil
     }
 
@@ -197,7 +197,8 @@ actor ProcessRunner {
         env["NPM_CONFIG_UPDATE_NOTIFIER"] = "false"
         for (k, v) in extra { env[k] = v }
         guard let exe = await which(command[0]) else {
-            throw RunnerError.launchFailed("\((command[0] as NSString).lastPathComponent) isn't installed, or only in a folder another account can write to")
+            let tool = (command[0] as NSString).lastPathComponent
+            throw RunnerError.launchFailed(String(localized: "\(tool) isn't installed, or only in a folder another account can write to", comment: "The placeholder is a tool name"))
         }
         let arguments = Array(command.dropFirst())
         return try await Self.launch(executable: exe, arguments: arguments, environment: env, timeout: timeout, display: [exe] + arguments)

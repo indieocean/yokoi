@@ -116,9 +116,12 @@ enum CacheBreakdown {
             return entries.map { u in
                 let n = u.lastPathComponent
                 for prefix in ["models--", "datasets--", "spaces--"] where n.hasPrefix(prefix) {
-                    let kind = String(prefix.dropLast(3))
-                    return Group(urls: [u], name: n.dropFirst(prefix.count).replacingOccurrences(of: "--", with: "/"),
-                                 detail: kind == "models" ? nil : String(kind.dropLast()))
+                    let detail: String? = switch prefix {
+                    case "datasets--": String(localized: "dataset", comment: "Detail of a Hugging Face cache row: the item is a dataset")
+                    case "spaces--": String(localized: "space", comment: "Detail of a Hugging Face cache row: the item is a Space (hosted app)")
+                    default: nil
+                    }
+                    return Group(urls: [u], name: n.dropFirst(prefix.count).replacingOccurrences(of: "--", with: "/"), detail: detail)
                 }
                 return plain(u)
             }
@@ -148,7 +151,7 @@ enum CacheBreakdown {
         let sessions = inside.filter { isDirectory($0) && UUID(uuidString: $0.lastPathComponent) != nil }
         guard !transcripts.isEmpty || !sessions.isEmpty else { return nil }
         return Group(urls: transcripts + sessions, name: claudeProjectName(project.lastPathComponent),
-                     detail: CountFormat.plural(transcripts.count, "transcript"))
+                     detail: String(localized: "\(transcripts.count) transcripts", comment: "Detail of a Claude Code project row: number of session transcripts"))
     }
 
     /// `-Users-me-Code-app` → `Code-app`. Claude Code replaces every `/` with `-`, so the real path can't be recovered.
@@ -255,7 +258,9 @@ enum CacheBreakdown {
         let api = url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent
         let tags = ["default": "AOSP", "google_apis": "Google APIs", "google_apis_playstore": "Google Play",
                     "google_atd": "Google ATD", "aosp_atd": "AOSP ATD", "android-wear": "Wear OS", "android-tv": "Android TV"]
-        let name = api.hasPrefix("android-") ? "Android API " + api.dropFirst("android-".count) : api
+        let name = api.hasPrefix("android-")
+            ? String(localized: "Android API \(String(api.dropFirst("android-".count)))", comment: "Android system image row; the placeholder is the API level, e.g. 34")
+            : api
         return Group(urls: [url], name: name, detail: "\(tags[tag] ?? tag) · \(abi)")
     }
 }

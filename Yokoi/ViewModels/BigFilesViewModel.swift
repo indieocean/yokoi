@@ -95,8 +95,8 @@ final class BigFilesViewModel: SelectionPruning {
     func cleanupRequest() -> CleanupRequest {
         let items = selectedItems.sorted { $0.size > $1.size }
         return CleanupRequest(
-            title: "Remove \(items.count) big file\(items.count == 1 ? "" : "s")?",
-            restoreHint: "These are your own files. Move to Trash keeps them recoverable until you empty it.",
+            title: String(localized: "Remove \(items.count) big files?", comment: "Confirmation title"),
+            restoreHint: String(localized: "These are your own files. Move to Trash keeps them recoverable until you empty it."),
             entries: items.map { CleanupEntry($0) }
         )
     }

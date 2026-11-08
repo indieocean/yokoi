@@ -94,8 +94,9 @@ final class ApplicationsViewModel: SelectionPruning {
         let items = selectedItems.sorted { $0.size > $1.size }
         let leftovers = items.reduce(0) { $0 + $1.removableLeftovers.count }
         return CleanupRequest(
-            title: "Uninstall \(CountFormat.plural(items.count, "app"))?",
-            restoreHint: "Moves each app and its \(CountFormat.plural(leftovers, "support file")) in ~/Library to the Trash. Put Back restores everything.",
+            title: String(localized: "Uninstall \(items.count) apps?", comment: "Confirmation title"),
+            restoreHint: String(localized: "Moves each app and its \(leftovers) support files in ~/Library to the Trash. Put Back restores everything.",
+                                 comment: "Uninstall confirmation hint; placeholder is the total number of leftover support files"),
             entries: items.map { CleanupEntry($0, displayPath: PathFormat.abbreviate($0.url)) }
         )
     }

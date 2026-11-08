@@ -6,10 +6,33 @@ enum Entry {
     static func main() {
         let args = CommandLine.arguments
         if CommandLineTool.isRequested(args) {
+            // The CLI's output is read by scripts, so it stays English whatever language the app is in.
+            // The argument domain outranks the user's language list and is never written to disk.
+            var arguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+            arguments["AppleLanguages"] = ["en"]
+            UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
             exit(CommandLineTool.run(args, settings: SettingsStore.loadStandard))
         }
         if SingleInstance.handOffToRunningCopy() { exit(0) }
+        LayoutDirection.matchLanguage()
         YokoiApp.main()
+    }
+}
+
+/// AppKit mirrors the layout only when the system language reads right to left. When just Yokoi is set to
+/// Arabic or Hebrew (System Settings → Language & Region → Applications), the text is translated but the
+/// layout stays left to right. AppKit reads these flags from the argument domain (as if passed at launch);
+/// that domain is never written to disk.
+enum LayoutDirection {
+    static func matchLanguage() {
+        guard let language = Bundle.main.preferredLocalizations.first,
+              Locale.Language(identifier: language).characterDirection == .rightToLeft else { return }
+        let defaults = UserDefaults.standard
+        var arguments = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        for key in ["AppleTextDirection", "NSForceRightToLeftWritingDirection"] where arguments[key] == nil {
+            arguments[key] = true
+        }
+        defaults.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
     }
 }
 

@@ -64,10 +64,11 @@ final class ScreenshotsViewModel: SelectionPruning {
 
     func deleteRequest() -> CleanupRequest {
         let n = selectedItems.count
-        let noun = tab == .recordings ? "recording" : "screenshot"
         return CleanupRequest(
-            title: "Delete \(n) \(noun)\(n == 1 ? "" : "s")?",
-            restoreHint: "They go to the Trash, so you can put them back until it's emptied.",
+            title: tab == .recordings
+                ? String(localized: "Delete \(n) recordings?", comment: "Confirmation title: screen recordings")
+                : String(localized: "Delete \(n) screenshots?", comment: "Confirmation title"),
+            restoreHint: String(localized: "They go to the Trash, so you can put them back until it's emptied."),
             entries: entries
         )
     }

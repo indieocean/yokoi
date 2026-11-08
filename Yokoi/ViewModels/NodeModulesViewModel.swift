@@ -87,10 +87,13 @@ final class NodeModulesViewModel: SelectionPruning {
     func cleanupRequest() -> CleanupRequest {
         let items = selectedItems.sorted { $0.size > $1.size }
         let managers = Set(items.map { $0.packageManager ?? .npm })
-        let hint = managers.count == 1 ? managers.first!.installCommand : "your package manager's install command"
+        let hint = managers.count == 1
+            ? String(localized: "You can restore them anytime with `\(managers.first!.installCommand)`.", comment: "Confirmation hint; placeholder is a command like npm install")
+            : String(localized: "You can restore them anytime with your package manager's install command.",
+                     comment: "Confirmation hint when several package managers are involved")
         return CleanupRequest(
-            title: "Remove \(items.count) node_modules folder\(items.count == 1 ? "" : "s")?",
-            restoreHint: "You can restore them anytime with `\(hint)`.",
+            title: String(localized: "Remove \(items.count) node_modules folders?", comment: "Confirmation title; node_modules is a folder name, don't translate"),
+            restoreHint: hint,
             entries: items.map { CleanupEntry($0) }
         )
     }

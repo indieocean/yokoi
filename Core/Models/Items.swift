@@ -156,13 +156,13 @@ enum BigFileKind: String, Codable, Sendable, CaseIterable {
 
     var filterTitle: String {
         switch self {
-        case .video: "Video"
-        case .archive: "Archives"
-        case .diskImage: "Disk images"
-        case .art: "3D / Art"
-        case .vm: "VMs"
-        case .audio: "Audio"
-        case .other: "Other"
+        case .video: String(localized: "Video", comment: "Big-file filter")
+        case .archive: String(localized: "Archives", comment: "Big-file filter")
+        case .diskImage: String(localized: "Disk images", comment: "Big-file filter")
+        case .art: String(localized: "3D / Art", comment: "Big-file filter: 3D models and art files")
+        case .vm: String(localized: "VMs", comment: "Big-file filter: virtual machines")
+        case .audio: String(localized: "Audio", comment: "Big-file filter")
+        case .other: String(localized: "Other", comment: "Big-file filter")
         }
     }
 
@@ -193,13 +193,13 @@ struct BigFileItem: Reclaimable, Codable, Hashable {
     var title: String { url.lastPathComponent }
     var urls: [URL] { [url] }
     var fileCount: Int { 1 }
-    var restoreHint: String { "restore from the Trash if you change your mind" }
+    var restoreHint: String { String(localized: "restore from the Trash if you change your mind", comment: "How to get a removed file back") }
     var safety: SafetyLevel { .review }
     var name: String { url.lastPathComponent }
     var location: String { PathFormat.abbreviate(url.deletingLastPathComponent()) }
     var badge: String {
         let ext = url.pathExtension.uppercased()
-        return ext.isEmpty ? "FILE" : String(ext.prefix(4))
+        return ext.isEmpty ? String(localized: "FILE", comment: "Badge for a file with no extension; keep it 4 letters or fewer") : String(ext.prefix(4))
     }
 }
 
@@ -222,7 +222,7 @@ struct DuplicateFile: Reclaimable, Codable, Hashable {
     var title: String { url.lastPathComponent }
     var urls: [URL] { [url] }
     var fileCount: Int { 1 }
-    var restoreHint: String { "restore from the Trash if you change your mind" }
+    var restoreHint: String { String(localized: "restore from the Trash if you change your mind", comment: "How to get a removed file back") }
     var safety: SafetyLevel { .review }
     var name: String { url.lastPathComponent }
     var location: String { PathFormat.abbreviate(url.deletingLastPathComponent()) }
@@ -235,8 +235,8 @@ struct SkippedFile: Codable, Hashable, Sendable, Identifiable {
 
         var label: String {
             switch self {
-            case .cloudOnly: "In the cloud only"
-            case .unreadable: "Couldn't be read"
+            case .cloudOnly: String(localized: "In the cloud only", comment: "Why a file couldn't be compared for duplicates")
+            case .unreadable: String(localized: "Couldn't be read", comment: "Why a file couldn't be compared for duplicates")
             }
         }
     }
@@ -286,7 +286,7 @@ struct DuplicateGroup: Identifiable, Hashable, Sendable {
     var fileSize: Int64 { files[0].fileSize }
     var badge: String {
         let ext = files[0].url.pathExtension.uppercased()
-        return ext.isEmpty ? "FILE" : String(ext.prefix(4))
+        return ext.isEmpty ? String(localized: "FILE", comment: "Badge for a file with no extension; keep it 4 letters or fewer") : String(ext.prefix(4))
     }
 
     /// What's freed by keeping the copy that frees least. Clones of each other free nothing between them, so
@@ -327,7 +327,7 @@ struct ScreenshotItem: Reclaimable, Codable, Hashable {
     var title: String { url.lastPathComponent }
     var urls: [URL] { [url] }
     var fileCount: Int { 1 }
-    var restoreHint: String { "restore from the Trash if you change your mind" }
+    var restoreHint: String { String(localized: "restore from the Trash if you change your mind", comment: "How to get a removed file back") }
 
     func ageInDays(now: Date = Date()) -> Int { Int(now.timeIntervalSince(created) / 86_400) }
 }
@@ -337,15 +337,15 @@ enum DownloadKind: String, Codable, Sendable, CaseIterable {
 
     var filterTitle: String {
         switch self {
-        case .installer: "Installers"
-        case .archive: "Archives"
-        case .image: "Images"
-        case .video: "Video"
-        case .audio: "Audio"
-        case .document: "Documents"
-        case .folder: "Folders"
-        case .incomplete: "Incomplete"
-        case .other: "Other"
+        case .installer: String(localized: "Installers", comment: "Downloads filter")
+        case .archive: String(localized: "Archives", comment: "Downloads filter")
+        case .image: String(localized: "Images", comment: "Downloads filter")
+        case .video: String(localized: "Video", comment: "Downloads filter")
+        case .audio: String(localized: "Audio", comment: "Downloads filter")
+        case .document: String(localized: "Documents", comment: "Downloads filter")
+        case .folder: String(localized: "Folders", comment: "Downloads filter")
+        case .incomplete: String(localized: "Incomplete", comment: "Downloads filter: partially downloaded files")
+        case .other: String(localized: "Other", comment: "Downloads filter")
         }
     }
 
@@ -403,7 +403,7 @@ struct DownloadItem: Reclaimable, Codable, Hashable {
     var title: String { url.lastPathComponent }
     var name: String { url.lastPathComponent }
     var urls: [URL] { [url] }
-    var restoreHint: String { "restore from the Trash if you change your mind" }
+    var restoreHint: String { String(localized: "restore from the Trash if you change your mind", comment: "How to get a removed file back") }
 
     /// Safe: leftovers with no value of their own. Re-download: installers. Everything else is yours to review.
     var safety: SafetyLevel {
@@ -414,9 +414,9 @@ struct DownloadItem: Reclaimable, Codable, Hashable {
 
     /// Why it's probably clutter, shown next to the name.
     var note: String? {
-        if kind == .incomplete { return "Incomplete download" }
-        if isExtracted { return "Already extracted" }
-        if kind == .installer { return "Installer" }
+        if kind == .incomplete { return String(localized: "Incomplete download", comment: "Note next to a download: the browser never finished it") }
+        if isExtracted { return String(localized: "Already extracted", comment: "Note next to a downloaded archive whose contents sit next to it") }
+        if kind == .installer { return String(localized: "Installer", comment: "Note next to a downloaded installer (.dmg, .pkg)") }
         return nil
     }
 

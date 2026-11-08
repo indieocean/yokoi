@@ -58,10 +58,10 @@ extension ArtifactRule {
                 Target(path: "Intermediate"),
                 Target(path: "DerivedDataCache"),
                 Target(path: "Saved", keepChildren: ["Config"]),
-                Target(path: "Saved/Config", optIn: true, note: "Project and editor settings. Only remove if you know you don't need them."),
-                Target(path: "Binaries", optIn: true, note: "Compiled editor and game binaries. Rebuilding takes a long time."),
+                Target(path: "Saved/Config", optIn: true, note: String(localized: "Project and editor settings. Only remove if you know you don't need them.", comment: "Tooltip for an opt-in Unreal Saved/Config folder")),
+                Target(path: "Binaries", optIn: true, note: String(localized: "Compiled editor and game binaries. Rebuilding takes a long time.", comment: "Tooltip for an opt-in Unreal Binaries folder")),
             ],
-            summary: "Intermediate · Saved · DDC", restoreHint: "reopen the project in Unreal Editor"
+            summary: "Intermediate · Saved · DDC", restoreHint: String(localized: "reopen the project in Unreal Editor", comment: "How to get removed build files back; shown after 'Rebuild anytime:'")
         ),
         ArtifactRule(
             id: "unity", ecosystem: .unity,
@@ -69,9 +69,9 @@ extension ArtifactRule {
             targets: [
                 Target(path: "Library"), Target(path: "Temp"), Target(path: "Obj"), Target(path: "Logs"),
                 Target(path: "*_BackUpThisFolder_ButDontShipItWithYourGame", optIn: true,
-                       note: "IL2CPP build backup. Unity suggests keeping it to symbolicate crash reports from that build."),
+                       note: String(localized: "IL2CPP build backup. Unity suggests keeping it to symbolicate crash reports from that build.", comment: "Tooltip for an opt-in Unity backup folder")),
             ],
-            summary: "Library · Temp", restoreHint: "reopen the project in Unity"
+            summary: "Library · Temp", restoreHint: String(localized: "reopen the project in Unity", comment: "How to get removed build files back; shown after 'Rebuild anytime:'")
         ),
         ArtifactRule(
             id: "gradle", ecosystem: .gradle,
@@ -93,7 +93,7 @@ extension ArtifactRule {
                 Target(path: ".pytest_cache"), Target(path: ".mypy_cache"), Target(path: ".ruff_cache"), Target(path: ".tox"),
                 Target(path: "__pycache__", anywhere: true),
             ],
-            summary: "__pycache__ · .venv", restoreHint: "recreate the virtualenv and reinstall"
+            summary: "__pycache__ · .venv", restoreHint: String(localized: "recreate the virtualenv and reinstall", comment: "How to get removed Python build files back; shown after 'Rebuild anytime:'")
         ),
         ArtifactRule(
             id: "dotnet", ecosystem: .dotnet,
@@ -108,21 +108,21 @@ extension ArtifactRule {
             targets: [
                 Target(path: ".next"), Target(path: ".nuxt"), Target(path: ".svelte-kit"), Target(path: ".turbo"),
                 Target(path: ".parcel-cache"), Target(path: ".angular"),
-                Target(path: "dist", optIn: true, note: "Build output. Some projects commit or publish dist/, so it's opt-in."),
+                Target(path: "dist", optIn: true, note: String(localized: "Build output. Some projects commit or publish dist/, so it's opt-in.", comment: "Tooltip for an opt-in dist/ folder")),
             ],
-            summary: ".next · .turbo · dist", restoreHint: "rebuild the project"
+            summary: ".next · .turbo · dist", restoreHint: String(localized: "rebuild the project", comment: "How to get removed build files back; shown after 'Rebuild anytime:'")
         ),
         ArtifactRule(
             id: "cocoapods", ecosystem: .xcode,
             markers: [.file("Podfile")],
-            targets: [Target(path: "Pods", optIn: true, note: "Some projects commit Pods/ to git, so it's opt-in.")],
+            targets: [Target(path: "Pods", optIn: true, note: String(localized: "Some projects commit Pods/ to git, so it's opt-in.", comment: "Tooltip for an opt-in CocoaPods Pods/ folder"))],
             summary: "Pods", restoreHint: "pod install"
         ),
         ArtifactRule(
             id: "cmake", ecosystem: .cmake,
             markers: [.file("CMakeLists.txt")],
             targets: [Target(path: "build"), Target(path: "cmake-build-*")],
-            summary: "build · cmake-build-*", restoreHint: "re-run cmake"
+            summary: "build · cmake-build-*", restoreHint: String(localized: "re-run cmake", comment: "How to get removed CMake build files back; shown after 'Rebuild anytime:'")
         ),
     ]
 
@@ -155,12 +155,12 @@ struct GlobalArtifactRule: Sendable, Identifiable, Hashable {
         GlobalArtifactRule(
             id: "xcode-deriveddata", ecosystem: .xcode,
             relativePath: "Library/Developer/Xcode/DerivedData",
-            title: "All projects", summary: "DerivedData", restoreHint: "build again in Xcode"
+            title: String(localized: "All projects", comment: "Row title for Xcode DerivedData, which holds build output of every project"), summary: "DerivedData", restoreHint: String(localized: "build again in Xcode", comment: "How to get removed DerivedData back; shown after 'Rebuild anytime:'")
         ),
         GlobalArtifactRule(
             id: "go-build", ecosystem: .go,
             relativePath: "Library/Caches/go-build",
-            title: "go-build", summary: "build cache", restoreHint: "go build"
+            title: "go-build", summary: String(localized: "build cache", comment: "Short summary for the Go build cache"), restoreHint: "go build"
         ),
     ]
 }

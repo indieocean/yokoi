@@ -11,7 +11,7 @@ struct BuildArtifactsView: View {
 
         VStack(spacing: 0) {
             HeaderBar(title: "Build Artifacts",
-                      subtitle: "\(CountFormat.plural(vm.toolchainCount, "toolchain")) · \(ByteFormat.string(store.total(.buildArtifacts)))") {
+                      subtitle: "\(vm.toolchainCount) toolchains · \(ByteFormat.string(store.total(.buildArtifacts)))") {
                 SegmentedTabs(selection: $vm.grouping, items: [
                     .init(value: .language, title: "By language"),
                     .init(value: .project, title: "By project"),
@@ -61,7 +61,8 @@ struct BuildArtifactsView: View {
             .padding(Theme.Metrics.contentPadding)
 
             SelectionBar(state: stateFor(allItems), toggleAll: { vm.toggleAll(allItems) },
-                         count: vm.checked.count, noun: vm.checked.count == 1 ? "target" : "targets", size: vm.selectedSize) {
+                         count: vm.checked.count, selection: "**\(vm.checked.count) targets** selected", size: vm.selectedSize,
+                         reclaim: "**\(ByteFormat.string(vm.selectedSize))** will be reclaimed") {
                 Button("Reveal in Finder") { Finder.reveal(vm.selectedItems.flatMap(\.targets)) }
                     .buttonStyle(.dkSecondary)
                     .disabled(vm.checked.isEmpty)
@@ -139,9 +140,9 @@ private struct ArtifactRow: View {
             }
             if item.optIn {
                 StatusPill(text: "OPT-IN", color: Theme.warning)
-                    .help(item.note ?? "Unchecked by default")
+                    .help(item.note ?? String(localized: "Unchecked by default"))
             }
-            Text(item.optIn ? "risky" : "rebuildable")
+            Text(item.optIn ? String(localized: "risky", comment: "Build artifact: may not be rebuildable") : String(localized: "rebuildable", comment: "Build artifact: rebuilt by its toolchain"))
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.textTertiary)
                 .frame(width: 80, alignment: .leading)

@@ -14,13 +14,13 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
 
     var title: String {
         switch self {
-        case .unavailableSimulators: "Unavailable simulators"
-        case .simulatorRuntimes: "Simulator runtimes"
-        case .localSnapshots: "Local Time Machine snapshots"
-        case .dockerImages: "Unused Docker images"
-        case .dockerBuildCache: "Docker build cache"
-        case .dockerVolumes: "Unused Docker volumes"
-        case .goModuleCache: "Go module cache"
+        case .unavailableSimulators: String(localized: "Unavailable simulators", comment: "Tool cleanup row title")
+        case .simulatorRuntimes: String(localized: "Simulator runtimes", comment: "Tool cleanup row title")
+        case .localSnapshots: String(localized: "Local Time Machine snapshots", comment: "Tool cleanup row title")
+        case .dockerImages: String(localized: "Unused Docker images", comment: "Tool cleanup row title")
+        case .dockerBuildCache: String(localized: "Docker build cache", comment: "Tool cleanup row title")
+        case .dockerVolumes: String(localized: "Unused Docker volumes", comment: "Tool cleanup row title")
+        case .goModuleCache: String(localized: "Go module cache", comment: "Tool cleanup row title")
         }
     }
 
@@ -57,13 +57,13 @@ enum ToolAction: String, CaseIterable, Sendable, Identifiable {
 
     var explanation: String {
         switch self {
-        case .unavailableSimulators: "Simulators whose iOS runtime is no longer installed. Xcode can't boot them."
-        case .simulatorRuntimes: "iOS, watchOS, tvOS and visionOS simulator images. Pick old ones to delete; Xcode › Settings › Components downloads them again."
-        case .localSnapshots: "APFS snapshots macOS keeps between Time Machine backups. macOS frees them on its own when space runs low."
-        case .dockerImages: "Images no container uses, including dangling layers. `docker pull` or a rebuild brings them back."
-        case .dockerBuildCache: "BuildKit layer cache. The next `docker build` is slower while it refills."
-        case .dockerVolumes: "Volumes no container is attached to. They can hold database data, which is lost for good."
-        case .goModuleCache: "Go modules downloaded for your builds. The next `go build` downloads what it needs again. Go makes these files read-only, so they're removed with `go clean -modcache` rather than deleted directly."
+        case .unavailableSimulators: String(localized: "Simulators whose iOS runtime is no longer installed. Xcode can't boot them.")
+        case .simulatorRuntimes: String(localized: "iOS, watchOS, tvOS and visionOS simulator images. Pick old ones to delete; Xcode › Settings › Components downloads them again.")
+        case .localSnapshots: String(localized: "APFS snapshots macOS keeps between Time Machine backups. macOS frees them on its own when space runs low.")
+        case .dockerImages: String(localized: "Images no container uses, including dangling layers. `docker pull` or a rebuild brings them back.")
+        case .dockerBuildCache: String(localized: "BuildKit layer cache. The next `docker build` is slower while it refills.")
+        case .dockerVolumes: String(localized: "Volumes no container is attached to. They can hold database data, which is lost for good.")
+        case .goModuleCache: String(localized: "Go modules downloaded for your builds. The next `go build` downloads what it needs again. Go makes these files read-only, so they're removed with `go clean -modcache` rather than deleted directly.")
         }
     }
 }
@@ -146,20 +146,20 @@ struct ToolActionService: Sendable {
             let runtimes = Self.parseSimulatorRuntimes(r.stdout)
             let items = runtimes.map { rt in
                 ToolActionStatus.Item(id: rt.identifier, label: "\(rt.platform) \(rt.version)",
-                                      detail: rt.build + (rt.deletable ? "" : " · managed by macOS"),
+                                      detail: rt.deletable ? rt.build : String(localized: "\(rt.build) · managed by macOS", comment: "Simulator runtime detail: build number, and macOS manages (and protects) it"),
                                       size: rt.size, date: rt.lastUsed,
                                       command: rt.deletable ? ["xcrun", "simctl", "runtime", "delete", rt.identifier] : nil)
             }
             return ToolActionStatus(action: action, count: runtimes.count, size: runtimes.reduce(0) { $0 + $1.size },
                                     items: items, commands: [],
-                                    note: "Simulators that use a deleted runtime stop booting until it's downloaded again.")
+                                    note: String(localized: "Simulators that use a deleted runtime stop booting until it's downloaded again."))
         case .localSnapshots:
             guard let r = try? await runner.run(["tmutil", "listlocalsnapshots", "/"], timeout: 30), r.succeeded else { return nil }
             let dates = Self.parseSnapshotDates(r.stdout)
             return ToolActionStatus(action: action, count: dates.count, size: nil,
                                     items: dates.map { .init(id: $0, label: $0, command: ["tmutil", "deletelocalsnapshots", $0]) },
                                     commands: dates.map { ["tmutil", "deletelocalsnapshots", $0] },
-                                    note: "macOS may require administrator rights for this. Yokoi never uses sudo; if it fails, run `sudo tmutil deletelocalsnapshots /` yourself.")
+                                    note: String(localized: "macOS may require administrator rights for this. Yokoi never uses sudo; if it fails, run `sudo tmutil deletelocalsnapshots /` yourself."))
         case .dockerImages, .dockerBuildCache, .dockerVolumes:
             return await dockerStatus(action)
         case .goModuleCache:
@@ -172,7 +172,7 @@ struct ToolActionService: Sendable {
             guard count > 0 else { return ToolActionStatus(action: action, count: 0, size: 0, items: [], commands: [], note: nil) }
             return ToolActionStatus(action: action, count: count, size: FileWalker.measure(cache, reclaimable: true).size, items: [],
                                     commands: [["go", "clean", "-modcache"]],
-                                    note: "Cached at \(PathFormat.abbreviate(cache)).")
+                                    note: String(localized: "Cached at \(PathFormat.abbreviate(cache)).", comment: "Where the Go module cache is; the placeholder is a folder path"))
         }
     }
 
@@ -189,7 +189,7 @@ struct ToolActionService: Sendable {
             let items = count > 0 ? await unusedDockerImages() : []
             return ToolActionStatus(action: action, count: count, size: u.reclaimable, items: items,
                                     commands: count > 0 ? [["docker", "image", "prune", "--all", "--force"]] : [],
-                                    note: items.isEmpty ? nil : "Sizes include layers images share, so single items can add up to more than the total.")
+                                    note: items.isEmpty ? nil : String(localized: "Sizes include layers images share, so single items can add up to more than the total."))
         case .dockerBuildCache:
             guard let u = usage["Build Cache"] else { return nil }
             let count = u.reclaimable > 0 ? max(u.total - u.active, 1) : 0
@@ -202,7 +202,7 @@ struct ToolActionService: Sendable {
             // Named volumes are listed one by one, so exactly these and nothing created since are removed.
             return ToolActionStatus(action: action, count: names.count, size: names.isEmpty ? 0 : usage["Local Volumes"]?.reclaimable,
                                     items: names.map { .init(id: $0, label: $0, command: ["docker", "volume", "rm", $0]) }, commands: names.isEmpty ? [] : [["docker", "volume", "rm"] + names],
-                                    note: "Volume data can't be put back. Check the list for databases you still need.")
+                                    note: String(localized: "Volume data can't be put back. Check the list for databases you still need."))
         default:
             return nil
         }
@@ -226,7 +226,7 @@ struct ToolActionService: Sendable {
             // Removing every tag deletes the image; an untagged image is removed by id.
             let refs = image.tags.isEmpty ? [image.id] : image.tags
             return ToolActionStatus.Item(id: image.id, label: image.tags.first ?? "<none>",
-                                         detail: image.tags.count > 1 ? "+\(image.tags.count - 1) tag\(image.tags.count == 2 ? "" : "s")" : String(image.id.replacingOccurrences(of: "sha256:", with: "").prefix(12)),
+                                         detail: image.tags.count > 1 ? String(localized: "+\(image.tags.count - 1) tags", comment: "Docker image with more tags than the one shown") : String(image.id.replacingOccurrences(of: "sha256:", with: "").prefix(12)),
                                          size: image.size, date: image.created, command: ["docker", "image", "rm"] + refs)
         }
     }

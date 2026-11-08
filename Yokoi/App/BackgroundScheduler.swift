@@ -96,8 +96,9 @@ final class BackgroundScheduler {
         if d.autoCleanSafeCaches { await runAutoClean(permanent: d.autoCleanPermanent) }
         let threshold = Int64(d.notifyThresholdGB) * 1_000_000_000
         if threshold > 0, store.reclaimableTotal >= threshold {
-            await notify("\(ByteFormat.string(store.reclaimableTotal)) can be reclaimed",
-                         "Open Yokoi to review node_modules, build artifacts and caches.")
+            await notify(String(localized: "\(ByteFormat.string(store.reclaimableTotal)) can be reclaimed",
+                                comment: "Notification title; placeholder is a size like 12 GB"),
+                         String(localized: "Open Yokoi to review node_modules, build artifacts and caches.", comment: "Notification body"))
         }
     }
 
@@ -109,8 +110,20 @@ final class BackgroundScheduler {
         let outcome = await store.perform(entries, action: permanent ? .delete : .trash)
         guard !outcome.dryRun, outcome.bytes > 0 else { return }
         let size = ByteFormat.string(outcome.bytes)
-        let skipped = blocked.isEmpty ? "" : " \(CountFormat.plural(blocked.count, "item")) in use left alone."
-        await notify("Auto-clean finished", (permanent ? "Permanently deleted \(size)." : "Moved \(size) to the Trash.") + skipped)
+        let body: String
+        switch (permanent, blocked.count) {
+        case (true, 0):
+            body = String(localized: "Permanently deleted \(size).", comment: "Auto-clean notification body; placeholder is a size like 1.2 GB")
+        case (false, 0):
+            body = String(localized: "Moved \(size) to the Trash.", comment: "Auto-clean notification body; placeholder is a size like 1.2 GB")
+        case (true, let n):
+            body = String(localized: "Permanently deleted \(size). \(n) items in use left alone.",
+                          comment: "Auto-clean notification body; first placeholder is a size, second the number of skipped items")
+        case (false, let n):
+            body = String(localized: "Moved \(size) to the Trash. \(n) items in use left alone.",
+                          comment: "Auto-clean notification body; first placeholder is a size, second the number of skipped items")
+        }
+        await notify(String(localized: "Auto-clean finished", comment: "Notification title"), body)
     }
 
     /// Daily: move (or trash) screenshots older than N days, as chosen in the Screenshots action panel.
@@ -125,8 +138,11 @@ final class BackgroundScheduler {
             : .move(destination: PathFormat.expand(d.screenshotDestination), organizeByDate: d.screenshotOrganizeByDate)
         let outcome = await store.perform(entries, action: action)
         if !outcome.dryRun, outcome.itemCount > 0 {
-            let verb = d.screenshotAutoAction == .delete ? "Moved to Trash" : "Filed"
-            await notify("\(verb) \(CountFormat.plural(outcome.itemCount, "screenshot"))", "Older than \(d.screenshotAgeDays) days.")
+            let count = outcome.itemCount
+            let title = d.screenshotAutoAction == .delete
+                ? String(localized: "Moved to Trash \(count) screenshots", comment: "Notification title after the daily screenshot rule trashed screenshots")
+                : String(localized: "Filed \(count) screenshots", comment: "Notification title after the daily screenshot rule moved screenshots into a folder")
+            await notify(title, String(localized: "Older than \(d.screenshotAgeDays) days.", comment: "Notification body: the screenshot age rule"))
         }
     }
 

@@ -9,8 +9,8 @@ struct CachesView: View {
         let sections = vm.sections(search: app.search)
 
         VStack(spacing: 0) {
-            HeaderBar(title: CleanCategory.caches.title,
-                      subtitle: "\(CountFormat.plural(store.caches.count, "location")) · \(ByteFormat.string(store.total(.caches)))") {
+            HeaderBar(title: "\(CleanCategory.caches.title)",
+                      subtitle: "\(store.caches.count) locations · \(ByteFormat.string(store.total(.caches)))") {
                 Button("Select safe only") { vm.selectSafeOnly() }.buttonStyle(.dkSecondary)
                 RescanButton(category: .caches)
             }
@@ -30,7 +30,7 @@ struct CachesView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(sections.filter { $0.section != .trash }) { section in
-                                SectionLabel(text: section.section.rawValue)
+                                SectionLabel(verbatim: section.section.title)
                                     .padding(.horizontal, 20)
                                     .padding(.top, 16)
                                     .padding(.bottom, 8)
@@ -66,7 +66,8 @@ struct CachesView: View {
             .padding(Theme.Metrics.contentPadding)
 
             SelectionBar(state: vm.allState, toggleAll: vm.toggleAll,
-                         count: vm.selectedCount, noun: vm.selectedCount == 1 ? "cache" : "caches", size: vm.selectedSize) {
+                         count: vm.selectedCount, selection: "**\(vm.selectedCount) caches** selected", size: vm.selectedSize,
+                         reclaim: "**\(ByteFormat.string(vm.selectedSize))** will be reclaimed") {
                 Button("Reveal in Finder") { Finder.reveal(vm.selectedURLs) }
                     .buttonStyle(.dkSecondary)
                     .disabled(vm.selectedCount == 0)
@@ -130,7 +131,7 @@ private struct CacheRow<Accessory: View>: View {
                     .foregroundStyle(Theme.textPrimary)
                 if let n = item.children?.count, n > 0 {
                     Text("\(n)").font(Theme.mono(10.5)).foregroundStyle(Theme.textTertiary)
-                        .help(CountFormat.plural(n, "item"))
+                        .help("\(n) items")
                 }
             }
             .frame(width: 280, alignment: .leading)
@@ -140,7 +141,7 @@ private struct CacheRow<Accessory: View>: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 12)
-            StatusPill(text: item.permanentOnly ? "PERMANENT" : item.safety.label, color: item.permanentOnly ? Theme.danger : item.safety.color)
+            StatusPill(text: item.permanentOnly ? String(localized: "PERMANENT", comment: "Status pill: can only be deleted for good") : item.safety.label, color: item.permanentOnly ? Theme.danger : item.safety.color)
                 .help(item.restoreHint)
                 .frame(width: 110, alignment: .leading)
             accessory
@@ -190,7 +191,7 @@ private struct TrashCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Text("Trash").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.textPrimary)
-                    Text(count == 0 ? "empty" : CountFormat.plural(count, "item"))
+                    Text(count == 0 ? String(localized: "empty", comment: "The Trash has nothing in it") : String(localized: "\(count) items"))
                         .font(Theme.mono(11.5)).foregroundStyle(Theme.textTertiary)
                 }
                 Text("Files you already deleted, not a cache. Emptying the Trash can't be undone.")
@@ -212,20 +213,22 @@ private struct TrashCard: View {
 struct Twisty: View {
     let expanded: Bool?
     let action: () -> Void
+    @Environment(\.layoutDirection) private var direction
 
     var body: some View {
         Group {
             if let expanded {
                 Button(action: action) {
-                    Image(systemName: "chevron.right")
+                    // `forward` points left in right-to-left languages, so it turns the other way to point down.
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(Theme.textSecondary)
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                        .rotationEffect(.degrees(expanded ? (direction == .rightToLeft ? -90 : 90) : 0))
                         .frame(width: 14, height: 24)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(expanded ? "Collapse" : "Expand")
+                .accessibilityLabel(expanded ? Text("Collapse") : Text("Expand"))
             } else {
                 Color.clear.frame(width: 14, height: 24)
             }
@@ -312,24 +315,24 @@ private struct ToolActionsSection: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(action.title).font(.system(size: 13.5)).foregroundStyle(Theme.textPrimary)
                         Text(LocalizedStringKey(action.explanation)).font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary).lineLimit(1)
-                            .help(status == nil && action.isDocker && tools.loaded ? "Docker isn't installed or its engine isn't running." : action.explanation)
+                            .help(status == nil && action.isDocker && tools.loaded ? String(localized: "Docker isn't installed or its engine isn't running.") : action.explanation)
                     }
                     Spacer(minLength: 12)
                     Group {
                         if let status {
-                            Text(status.count == 0 ? "none"
-                                 : picked.isEmpty ? CountFormat.plural(status.count, action.noun)
-                                 : "\(picked.count) of \(status.count) picked")
+                            Text(status.count == 0 ? String(localized: "none", comment: "Tool cleanup: nothing to delete")
+                                 : picked.isEmpty ? action.countPhrase(status.count)
+                                 : String(localized: "\(picked.count) of \(status.count) picked", comment: "Tool cleanup: items picked under the twisty"))
                                 .font(Theme.mono(11.5)).foregroundStyle(picked.isEmpty ? Theme.textSecondary : Theme.accentLight)
                         } else {
-                            Text(tools.loaded ? "unavailable" : "not checked").font(Theme.mono(11.5)).foregroundStyle(Theme.textTertiary)
+                            Text(tools.loaded ? String(localized: "unavailable", comment: "Tool cleanup: the tool isn't available") : String(localized: "not checked", comment: "Tool cleanup: not checked yet")).font(Theme.mono(11.5)).foregroundStyle(Theme.textTertiary)
                         }
                     }
                     .frame(width: 110, alignment: .leading)
                     Button("Delete…") { if let r = status.flatMap({ tools.cleanupRequest(for: $0) }) { app.requestCleanup(r) } }
                         .buttonStyle(DKButtonStyle(kind: .danger, compact: true))
                         .disabled((status?.count ?? 0) == 0 || tools.running || status.flatMap { tools.cleanupRequest(for: $0) } == nil)
-                        .help(action.requiresSelection && picked.isEmpty ? "Open the list and pick the ones to delete." : "")
+                        .help(action.requiresSelection && picked.isEmpty ? String(localized: "Open the list and pick the ones to delete.") : "")
                     Text(status?.size.map(ByteFormat.string) ?? "—").font(Theme.mono(12, .medium)).foregroundStyle(Theme.textPrimary)
                         .frame(width: 80, alignment: .trailing)
                 }
@@ -367,11 +370,11 @@ private struct ToolItemRow: View {
                     Text(detail).font(Theme.mono(11)).foregroundStyle(Theme.textSecondary).lineLimit(1)
                 }
             }
-            .help(item.command.map { "$ " + $0.joined(separator: " ") } ?? "Can't be deleted on its own.")
+            .help(item.command.map { "$ " + $0.joined(separator: " ") } ?? String(localized: "Can't be deleted on its own."))
             Spacer(minLength: 12)
             Text(item.date.map { RelativeDate.string($0) } ?? "")
                 .font(.system(size: 11.5)).foregroundStyle(Theme.textTertiary)
-                .help(item.date.map { "Last used or created " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "")
+                .help(item.date.map { String(localized: "Last used or created \($0.formatted(date: .abbreviated, time: .shortened))", comment: "Placeholder is a date and time") } ?? "")
                 .frame(width: 110, alignment: .leading)
             Text(item.size.map(ByteFormat.string) ?? "—").font(Theme.mono(12, .medium)).foregroundStyle(Theme.textPrimary)
                 .frame(width: 80, alignment: .trailing)
