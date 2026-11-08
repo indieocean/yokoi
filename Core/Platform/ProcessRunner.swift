@@ -20,6 +20,9 @@ actor ProcessRunner {
         let stderr: String
         let duration: TimeInterval
         let timedOut: Bool
+        /// False when the output pipes were still open after `drainTimeout` (a background child holding them),
+        /// so the output may be cut short.
+        var reachedEOF = true
 
         var succeeded: Bool { exitCode == 0 && !timedOut }
         var commandLine: String { command.map(ProcessRunner.quote).joined(separator: " ") }
@@ -264,9 +267,12 @@ actor ProcessRunner {
             throw error
         }
         // Wait for EOF on both pipes, but not forever: a background child can keep them open.
+        let reachedEOF = DataBox()
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             let resumed = Once()
-            drained.notify(queue: .global()) { if resumed.claim() { cont.resume() } }
+            drained.notify(queue: .global()) {
+                if resumed.claim() { reachedEOF.append(Data([1])); cont.resume() }
+            }
             DispatchQueue.global().asyncAfter(deadline: .now() + drainTimeout) { if resumed.claim() { cont.resume() } }
         }
         stopReading()
@@ -276,7 +282,8 @@ actor ProcessRunner {
                       stdout: String(decoding: outData.data, as: UTF8.self),
                       stderr: String(decoding: errData.data, as: UTF8.self),
                       duration: Date().timeIntervalSince(start),
-                      timedOut: !timedOut.data.isEmpty)
+                      timedOut: !timedOut.data.isEmpty,
+                      reachedEOF: !reachedEOF.data.isEmpty)
     }
 
     /// `arg` in single quotes whatever it holds, for a command that deletes: nothing in it is left to the shell.

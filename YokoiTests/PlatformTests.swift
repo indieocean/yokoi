@@ -140,6 +140,7 @@ struct PlatformTests {
         #expect(r.succeeded)
         #expect(!r.timedOut)
         #expect(r.stdout == "started\n")
+        #expect(!r.reachedEOF, "the drain timeout ended the wait")
         #expect(elapsed < .seconds(ProcessRunner.drainTimeout + 4), "didn't wait for the background child")
     }
 
@@ -149,7 +150,8 @@ struct PlatformTests {
         #expect(r.succeeded)
         #expect(r.stdout.split(separator: "\n").count == 20000)
         #expect(r.stdout.hasSuffix("20000\n"))
-        #expect(r.duration < 3, "EOF arrives right away, no drain timeout")
+        // Not a stopwatch check: on a loaded CI runner a correct run can take longer than the drain timeout.
+        #expect(r.reachedEOF, "EOF arrives on both pipes; the drain timeout isn't what ends the wait")
     }
 
     @Test func detectsAProcessWorkingInAFolder() async throws {
