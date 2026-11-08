@@ -191,6 +191,8 @@ struct CategoryRingCard: View {
                         } icon: {
                             Image(systemName: "arrow.clockwise")
                         }
+                        // One line in every language, so both buttons stay the same height.
+                        .lineLimit(1).minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.dkPrimary)
@@ -202,6 +204,7 @@ struct CategoryRingCard: View {
                             entries: smart))
                     } label: {
                         Label("Clean · \(ByteFormat.string(smartSize))", systemImage: "delete.left")
+                            .lineLimit(1).minimumScaleFactor(0.7)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.dkDanger)
