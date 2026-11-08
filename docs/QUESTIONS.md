@@ -3,7 +3,7 @@
 Questions that came up while building the MVP unattended. Each has the decision I made so work
 could continue. Answer or override any of them and I'll adjust.
 
-This is a log, so the entries below stay as written. For what happened since, see [Status at 1.6.0](#status-at-160).
+This is a log, so the entries below stay as written. For what happened since, see [Status at 1.7.0](#status-at-170).
 
 ## Spec conflicts I resolved
 
@@ -93,13 +93,13 @@ This is a log, so the entries below stay as written. For what happened since, se
 - Scheduled jobs would have crashed: Swift 6 asserted main-thread isolation on a background callback.
 - ⌘-number shortcuts would have trapped with 10 screens; capped at ⌘1–⌘9.
 
-## Status at 1.6.0
+## Status at 1.7.0
 
 Settled since these were written:
 
 - **2, 3.** Yokoi now runs `xcrun simctl`, `tmutil`, `docker` and other tools. Cache locations are still cleaned by removing a folder's contents.
 - **8.** Sizes of cleanable folders now count only what cleaning frees, including hard links and clones.
-- **14.** Scheduling, the menu bar helper, launch at login and the auto rule are all built.
+- **14.** Scheduling, the menu bar helper, launch at login and the auto rule are all built. Launch at login follows the status in System Settings.
 - **18.** The project is in git and public at `indieocean/yokoi`.
 - **24.** Auto-clean stayed, and it's wider now: Safe caches, or everything Smart Select takes. It uses the Trash unless "Delete permanently" is on.
 

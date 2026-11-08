@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Owner | Michael Irizarry |
-| Status | Living spec · built through v1.6.0 · updated Nov 6, 2026 |
+| Status | Living spec · built through v1.7.0 · updated Nov 8, 2026 |
 | Platform | Native macOS (Swift / SwiftUI) |
 | Design refs | [DESIGN.md](DESIGN.md) · [contact sheet](../assets/ui/00-contact-sheet.png) |
 
@@ -196,7 +196,7 @@ This has no sidebar item of its own: it's the project view under **Package Manag
 
 ## 8. Menu bar helper
 - `MenuBarExtra` showing free space and reclaimable space, last scan, **Scan now**, **Clean safe items** (opens a confirmation), and Open Yokoi.
-- Runs scheduled scans and the screenshot rule while the main window is closed. Launch at login via `SMAppService.mainApp`.
+- Runs scheduled scans and the screenshot rule while the main window is closed. Launch at login via `SMAppService.mainApp`. The Settings toggle shows macOS's own status, so it follows changes made in System Settings → Login Items, and offers to open that pane when Yokoi is switched off there.
 - User notifications for threshold alerts and finished auto-actions.
 
 ## 9. Non-functional requirements
@@ -211,7 +211,7 @@ This has no sidebar item of its own: it's the project view under **Package Manag
 | Accessibility | Full VoiceOver labels, keyboard navigation (⌘K, ⌘⌫, space to Quick Look), Dynamic Type where possible, respects Reduce Motion/Transparency, color never the only signal (pills carry text). |
 | Appearance | Dark only. Light mode isn't built. |
 | Min OS | macOS 14 Sonoma (Observation, latest SwiftUI Table/Inspector, SMAppService). |
-| Localization | English only. Strings aren't externalized yet. |
+| Localization | The app is in English, Japanese, Simplified and Traditional Chinese, Korean, Spanish, Portuguese (Brazil), German, French, Arabic and Hebrew, from one String Catalog (`Yokoi/Localizable.xcstrings`). It follows the Mac's language or the per-app choice in System Settings, with no picker of its own. Arabic and Hebrew mirror the layout. The CLI, cleanup log and website stay English. The translations are drafts awaiting native review. |
 
 ### Distribution tradeoff
 | | Mac App Store (sandboxed) | Direct (Developer ID + notarized) |
@@ -253,7 +253,7 @@ This has no sidebar item of its own: it's the project view under **Package Manag
 |---|---|
 | **MVP (v1.0)** | Dashboard, node_modules, Build Artifacts (Rust, Xcode, Swift PM, Gradle, Python, Unity, Unreal), Caches (Safe + Re-download levels), Big Files, Screenshots (manual move/delete), confirmation sheet, Trash default + dry run + exclusions + active-project protection + log, Settings (locations, exclusions, safety), direct distribution, macOS 14+ |
 | **v1.1** | Package managers (npm -g, pnpm -g, Homebrew formulae/casks, Cargo, pip, gem) with update/uninstall confirmation, screenshot auto rule, scheduling + menu bar helper + notifications, Go/.NET/CMake detectors, Xcode simulators/archives (Review level), undo from log |
-| **Shipped through v1.6** | FSEvents incremental index, Applications, External Drives, Docker, Android SDK/emulators, 17 package managers, CLI (`yokoi scan`, `yokoi clean`), Shortcuts/App Intents, Downloads, Duplicates (§5.9), auto-clean, AI agent cleanup (§5.4) |
+| **Shipped through v1.7** | FSEvents incremental index, Applications, External Drives, Docker, Android SDK/emulators, 17 package managers, CLI (`yokoi scan`, `yokoi clean`), Shortcuts/App Intents, Downloads, Duplicates (§5.9), auto-clean, AI agent cleanup (§5.4), 11 languages with right-to-left layout (§9) |
 | **Later** | Per-project "archive & restore" (lockfile kept, deps removed), light mode, App Store Lite edition |
 
 ## 13. Risks & open questions

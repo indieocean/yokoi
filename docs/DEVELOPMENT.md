@@ -143,7 +143,8 @@ simulators, local Time Machine snapshots), Big Files, **Duplicates**, **Download
 drive in scans), **Package Managers** (17 managers with confirmed update/uninstall, and project `node_modules` under npm),
 confirmation sheet, Put Back (undo from the log), open-project blocking, menu bar helper, scheduled scans,
 launch at login, notifications, Settings, **Docker** (unused images, build cache, dangling volumes via `docker`),
-**Android** (AVDs, system images, SDK and build caches, Gradle wrapper dists), the **`yokoi` CLI**, **App Intents** and auto-clean.
+**Android** (AVDs, system images, SDK and build caches, Gradle wrapper dists), the **`yokoi` CLI**, **App Intents**, auto-clean
+and **11 languages** with right-to-left layout ([Translations](#translations)).
 
 Extra safety added with these:
 - Personal data is hard-blocked regardless of roots: Keychains, Mail, Messages, iCloud Drive

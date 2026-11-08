@@ -42,6 +42,7 @@ Sidebar nav item (icon, label, mono count badge), disk-usage capsule, KPI tile, 
 - Big Files: `Slider` on a log scale. Reveal uses `NSWorkspace.shared.activateFileViewerSelecting`.
 - Screenshots: `LazyVGrid(.adaptive(min:150))`, `QLThumbnailGenerator`, and `NSOpenPanel` (canChooseDirectories) for "Move to folder…". The auto rule runs on a background schedule.
 - Package managers: shell out via `Process` (`npm outdated -g --json`, `brew outdated --json=v2`, `cargo install --list`, `pip list --outdated --format=json`, `gem outdated`). Always confirm before uninstalling.
+- Every label must survive translation: longer German and French text, CJK, and Arabic/Hebrew mirrored right to left. Give text room to grow or shrink (`.lineLimit(1).minimumScaleFactor`) instead of fixed widths, use leading/trailing rather than left/right, and direction-aware symbols (`chevron.forward`, not `chevron.right`).
 - Menu bar helper: `MenuBarExtra("Yokoi", systemImage: "internaldrive")`, plus `SMAppService.mainApp` for launch at login.
 - Scheduling: `NSBackgroundActivityScheduler`. Exclusions are stored as globs. Ask for Full Disk Access on first run.
 
