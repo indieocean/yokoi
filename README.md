@@ -201,6 +201,7 @@ Yokoi works without it too. It just skips what it can't read.
 - Optional **menu bar helper** shows free and reclaimable space, with one-click access.
 - Optional **scheduled scans** (daily, weekly or monthly) run at low priority, with a notification when reclaimable space passes a threshold.
 - Optional **auto-clean** runs after each scheduled scan with no confirmation. Choose Safe caches or everything Smart Select takes, and the Trash or permanent delete.
+- **In your language:** English, Japanese, Simplified and Traditional Chinese, Korean, Spanish, Portuguese (Brazil), German, French, Arabic and Hebrew. Yokoi follows your Mac's language; to choose one just for Yokoi, use **System Settings → General → Language & Region → Applications**. Arabic and Hebrew read right to left. The `yokoi` command line stays in English, so scripts keep working.
 - **Shortcuts and Siri:** *Scan for Reclaimable Space* (returns bytes), *Get Free Disk Space* and *Open Yokoi* on any screen. None of them deletes anything.
 
 ### Command line
@@ -281,6 +282,12 @@ No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for adminis
 </details>
 
 <details>
+<summary><strong>Can I use Yokoi in my language?</strong></summary>
+<br>
+Yokoi is available in English, Japanese, Simplified and Traditional Chinese, Korean, Spanish, Portuguese (Brazil), German, French, Arabic and Hebrew. It uses your Mac's language automatically. To use a different language just for Yokoi, open <strong>System Settings → General → Language & Region</strong>, add Yokoi under <em>Applications</em> and pick a language, then reopen Yokoi. The translations are new, so if something reads oddly in your language, please <a href="https://github.com/indieocean/yokoi/issues">open an issue</a>.
+</details>
+
+<details>
 <summary><strong>What does "garbage collected" mean here?</strong></summary>
 <br>
 It's the same idea as in a runtime: find what's no longer reachable from your active work, such as stale dependencies, rebuildable output and caches nobody reads, and reclaim it, without touching anything still in use.
@@ -299,12 +306,15 @@ It's the same idea as in a runtime: find what's no longer reachable from your ac
 - [x] Duplicate finder
 - [x] Scheduled auto-clean
 - [x] `yokoi clean`, to the Trash or permanently
+- [x] Translated into 10 languages, with right-to-left layout for Arabic and Hebrew
 
 <br>
 
 ## Contributing
 
 Issues and pull requests are welcome. Start with [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the architecture, the rule tables and how to run the test suite (`⌘U`).
+
+**Translations** are welcome too: add your language or review an existing one. All of Yokoi's text is in one file, `Yokoi/Localizable.xcstrings`; [Translations](docs/DEVELOPMENT.md#translations) explains how to edit and preview it.
 
 <br>
 

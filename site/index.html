@@ -265,6 +265,7 @@
             <li>Scheduled scans that notify you when reclaimable space passes a threshold</li>
             <li>Optional auto-clean after each scheduled scan</li>
             <li>Shortcuts and Siri actions that report, and never delete</li>
+            <li>In 11 languages, from Japanese and Chinese to Arabic and Hebrew, read right to left</li>
           </ul>
         </div>
         <div class="window reveal">
@@ -309,6 +310,7 @@
         <details class="reveal"><summary>Why isn't Yokoi sandboxed?</summary><p>The App Sandbox only lets an app into folders you pick in an Open panel, and it can't run other programs. A cleaner that measures <code>~/Library/Caches</code>, <code>node_modules</code> across your projects and Xcode's folders, and runs <code>brew</code>, <code>npm</code> or <code>docker</code> to clean up after them, can't work inside it. Yokoi is notarized and built with the Hardened Runtime and no exception entitlements: no unsigned code, no injected libraries, no debugger attach.</p></details>
         <details class="reveal"><summary>Does it need my password or run anything as root?</summary><p>No. Yokoi never uses <code>sudo</code>. A few actions macOS reserves for administrators, like removing root-owned files, are shown as commands you can run yourself.</p></details>
         <details class="reveal"><summary>How does it update?</summary><p>Through <a href="https://sparkle-project.org">Sparkle</a>. Every update is signed, and Sparkle refuses one whose signature doesn't match. You choose whether it checks automatically.</p></details>
+        <details class="reveal"><summary>Can I use Yokoi in my language?</summary><p>Yokoi is available in English, Japanese, Simplified and Traditional Chinese, Korean, Spanish, Portuguese (Brazil), German, French, Arabic and Hebrew. It uses your Mac's language automatically. To use a different language just for Yokoi, open <b>System Settings → General → Language &amp; Region</b>, add Yokoi under <em>Applications</em> and pick a language, then reopen Yokoi. The translations are new, so if something reads oddly, please <a href="https://github.com/indieocean/yokoi/issues">open an issue</a>.</p></details>
         <details class="reveal"><summary>What does "garbage collected" mean here?</summary><p>It's the same idea as in a runtime: find what's no longer reachable from your active work, such as stale dependencies, rebuildable output and caches nobody reads, and reclaim it without touching anything still in use.</p></details>
       </div>
     </section>

@@ -39,10 +39,72 @@ every screen, the confirmation sheet and a dry-run cleanup animation to PNG, the
 | `Yokoi/Views`, `Theme` | Screens, confirmation sheet, design-system components, palette (asset catalog + `Theme`). |
 | `YokoiTests` | Swift Testing suites against a throwaway fixture home folder. |
 
-## Adding a language / engine
+## Adding a programming language / engine
 
 Add one entry to `ArtifactRule.all` in `Core/Models/ArtifactRule.swift`: markers, target folders,
 opt-in flags and a restore hint. Badge color and name go in `Ecosystem` (`Core/Models/Categories.swift`).
+
+## Translations
+
+Every string the app shows lives in one file, [`Yokoi/Localizable.xcstrings`](../Yokoi/Localizable.xcstrings)
+(an Xcode String Catalog). Each entry has the English text, a note for translators and every language's translation.
+Yokoi is in English, Japanese, Simplified and Traditional Chinese, Korean, Spanish, Portuguese (Brazil), German,
+French, Arabic and Hebrew. The first translations were machine drafts, so every string is still marked
+**Needs Review**.
+
+### Adding a language
+
+1. Open `Yokoi.xcodeproj` and select `Localizable.xcstrings`.
+2. Click **+** under the language list and pick the language. Xcode adds it to the project.
+3. Translate each string. Strings with a count ask for every plural form your language needs ("1 file", "5 files").
+   Anything left empty falls back to English, so a partial translation still works.
+4. Run it in that language and check the screens (see below), then open a pull request.
+
+The file is JSON and can be edited without Xcode, but it's large and plural entries are nested, so Xcode is much easier.
+
+### Reviewing a language
+
+Fix what reads oddly, then right-click the string and choose **Mark as Reviewed**. A pull request that reviews part of a
+language is welcome too.
+
+### What to keep as is
+
+- Product and tool names: Yokoi, npm, Homebrew, Xcode, Docker, Time Machine…
+- Anything in backticks, paths, file names, commands and `node_modules`.
+- Placeholders (`%@`, `%lld`, `%1$@`) and `**bold**` markers. You can reorder placeholders with positions (`%2$@ %1$@`).
+- macOS terms (Trash, Put Back, Login Items, Full Disk Access): use the exact words macOS uses in your language.
+
+Keep buttons and labels about as short as the English: many sit in tight spaces.
+
+### Previewing a language
+
+Run with a language for one launch, without changing your settings (in Xcode: **Product › Scheme › Edit Scheme ›
+Run › Options › App Language**, or from the terminal):
+
+```sh
+Yokoi.app/Contents/MacOS/Yokoi -AppleLanguages "(ja)"
+```
+
+To check every screen at once, add it to the demo snapshot command (Debug build):
+
+```sh
+Yokoi.app/Contents/MacOS/Yokoi -YokoiDemo YES -ApplePersistenceIgnoreState YES -DKSnapshotDir /tmp/shots -AppleLanguages "(ja)"
+```
+
+Arabic and Hebrew mirror the whole layout. `LayoutDirection` in `Yokoi/App/YokoiApp.swift` turns this on when Yokoi's
+language reads right to left, even if the Mac's doesn't.
+
+### Writing new UI text
+
+- SwiftUI string literals (`Text("Scan")`, `Button("Clean")`) and `LocalizedStringKey` parameters are translated
+  automatically. Use `String(localized: "…", comment: "…")` for strings built in code, with a comment that says where
+  the string appears and what each placeholder is.
+- Interpolate counts as numbers (`"\(n) items"`) so the catalog can add plural forms. Don't build plurals by hand.
+- Data that shouldn't be translated (paths, project names, tool output) goes through `Text(verbatim:)` or the
+  `verbatim:` initializers on Yokoi's own components.
+- Build once: Xcode adds new strings to the catalog, where they show as untranslated.
+- The `yokoi` command line, the cleanup log and `HeadlessClean` stay English, since scripts read them. The CLI forces
+  English at launch (`Entry.main`).
 
 ## Safety model (as built)
 
