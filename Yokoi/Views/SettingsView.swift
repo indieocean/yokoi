@@ -372,12 +372,17 @@ private struct ScheduleCard: View {
                 SettingRow(title: "Show in menu bar", subtitle: "Free space + one-click clean") {
                     Toggle("", isOn: $settings.data.showInMenuBar).toggleStyle(.dk).fixedSize()
                 }
-                SettingRow(title: "Launch at login", subtitle: app.scheduler.loginItemError, divider: false) {
-                    Toggle("", isOn: Binding(get: { settings.data.launchAtLogin }, set: { on in
-                        settings.data.launchAtLogin = on
-                        app.scheduler.setLaunchAtLogin(on)
-                    }))
-                    .toggleStyle(.dk).fixedSize()
+                SettingRow(title: "Launch at login", subtitle: loginItemSubtitle, divider: false) {
+                    HStack(spacing: 10) {
+                        if app.scheduler.loginItem == .needsApproval {
+                            Button("Open Login Items") { app.scheduler.openLoginItemsSettings() }
+                                .buttonStyle(DKButtonStyle(kind: .secondary, compact: true))
+                        }
+                        Toggle("", isOn: Binding(get: { app.scheduler.loginItem != .off }, set: { on in
+                            app.scheduler.setLaunchAtLogin(on)
+                        }))
+                        .toggleStyle(.dk).fixedSize()
+                    }
                 }
             }
         }
@@ -385,6 +390,17 @@ private struct ScheduleCard: View {
         .onChange(of: settings.data.autoScan) { _, on in
             if on { Task { await app.scheduler.requestNotificationPermission() } }
         }
+        // Login Items can be changed in System Settings, so check again whenever Yokoi comes back.
+        .onAppear { if !app.store.isDemo { app.scheduler.refreshLoginItem() } }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if !app.store.isDemo { app.scheduler.refreshLoginItem() }
+        }
+    }
+
+    private var loginItemSubtitle: String? {
+        if let error = app.scheduler.loginItemError { return error }
+        if app.scheduler.loginItem == .needsApproval { return "Turned off in System Settings. Allow Yokoi in Login Items" }
+        return nil
     }
 }
 

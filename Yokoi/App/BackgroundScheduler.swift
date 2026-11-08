@@ -1,19 +1,24 @@
 import Foundation
+import Observation
 import ServiceManagement
 import UserNotifications
 
 /// Scheduled scans, the screenshot auto rule, launch at login and notifications (PRD §7–8).
 /// Uses `NSBackgroundActivityScheduler`, so macOS runs the work at low priority when convenient.
 @MainActor
+@Observable
 final class BackgroundScheduler {
-    private let settings: SettingsStore
-    private let store: ScanStore
-    private var scanActivity: NSBackgroundActivityScheduler?
-    private var screenshotActivity: NSBackgroundActivityScheduler?
-    private var configured: (autoScan: Bool, frequency: ScanFrequency, rule: Bool)?
+    @ObservationIgnored private let settings: SettingsStore
+    @ObservationIgnored private let store: ScanStore
+    @ObservationIgnored private var scanActivity: NSBackgroundActivityScheduler?
+    @ObservationIgnored private var screenshotActivity: NSBackgroundActivityScheduler?
+    @ObservationIgnored private var configured: (autoScan: Bool, frequency: ScanFrequency, rule: Bool)?
 
     private(set) var lastAutoRun: Date?
-    var loginItemError: String?
+    /// What macOS says about Yokoi's login item. The source of truth for the Settings toggle, since the
+    /// user can also change it in System Settings → General → Login Items.
+    private(set) var loginItem: LoginItemState = .off
+    private(set) var loginItemError: String?
 
     init(settings: SettingsStore, store: ScanStore) {
         self.settings = settings
@@ -127,6 +132,20 @@ final class BackgroundScheduler {
 
     // MARK: Login item
 
+    enum LoginItemState: Equatable {
+        case off, on
+        /// Registered, but switched off in Login Items, so it won't launch until the user allows it there.
+        case needsApproval
+
+        init(_ status: SMAppService.Status) {
+            switch status {
+            case .enabled: self = .on
+            case .requiresApproval: self = .needsApproval
+            default: self = .off  // .notRegistered, .notFound
+            }
+        }
+    }
+
     func setLaunchAtLogin(_ on: Bool) {
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
@@ -134,9 +153,19 @@ final class BackgroundScheduler {
         } catch {
             loginItemError = error.localizedDescription
         }
+        refreshLoginItem()
     }
 
-    var launchAtLoginEnabled: Bool { SMAppService.mainApp.status == .enabled }
+    /// Re-reads the status from macOS and keeps the saved setting in step with it.
+    func refreshLoginItem() {
+        loginItem = LoginItemState(SMAppService.mainApp.status)
+        let on = loginItem != .off
+        if settings.data.launchAtLogin != on { settings.data.launchAtLogin = on }
+    }
+
+    func openLoginItemsSettings() {
+        SMAppService.openSystemSettingsLoginItems()
+    }
 
     // MARK: Notifications
 

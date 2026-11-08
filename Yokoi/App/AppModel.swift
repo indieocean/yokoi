@@ -164,6 +164,7 @@ final class AppModel {
         if demo { fullDiskAccess = true }
         showOnboarding = !fullDiskAccess && !settings.data.hasCompletedOnboarding
         scheduler.configure()
+        if !demo { scheduler.refreshLoginItem() }
         IntentRouter.attach(self)
         AppDelegate.model = self
     }
