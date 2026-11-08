@@ -5844,27 +5844,15 @@
           }
         },
         "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld項目は、過去%2$lld日以内に変更されたプロジェクトに属しています"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld項目は、過去%2$lld日以内に変更されたプロジェクトに属しています"
           }
         },
         "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "항목 %1$lld개가 최근 %2$lld일 이내에 변경된 프로젝트에 속합니다"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "항목 %1$lld개가 최근 %2$lld일 이내에 변경된 프로젝트에 속합니다"
           }
         },
         "pt-BR" : {
@@ -5916,27 +5904,15 @@
           }
         },
         "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld 项属于最近 %2$lld 天内有改动的项目"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld 项属于最近 %2$lld 天内有改动的项目"
           }
         },
         "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld 個項目屬於最近 %2$lld 天內有變更的專案"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld 個項目屬於最近 %2$lld 天內有變更的專案"
           }
         }
       }
@@ -6293,27 +6269,15 @@
           }
         },
         "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld項目を処理しました（%2$@）。%3$lld個のパスをスキップしました。"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld項目を処理しました（%2$@）。%3$lld個のパスをスキップしました。"
           }
         },
         "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "항목 %1$lld개 완료(%2$@). 경로 %3$lld개를 건너뛰었습니다."
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "항목 %1$lld개 완료(%2$@). 경로 %3$lld개를 건너뛰었습니다."
           }
         },
         "pt-BR" : {
@@ -6365,27 +6329,15 @@
           }
         },
         "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "已完成 %1$lld 项（%2$@）。跳过了 %3$lld 个路径。"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "已完成 %1$lld 项（%2$@）。跳过了 %3$lld 个路径。"
           }
         },
         "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "已完成 %1$lld 個項目（%2$@）。已略過 %3$lld 個路徑。"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "已完成 %1$lld 個項目（%2$@）。已略過 %3$lld 個路徑。"
           }
         }
       }
@@ -6399,21 +6351,9 @@
           }
         },
         "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld von %2$lld Objekten"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld von %2$lld Objekten"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld von %2$lld Objekten"
           }
         },
         "en" : {
@@ -6451,18 +6391,28 @@
           }
         },
         "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld élément sur %2$lld"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld éléments sur %2$lld"
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%#@n@ sur %2$lld"
+          },
+          "substitutions" : {
+            "n" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg élément"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg éléments"
+                    }
+                  }
                 }
               }
             }
@@ -6475,69 +6425,55 @@
           }
         },
         "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%2$lld項目中%1$lld項目"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%2$lld項目中%1$lld項目"
           }
         },
         "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "항목 %1$lld/%2$lld개"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "항목 %1$lld/%2$lld개"
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld item de %2$lld"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld itens de %2$lld"
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%#@n@ de %2$lld"
+          },
+          "substitutions" : {
+            "n" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg item"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg itens"
+                    }
+                  }
                 }
               }
             }
           }
         },
         "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld / %2$lld 项"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld / %2$lld 项"
           }
         },
         "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld 個項目，共 %2$lld 個"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld 個項目，共 %2$lld 個"
           }
         }
       }
@@ -8117,21 +8053,9 @@
           }
         },
         "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld von %2$lld Befehlen fehlgeschlagen"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld von %2$lld Befehlen fehlgeschlagen"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld von %2$lld Befehlen fehlgeschlagen"
           }
         },
         "en" : {
@@ -8163,36 +8087,76 @@
           }
         },
         "es" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Falló %1$lld de %2$lld comandos"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Fallaron %1$lld de %2$lld comandos"
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%#@n@ de %2$lld comandos"
+          },
+          "substitutions" : {
+            "n" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "Falló %arg"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "Fallaron %arg"
+                    }
+                  }
                 }
               }
             }
           }
         },
         "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld commande sur %2$lld a échoué"
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%#@n@ sur %2$lld %#@v@"
+          },
+          "substitutions" : {
+            "n" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg commande"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg commandes"
+                    }
+                  }
                 }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld commandes sur %2$lld ont échoué"
+              }
+            },
+            "v" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "a échoué"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "ont échoué"
+                    }
+                  }
                 }
               }
             }
@@ -8205,69 +8169,75 @@
           }
         },
         "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%2$lld個中%1$lld個のコマンドが失敗しました"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%2$lld個中%1$lld個のコマンドが失敗しました"
           }
         },
         "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "명령 %2$lld개 중 %1$lld개 실패"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "명령 %2$lld개 중 %1$lld개 실패"
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld de %2$lld comandos falhou"
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%#@n@ de %2$lld comandos %#@v@"
+          },
+          "substitutions" : {
+            "n" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg"
+                    }
+                  }
                 }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld de %2$lld comandos falharam"
+              }
+            },
+            "v" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "falhou"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "falharam"
+                    }
+                  }
                 }
               }
             }
           }
         },
         "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%2$lld 个命令中有 %1$lld 个失败"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%2$lld 个命令中有 %1$lld 个失败"
           }
         },
         "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%2$lld 個指令中有 %1$lld 個失敗"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%2$lld 個指令中有 %1$lld 個失敗"
           }
         }
       }
@@ -8282,21 +8252,9 @@
           }
         },
         "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld von %2$lld ausgewählt"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld von %2$lld ausgewählt"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld von %2$lld ausgewählt"
           }
         },
         "en" : {
@@ -8312,18 +8270,48 @@
           }
         },
         "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld sur %2$lld choisi"
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%#@n@ sur %2$lld %#@v@"
+          },
+          "substitutions" : {
+            "n" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg"
+                    }
+                  }
                 }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld sur %2$lld choisis"
+              }
+            },
+            "v" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "choisi"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "choisis"
+                    }
+                  }
                 }
               }
             }
@@ -8336,69 +8324,75 @@
           }
         },
         "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%2$lld個中%1$lld個を選択"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%2$lld個中%1$lld個を選択"
           }
         },
         "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%2$lld개 중 %1$lld개 선택됨"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%2$lld개 중 %1$lld개 선택됨"
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld de %2$lld selecionado"
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%#@n@ de %2$lld %#@v@"
+          },
+          "substitutions" : {
+            "n" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "%arg"
+                    }
+                  }
                 }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld de %2$lld selecionados"
+              }
+            },
+            "v" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "selecionado"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "needs_review",
+                      "value" : "selecionados"
+                    }
+                  }
                 }
               }
             }
           }
         },
         "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "已选 %1$lld 个，共 %2$lld 个"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "已选 %1$lld 个，共 %2$lld 个"
           }
         },
         "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "已挑選 %1$lld 個，共 %2$lld 個"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "已挑選 %1$lld 個，共 %2$lld 個"
           }
         }
       }
@@ -20985,27 +20979,15 @@
           }
         },
         "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%1$lld個のキャッシュと%2$lld項目を消去しますか?"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "%1$lld個のキャッシュと%2$lld項目を消去しますか?"
           }
         },
         "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "캐시 %1$lld개와 항목 %2$lld개를 지우겠습니까?"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "캐시 %1$lld개와 항목 %2$lld개를 지우겠습니까?"
           }
         },
         "pt-BR" : {
@@ -21057,27 +21039,15 @@
           }
         },
         "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "清除 %1$lld 个缓存和 %2$lld 个项目？"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "清除 %1$lld 个缓存和 %2$lld 个项目？"
           }
         },
         "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "要清除 %1$lld 個快取和 %2$lld 個項目嗎？"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "要清除 %1$lld 個快取和 %2$lld 個項目嗎？"
           }
         }
       }
@@ -70321,21 +70291,9 @@
           }
         },
         "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Objekt %1$lld von %2$lld · %3$@ Dateien"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Objekt %1$lld von %2$lld · %3$@ Dateien"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Objekt %1$lld von %2$lld · %3$@ Dateien"
           }
         },
         "en" : {
@@ -70363,27 +70321,15 @@
           }
         },
         "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "項目 %1$lld/%2$lld · %3$@個のファイル"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "項目 %1$lld/%2$lld · %3$@個のファイル"
           }
         },
         "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "항목 %1$lld/%2$lld · 파일 %3$@개"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "항목 %1$lld/%2$lld · 파일 %3$@개"
           }
         },
         "pt-BR" : {
@@ -70399,15 +70345,9 @@
           }
         },
         "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "第 %1$lld 個項目，共 %2$lld 個 · %3$@ 個檔案"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "第 %1$lld 個項目，共 %2$lld 個 · %3$@ 個檔案"
           }
         }
       }
@@ -70422,21 +70362,9 @@
           }
         },
         "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Objekt %1$lld von %2$lld · %3$@ Dateien · %4$@"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Objekt %1$lld von %2$lld · %3$@ Dateien · %4$@"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Objekt %1$lld von %2$lld · %3$@ Dateien · %4$@"
           }
         },
         "en" : {
@@ -70464,27 +70392,15 @@
           }
         },
         "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "項目 %1$lld/%2$lld · %3$@個のファイル · %4$@"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "項目 %1$lld/%2$lld · %3$@個のファイル · %4$@"
           }
         },
         "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "항목 %1$lld/%2$lld · 파일 %3$@개 · %4$@"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "항목 %1$lld/%2$lld · 파일 %3$@개 · %4$@"
           }
         },
         "pt-BR" : {
@@ -70500,15 +70416,9 @@
           }
         },
         "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "第 %1$lld 個項目，共 %2$lld 個 · %3$@ 個檔案 · %4$@"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "第 %1$lld 個項目，共 %2$lld 個 · %3$@ 個檔案 · %4$@"
           }
         }
       }
