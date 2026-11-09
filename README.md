@@ -18,6 +18,12 @@ brew install --cask indieocean/tap/yokoi
 </p>
 
 <p align="center">
+  🌍 <b>Available in 11 languages</b><br>
+  English · 日本語 · 简体中文 · 繁體中文 · 한국어 · Español · Português (Brasil) · Deutsch · Français · العربية · עברית<br>
+  <sub>Follows your Mac's language · <a href="#faq">pick one just for Yokoi</a> · <a href="docs/DEVELOPMENT.md#translations">help translate</a></sub>
+</p>
+
+<p align="center">
   <a href="https://www.producthunt.com/products/yokoi?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-yokoi" target="_blank" rel="noopener noreferrer"><img alt="Yokoi - A native macOS cleaner built for developers | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1301013&amp;theme=light&amp;t=1793585003121"></a>
 </p>
 

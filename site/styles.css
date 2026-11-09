@@ -189,6 +189,18 @@ h1 .grad { padding-bottom: 0.08em; display: inline-block; }
 .kpi-sub.ok { color: var(--success); }
 .kpi-sub.accent { color: #A78BFA; }
 
+/* Languages */
+.langs { margin-top: 40px; text-align: center; }
+.langs-title { margin: 0 0 14px; font-size: 15px; color: var(--text-2); }
+.langs-title b { color: var(--text); font-weight: 600; }
+.langs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.langs-list li {
+  padding: 6px 14px; border-radius: 999px; font-size: 14px; color: var(--text);
+  background: linear-gradient(180deg, var(--card), var(--card-2)); border: 1px solid var(--stroke);
+}
+.langs-note { margin: 14px auto 0; max-width: 640px; font-size: 13px; color: var(--text-3); }
+a.pill:hover { background: color-mix(in srgb, var(--pc) 18%, transparent); }
+
 /* Sections */
 .section { padding-top: 140px; }
 .section-head { max-width: 720px; margin: 0 auto 48px; text-align: center; }
